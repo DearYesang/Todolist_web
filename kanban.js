@@ -302,7 +302,7 @@
             const card = document.createElement('div');
             card.className = 'task-card' + (depth > 0 ? ' child-card' : '');
             card.dataset.priority = task.priority;
-            if (depth > 0) card.style.marginLeft = `${depth * 18}px`;
+            if (depth > 0) card.style.marginLeft = `${depth * 32}px`;
 
             // 드래그 앤 드롭 이벤트 적용
             card.setAttribute('draggable', 'true');

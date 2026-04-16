@@ -359,13 +359,13 @@
         .drag-over-card { border: 2px dashed var(--accent) !important; background: var(--surface-hover); }
 
         /* 자식 카드 들여쓰기 */
-        .task-card.child-card { margin-left: 18px; border-left-width: 3px; }
+        .task-card.child-card { margin-left: 32px; border-left-width: 3px; }
         .task-card.child-card::before {
             content: '';
             position: absolute;
-            left: -14px;
+            left: -24px;
             top: 18px;
-            width: 10px;
+            width: 16px;
             height: 1px;
             background: var(--border);
         }
