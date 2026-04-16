@@ -361,6 +361,11 @@
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
+        /* 드래그 앤 드롭 효과 */
+        .task-card.dragging { opacity: 0.4; transform: scale(0.98); z-index: 100; }
+        .drag-over-col { background: var(--surface-hover); }
+        .drag-over-card { border: 2px dashed var(--accent) !important; background: var(--surface-hover); }
+
         /* 자식 카드 들여쓰기 */
         .task-card.child-card { margin-left: 18px; border-left-width: 3px; }
         .task-card.child-card::before {
@@ -699,6 +704,7 @@
         // ==========================================
         let tasks = JSON.parse(localStorage.getItem('kanbanTasks')) || [];
         let selectedPriority = 'medium';
+        let draggedTaskId = null;
         let selectedUrgency = 'normal';
         let filters = { priority: 'all', urgency: 'all', category: 'all' };
 
@@ -840,6 +846,97 @@
         }
 
         // ==========================================
+        // 드래그 앤 드롭 로직
+        // ==========================================
+        function handleDragStart(e, taskId) {
+            draggedTaskId = taskId;
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', taskId);
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.drag-over-col, .drag-over-card').forEach(el => {
+                el.classList.remove('drag-over-col', 'drag-over-card');
+            });
+            draggedTaskId = null;
+        }
+
+        function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+
+        function handleDragEnterCol(e) {
+            e.preventDefault();
+            if (e.currentTarget.classList.contains('task-list')) {
+                e.currentTarget.classList.add('drag-over-col');
+            }
+        }
+
+        function handleDragLeaveCol(e) {
+            if (e.currentTarget.classList.contains('task-list')) {
+                e.currentTarget.classList.remove('drag-over-col');
+            }
+        }
+
+        function handleDragEnterCard(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.currentTarget.dataset.taskId !== draggedTaskId) {
+                e.currentTarget.classList.add('drag-over-card');
+            }
+        }
+
+        function handleDragLeaveCard(e) {
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drag-over-card');
+        }
+
+        function handleDropOnCol(e, newStatus) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over-col');
+            const taskId = e.dataTransfer.getData('text/plain');
+            if (taskId) {
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.status = newStatus;
+                    task.parentId = null; // 루트로 분리
+                    renderBoard();
+                }
+            }
+        }
+
+        function handleDropOnCard(e, targetTaskId) {
+            e.preventDefault();
+            e.stopPropagation(); // 칼럼 드롭 이벤트 방지
+            e.currentTarget.classList.remove('drag-over-card');
+            const taskId = e.dataTransfer.getData('text/plain');
+            
+            if (taskId && taskId !== targetTaskId) {
+                // 순환 참조 방지
+                let isDescendant = false;
+                let current = tasks.find(t => t.id === targetTaskId);
+                while (current) {
+                    if (current.parentId === taskId) {
+                        isDescendant = true; break;
+                    }
+                    current = tasks.find(t => t.id === current.parentId);
+                }
+
+                if (!isDescendant) {
+                    const task = tasks.find(t => t.id === taskId);
+                    const parentTask = tasks.find(t => t.id === targetTaskId);
+                    if (task && parentTask) {
+                        task.parentId = targetTaskId;
+                        task.status = parentTask.status; // 부모 상태 동기화
+                        renderBoard();
+                    }
+                } else {
+                    alert('하위 작업을 해당 작업의 부모로 설정할 수 없습니다.');
+                }
+            }
+        }
+
+        // ==========================================
         // 렌더링
         // ==========================================
         function renderBoard() {
@@ -847,6 +944,12 @@
             statuses.forEach(status => {
                 const list = document.getElementById(`list-${status}`);
                 list.innerHTML = '';
+                
+                // 드래그 앤 드롭 이벤트 적용
+                list.ondragover = handleDragOver;
+                list.ondragenter = handleDragEnterCol;
+                list.ondragleave = handleDragLeaveCol;
+                list.ondrop = (e) => handleDropOnCol(e, status);
 
                 const columnTasks = tasks.filter(t => t.status === status && passesFilter(t));
 
@@ -901,6 +1004,16 @@
             card.className = 'task-card' + (depth > 0 ? ' child-card' : '');
             card.dataset.priority = task.priority;
             if (depth > 0) card.style.marginLeft = `${depth * 18}px`;
+
+            // 드래그 앤 드롭 이벤트 적용
+            card.setAttribute('draggable', 'true');
+            card.dataset.taskId = task.id;
+            card.ondragstart = (e) => handleDragStart(e, task.id);
+            card.ondragend = handleDragEnd;
+            card.ondragover = handleDragOver;
+            card.ondragenter = handleDragEnterCard;
+            card.ondragleave = handleDragLeaveCard;
+            card.ondrop = (e) => handleDropOnCard(e, task.id);
 
             // 자식 수 계산 (모든 칼럼 걸쳐)
             const allChildren = tasks.filter(t => t.parentId === task.id);
