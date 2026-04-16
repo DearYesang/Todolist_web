@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>크로스 플랫폼 칸반 보드</title>
+    <style>
+        /* 기본 스타일 및 반응형 레이아웃 */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f5f7; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #172b4d; }
+        
+        .board { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; overflow-x: auto; padding-bottom: 20px; }
+        .column { background-color: #ebecf0; border-radius: 10px; width: 33.33%; min-width: 280px; padding: 15px; display: flex; flex-direction: column; }
+        .column h2 { font-size: 16px; color: #172b4d; margin-top: 0; margin-bottom: 15px; display: flex; justify-content: space-between; }
+        
+        .task-list { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; }
+        .task-card { background-color: white; border-radius: 5px; padding: 15px; box-shadow: 0 1px 2px rgba(9,30,66,0.25); position: relative; }
+        .task-text { margin-bottom: 15px; word-break: break-all; }
+        
+        /* 모바일 환경을 고려한 이동 버튼 */
+        .task-actions { display: flex; justify-content: space-between; }
+        .btn { padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn-move { background-color: #0079bf; color: white; }
+        .btn-delete { background-color: #eb5a46; color: white; }
+        
+        /* 할 일 추가 영역 */
+        .add-task-container { display: flex; margin-bottom: 20px; max-width: 1200px; margin: 0 auto 30px auto; gap: 10px; }
+        #new-task-input { flex-grow: 1; padding: 12px; border: 1px solid #dfe1e6; border-radius: 5px; font-size: 16px; }
+        #add-btn { padding: 12px 24px; background-color: #5aac44; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; }
+
+        /* 화면이 좁아지면(모바일) 기둥을 세로로 배치합니다 */
+        @media (max-width: 768px) {
+            .board { flex-direction: column; }
+            .column { width: auto; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 나의 칸반 보드</h1>
+
+    <div class="add-task-container">
+        <input type="text" id="new-task-input" placeholder="새로운 할 일을 입력하세요...">
+        <button id="add-btn" onclick="addTask()">추가</button>
+    </div>
+
+    <div class="board">
+        <div class="column" id="col-todo">
+            <h2>할 일 (To Do)</h2>
+            <div class="task-list" id="list-todo"></div>
+        </div>
+
+        <div class="column" id="col-doing">
+            <h2>진행 중 (Doing)</h2>
+            <div class="task-list" id="list-doing"></div>
+        </div>
+
+        <div class="column" id="col-done">
+            <h2>완료 (Done)</h2>
+            <div class="task-list" id="list-done"></div>
+        </div>
+    </div>
+
+    <script>
+        // 데이터 구조: 각 할 일은 id, 내용, 상태(todo, doing, done)를 가집니다.
+        let tasks = JSON.parse(localStorage.getItem('kanbanTasks')) || [];
+
+        // 화면을 그려주는 함수
+        function renderBoard() {
+            // 각 리스트 초기화
+            document.getElementById('list-todo').innerHTML = '';
+            document.getElementById('list-doing').innerHTML = '';
+            document.getElementById('list-done').innerHTML = '';
+
+            tasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = 'task-card';
+                
+                // 상태에 따라 보여줄 버튼 결정
+                let moveButtons = '';
+                if (task.status === 'todo') {
+                    moveButtons = `<button class="btn btn-move" onclick="moveTask('${task.id}', 'doing')">진행 중으로 ➔</button>`;
+                } else if (task.status === 'doing') {
+                    moveButtons = `
+                        <button class="btn btn-move" onclick="moveTask('${task.id}', 'todo')">⬅️ 할 일로</button>
+                        <button class="btn btn-move" onclick="moveTask('${task.id}', 'done')">완료로 ➔</button>
+                    `;
+                } else if (task.status === 'done') {
+                    moveButtons = `<button class="btn btn-move" onclick="moveTask('${task.id}', 'doing')">⬅️ 진행 중으로</button>`;
+                }
+
+                card.innerHTML = `
+                    <div class="task-text">${task.text}</div>
+                    <div class="task-actions">
+                        <div>${moveButtons}</div>
+                        <button class="btn btn-delete" onclick="deleteTask('${task.id}')">삭제</button>
+                    </div>
+                `;
+
+                // 해당 상태의 컬럼에 카드 추가
+                document.getElementById(`list-${task.status}`).appendChild(card);
+            });
+
+            // 데이터 변경 시 로컬 스토리지에 저장 (임시 동기화 대체)
+            localStorage.setItem('kanbanTasks', JSON.stringify(tasks));
+        }
+
+        // 새로운 할 일 추가
+        function addTask() {
+            const input = document.getElementById('new-task-input');
+            const text = input.value.trim();
+            if (text) {
+                const newTask = {
+                    id: Date.now().toString(), // 고유 ID 부여
+                    text: text,
+                    status: 'todo' // 처음엔 항상 '할 일'
+                };
+                tasks.push(newTask);
+                input.value = '';
+                renderBoard();
+            }
+        }
+
+        // 상태 이동 (할 일 <-> 진행 중 <-> 완료)
+        function moveTask(id, newStatus) {
+            const taskIndex = tasks.findIndex(t => t.id === id);
+            if (taskIndex !== -1) {
+                tasks[taskIndex].status = newStatus;
+                renderBoard();
+            }
+        }
+
+        // 할 일 삭제
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            renderBoard();
+        }
+
+        // 엔터키 입력 지원
+        document.getElementById('new-task-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') addTask();
+        });
+
+        // 처음 시작 시 화면 그리기
+        renderBoard();
+    </script>
+
+</body>
+</html>
