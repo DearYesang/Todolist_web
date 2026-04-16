@@ -224,6 +224,24 @@
         .priority-pill.active[data-p="medium"] { background: var(--priority-medium-bg); color: var(--priority-medium); border-color: var(--priority-medium); }
         .priority-pill.active[data-p="low"] { background: var(--priority-low-bg); color: var(--priority-low); border-color: var(--priority-low); }
 
+        /* 시급성 선택 */
+        .urgency-pills { display: flex; gap: 6px; }
+        .urgency-pill {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all var(--transition);
+        }
+        .urgency-pill:hover { border-color: #484f58; }
+        .urgency-pill.active[data-u="urgent"] { background: var(--priority-high-bg); color: var(--priority-high); border-color: var(--priority-high); }
+        .urgency-pill.active[data-u="normal"] { background: var(--priority-low-bg); color: var(--priority-low); border-color: var(--priority-low); }
+
         /* ===== 필터 바 ===== */
         .filter-bar {
             max-width: 1320px;
@@ -375,6 +393,17 @@
         .priority-badge.high { background: var(--priority-high-bg); color: var(--priority-high); }
         .priority-badge.medium { background: var(--priority-medium-bg); color: var(--priority-medium); }
         .priority-badge.low { background: var(--priority-low-bg); color: var(--priority-low); }
+
+        .urgency-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .urgency-badge.urgent { background: var(--priority-high-bg); color: var(--priority-high); }
+        .urgency-badge.normal { background: var(--border-light); color: var(--text-secondary); }
 
         .category-tag {
             font-size: 10px;
@@ -594,6 +623,13 @@
                 </div>
             </div>
             <div class="form-row">
+                <label class="form-label">시급성</label>
+                <div class="urgency-pills" id="urgency-pills">
+                    <button class="urgency-pill" data-u="urgent" onclick="selectUrgency('urgent')">🔥 시급</button>
+                    <button class="urgency-pill active" data-u="normal" onclick="selectUrgency('normal')">⏳ 여유</button>
+                </div>
+            </div>
+            <div class="form-row">
                 <label class="form-label">카테고리</label>
                 <input type="text" class="form-input" id="category-input" placeholder="예: 개발, 디자인, 마케팅..." list="category-list" style="min-width:140px;">
                 <datalist id="category-list"></datalist>
@@ -618,6 +654,11 @@
         <button class="filter-chip" data-filter="priority" data-value="high" onclick="setFilter('priority','high')">🔴 높음</button>
         <button class="filter-chip" data-filter="priority" data-value="medium" onclick="setFilter('priority','medium')">🟡 보통</button>
         <button class="filter-chip" data-filter="priority" data-value="low" onclick="setFilter('priority','low')">🟢 낮음</button>
+        <div class="filter-divider"></div>
+        <span class="filter-label">시급성</span>
+        <button class="filter-chip active" data-filter="urgency" data-value="all" onclick="setFilter('urgency','all')">전체</button>
+        <button class="filter-chip" data-filter="urgency" data-value="urgent" onclick="setFilter('urgency','urgent')">🔥 시급</button>
+        <button class="filter-chip" data-filter="urgency" data-value="normal" onclick="setFilter('urgency','normal')">⏳ 여유</button>
         <div class="filter-divider"></div>
         <span class="filter-label">카테고리</span>
         <button class="filter-chip active" data-filter="category" data-value="all" onclick="setFilter('category','all')">전체</button>
@@ -658,7 +699,8 @@
         // ==========================================
         let tasks = JSON.parse(localStorage.getItem('kanbanTasks')) || [];
         let selectedPriority = 'medium';
-        let filters = { priority: 'all', category: 'all' };
+        let selectedUrgency = 'normal';
+        let filters = { priority: 'all', urgency: 'all', category: 'all' };
 
         // 기존 데이터 마이그레이션
         tasks = tasks.map(t => ({
@@ -666,6 +708,7 @@
             text: t.text || '',
             status: t.status || 'todo',
             priority: t.priority || 'medium',
+            urgency: t.urgency || 'normal',
             category: t.category || '',
             parentId: t.parentId || null,
             subtasks: t.subtasks || [],
@@ -729,6 +772,13 @@
             });
         }
 
+        function selectUrgency(u) {
+            selectedUrgency = u;
+            document.querySelectorAll('.urgency-pill').forEach(pill => {
+                pill.classList.toggle('active', pill.dataset.u === u);
+            });
+        }
+
         function updateParentSelect() {
             const sel = document.getElementById('parent-select');
             sel.innerHTML = '<option value="">없음 (최상위)</option>';
@@ -784,6 +834,7 @@
 
         function passesFilter(task) {
             if (filters.priority !== 'all' && task.priority !== filters.priority) return false;
+            if (filters.urgency !== 'all' && task.urgency !== filters.urgency) return false;
             if (filters.category !== 'all' && task.category !== filters.category) return false;
             return true;
         }
@@ -865,10 +916,12 @@
                 }
             }
 
-            // 메타 바 (우선순위 + 카테고리 + 부모)
+            // 메타 바 (우선순위 + 시급성 + 카테고리 + 부모)
             const priorityLabels = { high: '높음', medium: '보통', low: '낮음' };
+            const urgencyLabels = { urgent: '🔥 시급', normal: '⏳ 여유' };
             let metaHTML = `<div class="card-meta">`;
             metaHTML += `<span class="priority-badge ${task.priority}">${priorityLabels[task.priority]}</span>`;
+            metaHTML += `<span class="urgency-badge ${task.urgency}">${urgencyLabels[task.urgency]}</span>`;
             if (task.category) {
                 const cc = getCategoryColor(task.category);
                 metaHTML += `<span class="category-tag" style="background:${cc.bg};color:${cc.fg};border-color:${cc.border}">${task.category}</span>`;
@@ -971,6 +1024,7 @@
                 text,
                 status: parentId ? (tasks.find(t => t.id === parentId)?.status || 'todo') : 'todo',
                 priority: selectedPriority,
+                urgency: selectedUrgency,
                 category,
                 parentId,
                 subtasks: [],
@@ -983,6 +1037,7 @@
             document.getElementById('category-input').value = '';
             document.getElementById('parent-select').value = '';
             selectPriority('medium');
+            selectUrgency('normal');
 
             renderBoard();
             toggleAddForm();
