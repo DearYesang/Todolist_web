@@ -136,7 +136,9 @@ xdg-open kanban.html    # Linux
 
 ```
 Todolist/
-├── kanban.html    # 메인 애플리케이션 (HTML + CSS + JS 단일 파일)
+├── kanban.html    # 앱 구조 및 마크업 (HTML)
+├── kanban.css     # 스타일링 및 컴포넌트 디자인 (CSS)
+├── kanban.js      # 기능 로직, 데이터 관리, 상태 제어 (JS)
 └── README.md      # 프로젝트 문서
 ```
 
