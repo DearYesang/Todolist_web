@@ -4,144 +4,1084 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>크로스 플랫폼 칸반 보드</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* 기본 스타일 및 반응형 레이아웃 */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f5f7; margin: 0; padding: 20px; }
-        h1 { text-align: center; color: #172b4d; }
-        
-        .board { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; overflow-x: auto; padding-bottom: 20px; }
-        .column { background-color: #ebecf0; border-radius: 10px; width: 33.33%; min-width: 280px; padding: 15px; display: flex; flex-direction: column; }
-        .column h2 { font-size: 16px; color: #172b4d; margin-top: 0; margin-bottom: 15px; display: flex; justify-content: space-between; }
-        
-        .task-list { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; }
-        .task-card { background-color: white; border-radius: 5px; padding: 15px; box-shadow: 0 1px 2px rgba(9,30,66,0.25); position: relative; }
-        .task-text { margin-bottom: 15px; word-break: break-all; }
-        
-        /* 모바일 환경을 고려한 이동 버튼 */
-        .task-actions { display: flex; justify-content: space-between; }
-        .btn { padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .btn-move { background-color: #0079bf; color: white; }
-        .btn-delete { background-color: #eb5a46; color: white; }
-        
-        /* 할 일 추가 영역 */
-        .add-task-container { display: flex; margin-bottom: 20px; max-width: 1200px; margin: 0 auto 30px auto; gap: 10px; }
-        #new-task-input { flex-grow: 1; padding: 12px; border: 1px solid #dfe1e6; border-radius: 5px; font-size: 16px; }
-        #add-btn { padding: 12px 24px; background-color: #5aac44; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --surface-raised: #1c2129;
+            --surface-hover: #21262d;
+            --border: #30363d;
+            --border-light: #21262d;
+            --text: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent: #58a6ff;
+            --accent-glow: rgba(88, 166, 255, 0.15);
 
-        /* 화면이 좁아지면(모바일) 기둥을 세로로 배치합니다 */
-        @media (max-width: 768px) {
-            .board { flex-direction: column; }
-            .column { width: auto; min-width: auto; }
+            --priority-high: #f85149;
+            --priority-high-bg: rgba(248, 81, 73, 0.12);
+            --priority-medium: #d29922;
+            --priority-medium-bg: rgba(210, 153, 34, 0.12);
+            --priority-low: #3fb950;
+            --priority-low-bg: rgba(63, 185, 80, 0.12);
+
+            --col-todo: #58a6ff;
+            --col-doing: #d29922;
+            --col-done: #3fb950;
+
+            --radius: 10px;
+            --radius-sm: 6px;
+            --shadow: 0 3px 12px rgba(0,0,0,0.4);
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* ===== 헤더 ===== */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 18px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions { display: flex; gap: 8px; }
+
+        /* ===== 공통 버튼 ===== */
+        .btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            background: var(--surface-raised);
+            color: var(--text-secondary);
+            transition: all var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn:hover { background: var(--surface-hover); color: var(--text); border-color: #484f58; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            color: #fff;
+            border-color: #238636;
+            font-weight: 600;
+        }
+        .btn-primary:hover { background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%); border-color: #3fb950; }
+
+        .btn-accent {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .btn-accent:hover { background: #79c0ff; border-color: #79c0ff; }
+
+        .btn-danger {
+            color: var(--priority-high);
+            border-color: transparent;
+            background: transparent;
+            padding: 4px 8px;
+        }
+        .btn-danger:hover { background: var(--priority-high-bg); }
+
+        .btn-ghost {
+            background: transparent;
+            border-color: transparent;
+            padding: 4px 8px;
+        }
+        .btn-ghost:hover { background: var(--surface-hover); }
+
+        .btn-move {
+            background: transparent;
+            border-color: var(--border);
+            color: var(--text-secondary);
+            font-size: 11px;
+            padding: 4px 10px;
+        }
+        .btn-move:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+
+        /* ===== 작업 추가 패널 ===== */
+        .add-panel {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 16px 24px;
+        }
+
+        .add-toggle {
+            width: 100%;
+            padding: 12px 18px;
+            background: var(--surface);
+            border: 1px dashed var(--border);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            font-family: inherit;
+            text-align: left;
+            transition: all var(--transition);
+        }
+        .add-toggle:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+        .add-toggle.active { display: none; }
+
+        .add-form {
+            display: none;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            animation: slideDown 0.25s ease-out;
+        }
+        .add-form.active { display: block; }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+        .form-row:last-child { margin-bottom: 0; }
+
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 70px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input {
+            flex: 1;
+            padding: 10px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color var(--transition);
+            min-width: 200px;
+        }
+        .form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+        .form-select {
+            padding: 10px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            min-width: 160px;
+        }
+        .form-select:focus { outline: none; border-color: var(--accent); }
+
+        /* 우선순위 선택 */
+        .priority-pills { display: flex; gap: 6px; }
+        .priority-pill {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all var(--transition);
+        }
+        .priority-pill:hover { border-color: #484f58; }
+        .priority-pill.active[data-p="high"] { background: var(--priority-high-bg); color: var(--priority-high); border-color: var(--priority-high); }
+        .priority-pill.active[data-p="medium"] { background: var(--priority-medium-bg); color: var(--priority-medium); border-color: var(--priority-medium); }
+        .priority-pill.active[data-p="low"] { background: var(--priority-low-bg); color: var(--priority-low); border-color: var(--priority-low); }
+
+        /* ===== 필터 바 ===== */
+        .filter-bar {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 0 24px 14px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .filter-chip {
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all var(--transition);
+        }
+        .filter-chip:hover { border-color: #484f58; color: var(--text); }
+        .filter-chip.active { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+
+        .filter-divider { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
+
+        /* ===== 보드 레이아웃 ===== */
+        .board {
+            display: flex;
+            gap: 16px;
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 0 24px 30px;
+            min-height: calc(100vh - 260px);
+        }
+
+        .column {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 220px);
+        }
+
+        .column-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+        }
+
+        .column-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        #col-todo .column-dot { background: var(--col-todo); box-shadow: 0 0 8px var(--col-todo); }
+        #col-doing .column-dot { background: var(--col-doing); box-shadow: 0 0 8px var(--col-doing); }
+        #col-done .column-dot { background: var(--col-done); box-shadow: 0 0 8px var(--col-done); }
+
+        .column-title { font-size: 14px; font-weight: 600; }
+
+        .column-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--bg);
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .task-list {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* ===== 카드 ===== */
+        .task-card {
+            background: var(--surface-raised);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            transition: all var(--transition);
+            animation: cardIn 0.25s ease-out;
+            position: relative;
+            border-left: 3px solid transparent;
+        }
+        .task-card:hover { border-color: #484f58; border-left-color: inherit; background: var(--surface-hover); }
+
+        .task-card[data-priority="high"] { border-left-color: var(--priority-high); }
+        .task-card[data-priority="medium"] { border-left-color: var(--priority-medium); }
+        .task-card[data-priority="low"] { border-left-color: var(--priority-low); }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(6px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* 자식 카드 들여쓰기 */
+        .task-card.child-card { margin-left: 18px; border-left-width: 3px; }
+        .task-card.child-card::before {
+            content: '';
+            position: absolute;
+            left: -14px;
+            top: 18px;
+            width: 10px;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* 카드 상단 메타 */
+        .card-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .priority-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .priority-badge.high { background: var(--priority-high-bg); color: var(--priority-high); }
+        .priority-badge.medium { background: var(--priority-medium-bg); color: var(--priority-medium); }
+        .priority-badge.low { background: var(--priority-low-bg); color: var(--priority-low); }
+
+        .category-tag {
+            font-size: 10px;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid;
+        }
+
+        .parent-indicator {
+            font-size: 10px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .parent-indicator::before { content: '↳'; font-size: 12px; }
+
+        .card-text {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            word-break: break-word;
+            line-height: 1.5;
+        }
+
+        /* 접기/펼치기 버튼 */
+        .collapse-toggle {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 4px;
+            line-height: 1;
+            transition: transform var(--transition);
+            font-family: inherit;
+        }
+        .collapse-toggle:hover { color: var(--text); }
+        .collapse-toggle.collapsed { transform: rotate(-90deg); }
+
+        /* 하위 작업 카운트 */
+        .children-info {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 8px;
+            padding: 4px 8px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+        }
+
+        /* ===== 체크리스트 (서브태스크) ===== */
+        .subtask-section { margin-bottom: 10px; }
+
+        .subtask-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .subtask-progress-info {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: var(--bg);
+            border-radius: 2px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--col-done));
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .subtask-list { display: flex; flex-direction: column; gap: 3px; }
+
+        .subtask-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: background var(--transition);
+        }
+        .subtask-item:hover { background: var(--bg); }
+
+        .subtask-item input[type="checkbox"] {
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border: 1.5px solid var(--border);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            flex-shrink: 0;
+            transition: all var(--transition);
+            background: transparent;
+        }
+        .subtask-item input[type="checkbox"]:checked {
+            background: var(--col-done);
+            border-color: var(--col-done);
+        }
+        .subtask-item input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            top: -1px;
+            left: 2px;
+            font-size: 11px;
+            color: white;
+            font-weight: 700;
+        }
+
+        .subtask-text { font-size: 12px; color: var(--text-secondary); flex: 1; }
+        .subtask-text.done { text-decoration: line-through; color: var(--text-muted); }
+
+        .subtask-delete {
+            opacity: 0;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0px 4px;
+            transition: all var(--transition);
+        }
+        .subtask-item:hover .subtask-delete { opacity: 1; }
+        .subtask-delete:hover { color: var(--priority-high); }
+
+        .add-subtask-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .add-subtask-input {
+            flex: 1;
+            padding: 5px 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 12px;
+            font-family: inherit;
+        }
+        .add-subtask-input:focus { outline: none; border-color: var(--accent); }
+        .add-subtask-input::placeholder { color: var(--text-muted); }
+
+        /* ===== 카드 액션 ===== */
+        .card-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .move-btns { display: flex; gap: 4px; }
+
+        /* ===== 반응형 ===== */
+        @media (max-width: 900px) {
+            .board { flex-direction: column; }
+            .column { min-width: auto; max-height: none; }
+            .header { padding: 14px 16px; }
+            .add-panel, .filter-bar, .board { padding-left: 12px; padding-right: 12px; }
+        }
+
+        /* ===== 스크롤바 ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+        /* ===== 빈 상태 ===== */
+        .empty-state {
+            text-align: center;
+            padding: 30px 10px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .empty-state .icon { font-size: 28px; margin-bottom: 8px; }
     </style>
 </head>
 <body>
 
-    <h1>🚀 나의 칸반 보드</h1>
-
-    <div class="add-task-container">
-        <input type="text" id="new-task-input" placeholder="새로운 할 일을 입력하세요...">
-        <button id="add-btn" onclick="addTask()">추가</button>
+    <!-- 헤더 -->
+    <div class="header">
+        <h1>🚀 나의 칸반 보드</h1>
+        <div class="header-actions">
+            <button class="btn" onclick="clearAllDone()" title="완료된 작업 정리">🧹 정리</button>
+        </div>
     </div>
 
+    <!-- 작업 추가 패널 -->
+    <div class="add-panel">
+        <button class="add-toggle" id="add-toggle" onclick="toggleAddForm()">＋ 새 작업 추가...</button>
+        <div class="add-form" id="add-form">
+            <div class="form-row">
+                <label class="form-label">작업명</label>
+                <input type="text" class="form-input" id="new-task-input" placeholder="무엇을 해야 하나요?">
+            </div>
+            <div class="form-row">
+                <label class="form-label">우선순위</label>
+                <div class="priority-pills" id="priority-pills">
+                    <button class="priority-pill" data-p="high" onclick="selectPriority('high')">🔴 높음</button>
+                    <button class="priority-pill active" data-p="medium" onclick="selectPriority('medium')">🟡 보통</button>
+                    <button class="priority-pill" data-p="low" onclick="selectPriority('low')">🟢 낮음</button>
+                </div>
+            </div>
+            <div class="form-row">
+                <label class="form-label">카테고리</label>
+                <input type="text" class="form-input" id="category-input" placeholder="예: 개발, 디자인, 마케팅..." list="category-list" style="min-width:140px;">
+                <datalist id="category-list"></datalist>
+            </div>
+            <div class="form-row">
+                <label class="form-label">상위 작업</label>
+                <select class="form-select" id="parent-select">
+                    <option value="">없음 (최상위)</option>
+                </select>
+            </div>
+            <div class="form-row" style="justify-content: flex-end; gap: 8px;">
+                <button class="btn" onclick="toggleAddForm()">취소</button>
+                <button class="btn btn-primary" onclick="addTask()">✚ 작업 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 필터 바 -->
+    <div class="filter-bar" id="filter-bar">
+        <span class="filter-label">필터</span>
+        <button class="filter-chip active" data-filter="priority" data-value="all" onclick="setFilter('priority','all')">전체</button>
+        <button class="filter-chip" data-filter="priority" data-value="high" onclick="setFilter('priority','high')">🔴 높음</button>
+        <button class="filter-chip" data-filter="priority" data-value="medium" onclick="setFilter('priority','medium')">🟡 보통</button>
+        <button class="filter-chip" data-filter="priority" data-value="low" onclick="setFilter('priority','low')">🟢 낮음</button>
+        <div class="filter-divider"></div>
+        <span class="filter-label">카테고리</span>
+        <button class="filter-chip active" data-filter="category" data-value="all" onclick="setFilter('category','all')">전체</button>
+        <span id="category-filters"></span>
+    </div>
+
+    <!-- 보드 -->
     <div class="board">
         <div class="column" id="col-todo">
-            <h2>할 일 (To Do)</h2>
+            <div class="column-header">
+                <div class="column-dot"></div>
+                <span class="column-title">할 일</span>
+                <span class="column-count" id="count-todo">0</span>
+            </div>
             <div class="task-list" id="list-todo"></div>
         </div>
-
         <div class="column" id="col-doing">
-            <h2>진행 중 (Doing)</h2>
+            <div class="column-header">
+                <div class="column-dot"></div>
+                <span class="column-title">진행 중</span>
+                <span class="column-count" id="count-doing">0</span>
+            </div>
             <div class="task-list" id="list-doing"></div>
         </div>
-
         <div class="column" id="col-done">
-            <h2>완료 (Done)</h2>
+            <div class="column-header">
+                <div class="column-dot"></div>
+                <span class="column-title">완료</span>
+                <span class="column-count" id="count-done">0</span>
+            </div>
             <div class="task-list" id="list-done"></div>
         </div>
     </div>
 
     <script>
-        // 데이터 구조: 각 할 일은 id, 내용, 상태(todo, doing, done)를 가집니다.
+        // ==========================================
+        // 데이터 관리
+        // ==========================================
         let tasks = JSON.parse(localStorage.getItem('kanbanTasks')) || [];
+        let selectedPriority = 'medium';
+        let filters = { priority: 'all', category: 'all' };
 
-        // 화면을 그려주는 함수
-        function renderBoard() {
-            // 각 리스트 초기화
-            document.getElementById('list-todo').innerHTML = '';
-            document.getElementById('list-doing').innerHTML = '';
-            document.getElementById('list-done').innerHTML = '';
+        // 기존 데이터 마이그레이션
+        tasks = tasks.map(t => ({
+            id: t.id || Date.now().toString(),
+            text: t.text || '',
+            status: t.status || 'todo',
+            priority: t.priority || 'medium',
+            category: t.category || '',
+            parentId: t.parentId || null,
+            subtasks: t.subtasks || [],
+            collapsed: t.collapsed || false,
+            createdAt: t.createdAt || Date.now()
+        }));
+        saveTasks();
 
-            tasks.forEach(task => {
-                const card = document.createElement('div');
-                card.className = 'task-card';
-                
-                // 상태에 따라 보여줄 버튼 결정
-                let moveButtons = '';
-                if (task.status === 'todo') {
-                    moveButtons = `<button class="btn btn-move" onclick="moveTask('${task.id}', 'doing')">진행 중으로 ➔</button>`;
-                } else if (task.status === 'doing') {
-                    moveButtons = `
-                        <button class="btn btn-move" onclick="moveTask('${task.id}', 'todo')">⬅️ 할 일로</button>
-                        <button class="btn btn-move" onclick="moveTask('${task.id}', 'done')">완료로 ➔</button>
-                    `;
-                } else if (task.status === 'done') {
-                    moveButtons = `<button class="btn btn-move" onclick="moveTask('${task.id}', 'doing')">⬅️ 진행 중으로</button>`;
-                }
-
-                card.innerHTML = `
-                    <div class="task-text">${task.text}</div>
-                    <div class="task-actions">
-                        <div>${moveButtons}</div>
-                        <button class="btn btn-delete" onclick="deleteTask('${task.id}')">삭제</button>
-                    </div>
-                `;
-
-                // 해당 상태의 컬럼에 카드 추가
-                document.getElementById(`list-${task.status}`).appendChild(card);
-            });
-
-            // 데이터 변경 시 로컬 스토리지에 저장 (임시 동기화 대체)
+        function saveTasks() {
             localStorage.setItem('kanbanTasks', JSON.stringify(tasks));
         }
 
-        // 새로운 할 일 추가
+        // ==========================================
+        // 카테고리 관련 유틸리티
+        // ==========================================
+        const CATEGORY_COLORS = [
+            { bg: 'rgba(88,166,255,0.15)', fg: '#58a6ff', border: '#58a6ff' },
+            { bg: 'rgba(63,185,80,0.15)', fg: '#3fb950', border: '#3fb950' },
+            { bg: 'rgba(210,153,34,0.15)', fg: '#d29922', border: '#d29922' },
+            { bg: 'rgba(188,76,255,0.15)', fg: '#bc4cff', border: '#bc4cff' },
+            { bg: 'rgba(255,123,114,0.15)', fg: '#ff7b72', border: '#ff7b72' },
+            { bg: 'rgba(121,192,255,0.15)', fg: '#79c0ff', border: '#79c0ff' },
+            { bg: 'rgba(210,106,155,0.15)', fg: '#d26a9b', border: '#d26a9b' },
+            { bg: 'rgba(255,166,87,0.15)', fg: '#ffa657', border: '#ffa657' },
+        ];
+
+        function getCategoryColor(category) {
+            if (!category) return null;
+            let hash = 0;
+            for (let i = 0; i < category.length; i++) {
+                hash = category.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return CATEGORY_COLORS[Math.abs(hash) % CATEGORY_COLORS.length];
+        }
+
+        function getCategories() {
+            const cats = new Set(tasks.map(t => t.category).filter(Boolean));
+            return [...cats].sort();
+        }
+
+        // ==========================================
+        // 폼 관련
+        // ==========================================
+        function toggleAddForm() {
+            const toggle = document.getElementById('add-toggle');
+            const form = document.getElementById('add-form');
+            const isOpen = form.classList.contains('active');
+            toggle.classList.toggle('active', !isOpen);
+            form.classList.toggle('active', !isOpen);
+            if (!isOpen) {
+                document.getElementById('new-task-input').focus();
+                updateParentSelect();
+                updateCategoryDatalist();
+            }
+        }
+
+        function selectPriority(p) {
+            selectedPriority = p;
+            document.querySelectorAll('.priority-pill').forEach(pill => {
+                pill.classList.toggle('active', pill.dataset.p === p);
+            });
+        }
+
+        function updateParentSelect() {
+            const sel = document.getElementById('parent-select');
+            sel.innerHTML = '<option value="">없음 (최상위)</option>';
+            tasks.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                const statusIcon = t.status === 'todo' ? '📋' : t.status === 'doing' ? '🔄' : '✅';
+                opt.textContent = `${statusIcon} ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`;
+                sel.appendChild(opt);
+            });
+        }
+
+        function updateCategoryDatalist() {
+            const dl = document.getElementById('category-list');
+            dl.innerHTML = '';
+            getCategories().forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                dl.appendChild(opt);
+            });
+        }
+
+        // ==========================================
+        // 필터
+        // ==========================================
+        function setFilter(type, value) {
+            filters[type] = value;
+            document.querySelectorAll(`.filter-chip[data-filter="${type}"]`).forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.value === value);
+            });
+            renderBoard();
+        }
+
+        function updateCategoryFilters() {
+            const container = document.getElementById('category-filters');
+            container.innerHTML = '';
+            getCategories().forEach(cat => {
+                const chip = document.createElement('button');
+                chip.className = 'filter-chip' + (filters.category === cat ? ' active' : '');
+                chip.dataset.filter = 'category';
+                chip.dataset.value = cat;
+                chip.onclick = () => setFilter('category', cat);
+                const color = getCategoryColor(cat);
+                if (filters.category === cat && color) {
+                    chip.style.background = color.bg;
+                    chip.style.color = color.fg;
+                    chip.style.borderColor = color.border;
+                }
+                chip.textContent = cat;
+                container.appendChild(chip);
+            });
+        }
+
+        function passesFilter(task) {
+            if (filters.priority !== 'all' && task.priority !== filters.priority) return false;
+            if (filters.category !== 'all' && task.category !== filters.category) return false;
+            return true;
+        }
+
+        // ==========================================
+        // 렌더링
+        // ==========================================
+        function renderBoard() {
+            const statuses = ['todo', 'doing', 'done'];
+            statuses.forEach(status => {
+                const list = document.getElementById(`list-${status}`);
+                list.innerHTML = '';
+
+                const columnTasks = tasks.filter(t => t.status === status && passesFilter(t));
+
+                // 트리 구조 분리: 부모 / 자식
+                const childrenMap = {};
+                const rootTasks = [];
+
+                columnTasks.forEach(t => {
+                    if (t.parentId) {
+                        const parentInCol = columnTasks.find(p => p.id === t.parentId);
+                        if (parentInCol) {
+                            if (!childrenMap[t.parentId]) childrenMap[t.parentId] = [];
+                            childrenMap[t.parentId].push(t);
+                        } else {
+                            rootTasks.push(t);
+                        }
+                    } else {
+                        rootTasks.push(t);
+                    }
+                });
+
+                if (rootTasks.length === 0 && Object.keys(childrenMap).length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'empty-state';
+                    const icons = { todo: '📋', doing: '⚡', done: '🎉' };
+                    empty.innerHTML = `<div class="icon">${icons[status]}</div><div>작업이 없습니다</div>`;
+                    list.appendChild(empty);
+                }
+
+                // 재귀적 렌더링
+                function renderTaskTree(task, depth) {
+                    const card = createCardElement(task, depth);
+                    list.appendChild(card);
+
+                    if (childrenMap[task.id] && !task.collapsed) {
+                        childrenMap[task.id].forEach(child => renderTaskTree(child, depth + 1));
+                    }
+                }
+
+                rootTasks.forEach(t => renderTaskTree(t, 0));
+
+                // 카운트 업데이트
+                document.getElementById(`count-${status}`).textContent = columnTasks.length;
+            });
+
+            updateCategoryFilters();
+            saveTasks();
+        }
+
+        function createCardElement(task, depth) {
+            const card = document.createElement('div');
+            card.className = 'task-card' + (depth > 0 ? ' child-card' : '');
+            card.dataset.priority = task.priority;
+            if (depth > 0) card.style.marginLeft = `${depth * 18}px`;
+
+            // 자식 수 계산 (모든 칼럼 걸쳐)
+            const allChildren = tasks.filter(t => t.parentId === task.id);
+            const hasChildren = allChildren.length > 0;
+
+            // 부모 참조 (다른 칼럼에 있는 경우)
+            let parentRef = '';
+            if (task.parentId) {
+                const parent = tasks.find(t => t.id === task.parentId);
+                if (parent && parent.status !== task.status) {
+                    const statusName = { todo: '할 일', doing: '진행 중', done: '완료' };
+                    parentRef = `<span class="parent-indicator">${parent.text.substring(0, 15)}${parent.text.length > 15 ? '...' : ''} <span style="color:var(--text-muted);font-size:9px">(${statusName[parent.status]})</span></span>`;
+                }
+            }
+
+            // 메타 바 (우선순위 + 카테고리 + 부모)
+            const priorityLabels = { high: '높음', medium: '보통', low: '낮음' };
+            let metaHTML = `<div class="card-meta">`;
+            metaHTML += `<span class="priority-badge ${task.priority}">${priorityLabels[task.priority]}</span>`;
+            if (task.category) {
+                const cc = getCategoryColor(task.category);
+                metaHTML += `<span class="category-tag" style="background:${cc.bg};color:${cc.fg};border-color:${cc.border}">${task.category}</span>`;
+            }
+            if (parentRef) metaHTML += parentRef;
+            if (hasChildren) {
+                metaHTML += `<button class="collapse-toggle ${task.collapsed ? 'collapsed' : ''}" onclick="toggleCollapse('${task.id}')" title="${task.collapsed ? '펼치기' : '접기'}">▼</button>`;
+            }
+            metaHTML += `</div>`;
+
+            // 작업 텍스트
+            let textHTML = `<div class="card-text">${escapeHTML(task.text)}</div>`;
+
+            // 자식 정보 (다른 칼럼 포함)
+            let childrenInfoHTML = '';
+            if (hasChildren) {
+                const doneChildren = allChildren.filter(c => c.status === 'done').length;
+                childrenInfoHTML = `
+                    <div class="children-info">
+                        📎 하위 작업 ${allChildren.length}개 (완료 ${doneChildren}/${allChildren.length})
+                    </div>`;
+            }
+
+            // 체크리스트 (서브태스크)
+            let subtaskHTML = '';
+            if (task.subtasks.length > 0 || true) {
+                const doneCount = task.subtasks.filter(s => s.done).length;
+                const total = task.subtasks.length;
+                const pct = total > 0 ? (doneCount / total * 100) : 0;
+
+                subtaskHTML = `<div class="subtask-section">`;
+                if (total > 0) {
+                    subtaskHTML += `
+                        <div class="subtask-header">
+                            <span class="subtask-progress-info">체크리스트 ${doneCount}/${total}</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width:${pct}%"></div>
+                        </div>
+                        <div class="subtask-list">`;
+
+                    task.subtasks.forEach(st => {
+                        subtaskHTML += `
+                            <div class="subtask-item">
+                                <input type="checkbox" ${st.done ? 'checked' : ''} onchange="toggleSubtask('${task.id}','${st.id}')">
+                                <span class="subtask-text ${st.done ? 'done' : ''}">${escapeHTML(st.text)}</span>
+                                <button class="subtask-delete" onclick="deleteSubtask('${task.id}','${st.id}')" title="삭제">×</button>
+                            </div>`;
+                    });
+                    subtaskHTML += `</div>`;
+                }
+
+                subtaskHTML += `
+                    <div class="add-subtask-row">
+                        <input type="text" class="add-subtask-input" placeholder="+ 체크리스트 추가..." onkeypress="if(event.key==='Enter')addSubtask('${task.id}',this)">
+                        <button class="btn btn-ghost" onclick="addSubtask('${task.id}',this.previousElementSibling)" style="font-size:14px">+</button>
+                    </div>
+                </div>`;
+            }
+
+            // 이동 버튼
+            let moveHTML = '<div class="move-btns">';
+            if (task.status === 'todo') {
+                moveHTML += `<button class="btn btn-move" onclick="moveTask('${task.id}','doing')">진행 중으로 →</button>`;
+            } else if (task.status === 'doing') {
+                moveHTML += `<button class="btn btn-move" onclick="moveTask('${task.id}','todo')">← 할 일</button>`;
+                moveHTML += `<button class="btn btn-move" onclick="moveTask('${task.id}','done')">완료 →</button>`;
+            } else {
+                moveHTML += `<button class="btn btn-move" onclick="moveTask('${task.id}','doing')">← 진행 중</button>`;
+            }
+            moveHTML += '</div>';
+
+            card.innerHTML = `
+                ${metaHTML}
+                ${textHTML}
+                ${childrenInfoHTML}
+                ${subtaskHTML}
+                <div class="card-actions">
+                    ${moveHTML}
+                    <button class="btn btn-danger" onclick="deleteTask('${task.id}')" title="삭제">🗑</button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // ==========================================
+        // CRUD
+        // ==========================================
         function addTask() {
             const input = document.getElementById('new-task-input');
             const text = input.value.trim();
-            if (text) {
-                const newTask = {
-                    id: Date.now().toString(), // 고유 ID 부여
-                    text: text,
-                    status: 'todo' // 처음엔 항상 '할 일'
-                };
-                tasks.push(newTask);
-                input.value = '';
-                renderBoard();
-            }
+            if (!text) { input.focus(); return; }
+
+            const category = document.getElementById('category-input').value.trim();
+            const parentId = document.getElementById('parent-select').value || null;
+
+            const newTask = {
+                id: Date.now().toString(),
+                text,
+                status: parentId ? (tasks.find(t => t.id === parentId)?.status || 'todo') : 'todo',
+                priority: selectedPriority,
+                category,
+                parentId,
+                subtasks: [],
+                collapsed: false,
+                createdAt: Date.now()
+            };
+
+            tasks.push(newTask);
+            input.value = '';
+            document.getElementById('category-input').value = '';
+            document.getElementById('parent-select').value = '';
+            selectPriority('medium');
+
+            renderBoard();
+            toggleAddForm();
         }
 
-        // 상태 이동 (할 일 <-> 진행 중 <-> 완료)
         function moveTask(id, newStatus) {
-            const taskIndex = tasks.findIndex(t => t.id === id);
-            if (taskIndex !== -1) {
-                tasks[taskIndex].status = newStatus;
+            const idx = tasks.findIndex(t => t.id === id);
+            if (idx !== -1) {
+                tasks[idx].status = newStatus;
                 renderBoard();
             }
         }
 
-        // 할 일 삭제
         function deleteTask(id) {
+            // 자식 작업도 함께 삭제할지 확인
+            const children = tasks.filter(t => t.parentId === id);
+            if (children.length > 0) {
+                if (!confirm(`이 작업에는 ${children.length}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`)) return;
+                // 재귀적으로 모든 자식 삭제
+                function removeDescendants(parentId) {
+                    const kids = tasks.filter(t => t.parentId === parentId);
+                    kids.forEach(k => removeDescendants(k.id));
+                    tasks = tasks.filter(t => t.parentId !== parentId);
+                }
+                removeDescendants(id);
+            }
             tasks = tasks.filter(t => t.id !== id);
             renderBoard();
         }
 
-        // 엔터키 입력 지원
-        document.getElementById('new-task-input').addEventListener('keypress', function(e) {
+        function clearAllDone() {
+            const doneTasks = tasks.filter(t => t.status === 'done');
+            if (doneTasks.length === 0) return;
+            if (!confirm(`완료된 작업 ${doneTasks.length}개를 모두 삭제하시겠습니까?`)) return;
+            const doneIds = new Set(doneTasks.map(t => t.id));
+            tasks = tasks.filter(t => !doneIds.has(t.id));
+            // 삭제된 부모를 참조하는 자식의 parentId 초기화
+            tasks.forEach(t => { if (t.parentId && doneIds.has(t.parentId)) t.parentId = null; });
+            renderBoard();
+        }
+
+        // ==========================================
+        // 서브태스크 (체크리스트)
+        // ==========================================
+        function addSubtask(taskId, inputEl) {
+            const text = inputEl.value.trim();
+            if (!text) return;
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            task.subtasks.push({ id: Date.now().toString(), text, done: false });
+            inputEl.value = '';
+            renderBoard();
+        }
+
+        function toggleSubtask(taskId, subtaskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const st = task.subtasks.find(s => s.id === subtaskId);
+            if (st) st.done = !st.done;
+            renderBoard();
+        }
+
+        function deleteSubtask(taskId, subtaskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            task.subtasks = task.subtasks.filter(s => s.id !== subtaskId);
+            renderBoard();
+        }
+
+        // ==========================================
+        // 트리 접기/펼치기
+        // ==========================================
+        function toggleCollapse(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.collapsed = !task.collapsed;
+                renderBoard();
+            }
+        }
+
+        // ==========================================
+        // 유틸리티
+        // ==========================================
+        function escapeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ==========================================
+        // 이벤트 리스너
+        // ==========================================
+        document.getElementById('new-task-input').addEventListener('keypress', e => {
             if (e.key === 'Enter') addTask();
         });
 
-        // 처음 시작 시 화면 그리기
+        // ==========================================
+        // 초기 렌더링
+        // ==========================================
         renderBoard();
     </script>
 
