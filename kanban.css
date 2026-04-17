@@ -527,7 +527,7 @@
         .subtask-text { font-size: 12px; color: var(--text-secondary); flex: 1; }
         .subtask-text.done { text-decoration: line-through; color: var(--text-muted); }
 
-        .subtask-delete {
+        .subtask-action {
             opacity: 0;
             background: none;
             border: none;
@@ -537,8 +537,10 @@
             padding: 0px 4px;
             transition: all var(--transition);
         }
-        .subtask-item:hover .subtask-delete { opacity: 1; }
-        .subtask-delete:hover { color: var(--priority-high); }
+        .subtask-item:hover .subtask-action { opacity: 1; }
+        .subtask-action.delete:hover { color: var(--priority-high); }
+        .subtask-action.edit { font-size: 10px; margin-right: 2px; }
+        .subtask-action.edit:hover { filter: grayscale(0) brightness(1.2); transform: scale(1.1); }
 
         .add-subtask-row {
             display: flex;

@@ -380,7 +380,8 @@
                             <div class="subtask-item">
                                 <input type="checkbox" ${st.done ? 'checked' : ''} onchange="toggleSubtask('${task.id}','${st.id}')">
                                 <span class="subtask-text ${st.done ? 'done' : ''}">${escapeHTML(st.text)}</span>
-                                <button class="subtask-delete" onclick="deleteSubtask('${task.id}','${st.id}')" title="삭제">×</button>
+                                <button class="subtask-action edit" onclick="editSubtask('${task.id}','${st.id}')" title="수정">✏️</button>
+                                <button class="subtask-action delete" onclick="deleteSubtask('${task.id}','${st.id}')" title="삭제">×</button>
                             </div>`;
                     });
                     subtaskHTML += `</div>`;
@@ -519,6 +520,18 @@
             const st = task.subtasks.find(s => s.id === subtaskId);
             if (st) st.done = !st.done;
             renderBoard();
+        }
+
+        function editSubtask(taskId, subtaskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const st = task.subtasks.find(s => s.id === subtaskId);
+            if (!st) return;
+            const newText = prompt('체크리스트 내용을 수정하세요:', st.text);
+            if (newText !== null && newText.trim() !== '') {
+                st.text = newText.trim();
+                renderBoard();
+            }
         }
 
         function deleteSubtask(taskId, subtaskId) {
