@@ -361,7 +361,7 @@
 
             // 체크리스트 (서브태스크)
             let subtaskHTML = '';
-            if (task.subtasks.length > 0 || true) {
+            { // 항상 추가 폼 렌더링을 위해 블록 유지
                 const doneCount = task.subtasks.filter(s => s.done).length;
                 const total = task.subtasks.length;
                 const pct = total > 0 ? (doneCount / total * 100) : 0;
