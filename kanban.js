@@ -417,6 +417,15 @@
                 </div>
             `;
 
+            // 이벤트 리스너: 텍스트 선택 (드래그) 허용을 위해 시스템 드래그 임시 비활성화
+            card.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.card-text') || e.target.closest('.subtask-text') || e.target.tagName.toLowerCase() === 'a') {
+                    card.setAttribute('draggable', 'false');
+                }
+            });
+            card.addEventListener('mouseup', () => card.setAttribute('draggable', 'true'));
+            card.addEventListener('mouseleave', () => card.setAttribute('draggable', 'true'));
+
             return card;
         }
 
@@ -536,7 +545,11 @@
         function escapeHTML(str) {
             const div = document.createElement('div');
             div.textContent = str;
-            return div.innerHTML;
+            let escaped = div.innerHTML;
+            
+            // 하이퍼링크 변환 (http:// 또는 https://)
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return escaped.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:var(--accent); text-decoration:underline; font-weight:600;" onclick="event.stopPropagation()">$1</a>');
         }
 
         // ==========================================
