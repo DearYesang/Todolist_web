@@ -336,7 +336,9 @@
             metaHTML += `<span class="urgency-badge ${task.urgency}">${urgencyLabels[task.urgency]}</span>`;
             if (task.category) {
                 const cc = getCategoryColor(task.category);
-                metaHTML += `<span class="category-tag" style="background:${cc.bg};color:${cc.fg};border-color:${cc.border}">${task.category}</span>`;
+                metaHTML += `<span class="category-tag" style="background:${cc.bg};color:${cc.fg};border-color:${cc.border};cursor:pointer" onclick="editTaskCategory('${task.id}')" title="카테고리 수정">${task.category}</span>`;
+            } else {
+                metaHTML += `<span class="category-tag add-category" style="cursor:pointer;border:1px dashed var(--border);color:var(--text-muted);background:transparent" onclick="editTaskCategory('${task.id}')" title="카테고리 추가">+ 카테고리</span>`;
             }
             if (parentRef) metaHTML += parentRef;
             if (hasChildren) {
@@ -345,7 +347,7 @@
             metaHTML += `</div>`;
 
             // 작업 텍스트
-            let textHTML = `<div class="card-text">${escapeHTML(task.text)}</div>`;
+            let textHTML = `<div class="card-text" style="cursor:pointer" onclick="editTaskName('${task.id}')" title="작업명 수정">${escapeHTML(task.text)}</div>`;
 
             // 자식 정보 (다른 칼럼 포함)
             let childrenInfoHTML = '';
@@ -512,6 +514,27 @@
             task.subtasks.push({ id: Date.now().toString(), text, done: false });
             inputEl.value = '';
             renderBoard();
+        }
+
+        function editTaskName(taskId) {
+            if (window.getSelection().toString().trim() !== '') return; // 드래그 텍스트 선택 시 동작 방지
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const newText = prompt('작업명을 수정하세요:', task.text);
+            if (newText !== null && newText.trim() !== '') {
+                task.text = newText.trim();
+                renderBoard();
+            }
+        }
+
+        function editTaskCategory(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const newCat = prompt(`카테고리를 수정/입력하세요 (삭제하려면 비워두세요):\n(현재: ${task.category || '없음'})`, task.category || '');
+            if (newCat !== null) {
+                task.category = newCat.trim();
+                renderBoard();
+            }
         }
 
         function toggleSubtask(taskId, subtaskId) {
