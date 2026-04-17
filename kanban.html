@@ -13,6 +13,10 @@
     <div class="header">
         <h1>🚀 나의 칸반 보드</h1>
         <div class="header-actions">
+            <!-- 데이터 불러오기 파일 인풋 (숨김) -->
+            <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(event)">
+            <button class="btn" onclick="document.getElementById('import-file').click()" title="데이터 불러오기">📂 불러오기</button>
+            <button class="btn" onclick="exportData()" title="데이터 내보내기">💾 내보내기</button>
             <button class="btn" onclick="clearAllDone()" title="완료된 작업 정리">🧹 정리</button>
         </div>
     </div>

@@ -553,6 +553,45 @@
         }
 
         // ==========================================
+        // 데이터 내보내기 / 불러오기
+        // ==========================================
+        function exportData() {
+            const dataStr = JSON.stringify(tasks, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kanban_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedTasks = JSON.parse(e.target.result);
+                    if (Array.isArray(importedTasks)) {
+                        if (confirm('기존 데이터를 덮어쓰고 불러오시겠습니까? (이 작업은 되돌릴 수 없습니다.)')) {
+                            tasks = importedTasks;
+                            saveTasks();
+                            renderBoard();
+                            alert('데이터가 성공적으로 불러와졌습니다.');
+                        }
+                    } else {
+                        alert('올바른 칸반 데이터 형식이 아닙니다.');
+                    }
+                } catch (error) {
+                    alert('파일을 읽는 중 오류가 발생했습니다.');
+                }
+                event.target.value = ''; // Input 초기화
+            };
+            reader.readAsText(file);
+        }
+
+        // ==========================================
         // 이벤트 리스너
         // ==========================================
         document.getElementById('new-task-input').addEventListener('keypress', e => {
