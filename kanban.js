@@ -327,6 +327,8 @@
             addToList(rootTasks, 0);
 
             let timelineHTML = '';
+            let sidebarHTML = '';
+
             displayList.forEach(({task, depth}) => {
                 const s = new Date(task.startDate);
                 const e = new Date(task.endDate);
@@ -338,20 +340,25 @@
                 const leftPx = offsetDays * dayWidth;
                 const widthPx = durationDays * dayWidth;
 
-                const cc = getCategoryColor(task.category) || { bg: 'var(--surface-hover)', fg: 'var(--text)', border: 'var(--border)' };
+                const cc = getCategoryColor(task.category) || { bg: 'var(--surface-hover)', fg: 'var(--text-secondary)', border: 'var(--border)' };
+                const isDone = task.status === 'done';
+
+                sidebarHTML += `
+                <div class="gantt-sidebar-item ${isDone ? 'done' : ''}" style="padding-left: ${16 + depth * 24}px">
+                    ${depth > 0 ? '<div class="gantt-link-line"></div>' : ''}
+                    <span onclick="editTaskName('${task.id}')" title="${escapeHTML(task.text)}">
+                        ${isDone ? '☑️' : '🗓️'} ${escapeHTML(task.text)}
+                    </span>
+                </div>`;
 
                 timelineHTML += `
-                <div class="gantt-row" style="padding-left: ${depth * 24}px">
+                <div class="gantt-row">
                     <div class="gantt-bar-wrapper" style="left: ${leftPx}px; width: ${widthPx}px;">
-                        ${depth > 0 ? '<div class="gantt-connection"></div>' : ''}
-                        <div class="gantt-bar" onclick="editTaskDates('${task.id}')" style="background:${cc.bg}; border: 1px solid ${cc.border};" title="시작: ${task.startDate} / 마감: ${task.endDate}"></div>
-                        <div class="gantt-label ${task.status === 'done' ? 'done' : ''}">
-                            <span style="cursor:pointer" onclick="editTaskDates('${task.id}')">📅</span>
-                            ${escapeHTML(task.text)}
-                        </div>
+                        <div class="gantt-bar ${isDone ? 'done' : ''}" onclick="editTaskDates('${task.id}')" style="background:${cc.fg}; border: 1px solid ${cc.border};" title="시작: ${task.startDate} / 마감: ${task.endDate}"></div>
                     </div>
                 </div>`;
             });
+            document.getElementById('gantt-sidebar-rows').innerHTML = sidebarHTML;
             timelineContainer.innerHTML = timelineHTML;
         }
 
