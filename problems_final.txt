@@ -1,0 +1,319 @@
+Loading svelte-check in workspace: /Users/sc/Desktop/Todolist
+Getting Svelte diagnostics...
+
+/Users/sc/Desktop/Todolist/src/store.js:19:33
+Error: Parameter 't' implicitly has an 'any' type. 
+
+initialTasks = initialTasks.map(t => ({
+    id: t.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
+
+/Users/sc/Desktop/Todolist/src/store.js:56:34
+Error: Parameter 'category' implicitly has an 'any' type. 
+
+export function getCategoryColor(category) {
+    if (!category) return null;
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:14:27
+Error: Parameter 'taskId' implicitly has an 'any' type. (js)
+
+    function updateStatus(taskId, newStatus) {
+        tasks.update(ts => {
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:14:35
+Error: Parameter 'newStatus' implicitly has an 'any' type. (js)
+
+    function updateStatus(taskId, newStatus) {
+        tasks.update(ts => {
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:16:34
+Error: Parameter 't' implicitly has an 'any' type. (js)
+        tasks.update(ts => {
+            const task = ts.find(t => t.id === taskId);
+            if (task) task.status = newStatus;
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:24:26
+Error: Parameter 'e' implicitly has an 'any' type. (js)
+
+    function onDragStart(e, id) {
+        draggedId = id;
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:24:29
+Error: Parameter 'id' implicitly has an 'any' type. (js)
+
+    function onDragStart(e, id) {
+        draggedId = id;
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:30:21
+Error: Parameter 'e' implicitly has an 'any' type. (js)
+
+    function onDrop(e, status) {
+        e.preventDefault();
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:30:24
+Error: Parameter 'status' implicitly has an 'any' type. (js)
+
+    function onDrop(e, status) {
+        e.preventDefault();
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:37:31
+Error: Parameter 'taskId' implicitly has an 'any' type. (js)
+
+    function toggleTaskStatus(taskId) {
+        tasks.update(ts => ts.map(t => {
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:38:35
+Error: Parameter 't' implicitly has an 'any' type. (js)
+    function toggleTaskStatus(taskId) {
+        tasks.update(ts => ts.map(t => {
+            if (t.id === taskId) {
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:58:59
+Error: Parameter 't' implicitly has an 'any' type. (js)
+                <span class="column-title">{col.title}</span>
+                <span class="column-count">{$tasks.filter(t => t.status === col.id).length}</span>
+            </div>
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:62:38
+Error: Parameter 't' implicitly has an 'any' type. (js)
+            <div class="task-list">
+                {#each $tasks.filter(t => t.status === col.id && !t.parentId) as parent (parent.id)}
+                    {@const cc = getCategoryColor(parent.category)}
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:64:54
+Error: Parameter 'c' implicitly has an 'any' type. (js)
+                    {@const cc = getCategoryColor(parent.category)}
+                    {@const children = $tasks.filter(c => c.parentId === parent.id)}
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:81:80
+Error: 'cc' is possibly 'null'. (js)
+                            {#if parent.category}
+                                <span class="card-category" style="background:{cc.bg}; color:{cc.fg}; border:1px solid {cc.border}">
+                                    {parent.category}
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:81:95
+Error: 'cc' is possibly 'null'. (js)
+                            {#if parent.category}
+                                <span class="card-category" style="background:{cc.bg}; color:{cc.fg}; border:1px solid {cc.border}">
+                                    {parent.category}
+
+/Users/sc/Desktop/Todolist/src/KanbanBoard.svelte:81:121
+Error: 'cc' is possibly 'null'. (js)
+                            {#if parent.category}
+                                <span class="card-category" style="background:{cc.bg}; color:{cc.fg}; border:1px solid {cc.border}">
+                                    {parent.category}
+
+/Users/sc/Desktop/Todolist/src/GanttTimeline.svelte:11:24
+Error: Parameter 't' implicitly has an 'any' type. (js)
+
+        $tasks.forEach(t => {
+            const s = new Date(t.startDate);
+
+/Users/sc/Desktop/Todolist/src/GanttTimeline.svelte:68:24
+Error: Parameter 'task' implicitly has an 'any' type. (js)
+
+    function getCoords(task) {
+        const s = new Date(task.startDate);
+
+/Users/sc/Desktop/Todolist/src/TaskForm.svelte:26:45
+Error: Parameter 't' implicitly has an 'any' type. (js)
+                text: newTaskText.trim(),
+                status: parentId ? (ts.find(t => t.id === parentId)?.status || 'todo') : 'todo',
+                priority: selectedPriority,
+
+/Users/sc/Desktop/Todolist/src/TaskForm.svelte:69:38
+Error: Parameter 't' implicitly has an 'any' type. (js)
+                <option value="">없음 (최상위)</option>
+                {#each $tasks.filter(t => !t.parentId) as t}
+                    <option value={t.id}>{t.text}</option>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:29:5
+Warn: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+     transition:fade={{duration: 200}}>
+    <div class="side-panel" 
+         role="dialog"
+         aria-modal="true"
+         onclick={(e) => e.stopPropagation()} 
+         onkeydown={(e) => e.stopPropagation()}
+         transition:fly={{ x: 400, duration: 300 }}>
+        <div class="panel-header">
+            <h2>작업 상세 정보</h2>
+            <button class="close-btn" onclick={onclose}>✕</button>
+        </div>
+
+        <div class="panel-body">
+            <div class="form-section">
+                <label for="modal-task-text">작업명</label>
+                <input id="modal-task-text" type="text" value={task.text} oninput={(e) => updateField('text', e.target.value)} />
+            </div>
+
+            <div class="form-grid">
+                <div class="form-section">
+                    <label for="modal-start-date">시작일</label>
+                    <input id="modal-start-date" type="date" value={task.startDate} oninput={(e) => updateField('startDate', e.target.value)} />
+                </div>
+                <div class="form-section">
+                    <label for="modal-end-date">마감일</label>
+                    <input id="modal-end-date" type="date" value={task.endDate} oninput={(e) => updateField('endDate', e.target.value)} />
+                </div>
+            </div>
+
+            <div class="form-section">
+                <label for="modal-priority">중요도</label>
+                <select id="modal-priority" value={task.priority} onchange={(e) => updateField('priority', e.target.value)}>
+                    <option value="high">🔴 긴급</option>
+                    <option value="medium">🟡 보통</option>
+                    <option value="low">🟢 낮음</option>
+                </select>
+            </div>
+
+            <div class="form-section">
+                <label for="modal-category">카테고리</label>
+                <input id="modal-category" type="text" value={task.category} oninput={(e) => updateField('category', e.target.value)} placeholder="예: 개발, 기획" />
+            </div>
+
+            <div class="form-section">
+                <label for="modal-status">상태</label>
+                <select id="modal-status" value={task.status} onchange={(e) => updateField('status', e.target.value)}>
+                    <option value="todo">할 일</option>
+                    <option value="doing">진행 중</option>
+                    <option value="done">완료</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="panel-footer">
+            <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
+            <button class="btn btn-primary" style="margin-left: auto;" onclick={onclose}>완료</button>
+        </div>
+    </div>
+</div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:8:37
+Error: Parameter 't' implicitly has an 'any' type. (js)
+    // 선택된 태스크 구독 (Svelte 5 룬 사용)
+    let task = $derived($tasks.find(t => t.id === taskId));
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:10:26
+Error: Parameter 'field' implicitly has an 'any' type. (js)
+
+    function updateField(field, value) {
+        tasks.update(ts => ts.map(t => t.id === taskId ? { ...t, [field]: value } : t));
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:10:33
+Error: Parameter 'value' implicitly has an 'any' type. (js)
+
+    function updateField(field, value) {
+        tasks.update(ts => ts.map(t => t.id === taskId ? { ...t, [field]: value } : t));
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:11:35
+Error: Parameter 't' implicitly has an 'any' type. (js)
+    function updateField(field, value) {
+        tasks.update(ts => ts.map(t => t.id === taskId ? { ...t, [field]: value } : t));
+    }
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:16:42
+Error: Parameter 't' implicitly has an 'any' type. (js)
+        if (confirm('이 작업을 삭제하시겠습니까?')) {
+            tasks.update(ts => ts.filter(t => t.id !== taskId));
+            onclose();
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:43:111
+Error: 'e.target' is possibly 'null'. (js)
+                <label for="modal-task-text">작업명</label>
+                <input id="modal-task-text" type="text" value={task.text} oninput={(e) => updateField('text', e.target.value)} />
+            </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:43:120
+Error: Property 'value' does not exist on type 'EventTarget'. (js)
+                <label for="modal-task-text">작업명</label>
+                <input id="modal-task-text" type="text" value={task.text} oninput={(e) => updateField('text', e.target.value)} />
+            </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:49:126
+Error: 'e.target' is possibly 'null'. (js)
+                    <label for="modal-start-date">시작일</label>
+                    <input id="modal-start-date" type="date" value={task.startDate} oninput={(e) => updateField('startDate', e.target.value)} />
+                </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:49:135
+Error: Property 'value' does not exist on type 'EventTarget'. (js)
+                    <label for="modal-start-date">시작일</label>
+                    <input id="modal-start-date" type="date" value={task.startDate} oninput={(e) => updateField('startDate', e.target.value)} />
+                </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:53:120
+Error: 'e.target' is possibly 'null'. (js)
+                    <label for="modal-end-date">마감일</label>
+                    <input id="modal-end-date" type="date" value={task.endDate} oninput={(e) => updateField('endDate', e.target.value)} />
+                </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:53:129
+Error: Property 'value' does not exist on type 'EventTarget'. (js)
+                    <label for="modal-end-date">마감일</label>
+                    <input id="modal-end-date" type="date" value={task.endDate} oninput={(e) => updateField('endDate', e.target.value)} />
+                </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:59:108
+Error: 'e.target' is possibly 'null'. (js)
+                <label for="modal-priority">중요도</label>
+                <select id="modal-priority" value={task.priority} onchange={(e) => updateField('priority', e.target.value)}>
+                    <option value="high">🔴 긴급</option>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:59:117
+Error: Property 'value' does not exist on type 'EventTarget'. (js)
+                <label for="modal-priority">중요도</label>
+                <select id="modal-priority" value={task.priority} onchange={(e) => updateField('priority', e.target.value)}>
+                    <option value="high">🔴 긴급</option>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:68:118
+Error: 'e.target' is possibly 'null'. (js)
+                <label for="modal-category">카테고리</label>
+                <input id="modal-category" type="text" value={task.category} oninput={(e) => updateField('category', e.target.value)} placeholder="예: 개발, 기획" />
+            </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:68:127
+Error: Property 'value' does not exist on type 'EventTarget'. (js)
+                <label for="modal-category">카테고리</label>
+                <input id="modal-category" type="text" value={task.category} oninput={(e) => updateField('category', e.target.value)} placeholder="예: 개발, 기획" />
+            </div>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:73:102
+Error: 'e.target' is possibly 'null'. (js)
+                <label for="modal-status">상태</label>
+                <select id="modal-status" value={task.status} onchange={(e) => updateField('status', e.target.value)}>
+                    <option value="todo">할 일</option>
+
+/Users/sc/Desktop/Todolist/src/TaskModal.svelte:73:111
+Error: Property 'value' does not exist on type 'EventTarget'. (js)
+                <label for="modal-status">상태</label>
+                <select id="modal-status" value={task.status} onchange={(e) => updateField('status', e.target.value)}>
+                    <option value="todo">할 일</option>
+
+/Users/sc/Desktop/Todolist/src/App.svelte:12:25
+Error: Parameter 'e' implicitly has an 'any' type. (js)
+    // 파일 업로드 핸들러
+    function importData(e) {
+        const file = e.target.files[0];
+
+/Users/sc/Desktop/Todolist/src/App.svelte:18:41
+Error: 'evt.target' is possibly 'null'. (js)
+            try {
+                const data = JSON.parse(evt.target.result);
+                if (Array.isArray(data)) {
+
+/Users/sc/Desktop/Todolist/src/App.svelte:18:41
+Error: Argument of type 'string | ArrayBuffer | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'. (js)
+            try {
+                const data = JSON.parse(evt.target.result);
+                if (Array.isArray(data)) {
+
+/Users/sc/Desktop/Todolist/src/App.svelte:49:44
+Error: Object is possibly 'null'. (js)
+        <input type="file" id="import-file" accept=".json" style="display:none;" onchange={importData}>
+        <button class="btn" onclick={() => document.getElementById('import-file').click()} title="데이터 불러오기">📂 불러오기</button>
+        <button class="btn" onclick={exportData} title="데이터 내보내기">💾 내보내기</button>
+
+====================================
+svelte-check found 42 errors and 1 warning in 6 files

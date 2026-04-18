@@ -11,31 +11,40 @@
         { id: 'done', title: '완료' }
     ];
 
+    /** @param {string} taskId @param {string} newStatus */
     function updateStatus(taskId, newStatus) {
-        tasks.update(ts => {
-            const task = ts.find(t => t.id === taskId);
+        tasks.update((/** @type {any[]} */ ts) => {
+            const task = ts.find((/** @type {any} */ t) => t.id === taskId);
             if (task) task.status = newStatus;
             return ts;
         });
     }
 
+    /** @type {string | null} */
     let draggedId = $state(null);
 
+    /** @param {DragEvent} e @param {string} id */
     function onDragStart(e, id) {
         draggedId = id;
-        e.dataTransfer.setData('text/plain', id);
-        e.dataTransfer.effectAllowed = 'move';
+        if (e.dataTransfer) {
+            e.dataTransfer.setData('text/plain', id);
+            e.dataTransfer.effectAllowed = 'move';
+        }
     }
 
+    /** @param {DragEvent} e @param {string} status */
     function onDrop(e, status) {
         e.preventDefault();
-        const id = e.dataTransfer.getData('text/plain');
-        if (id) updateStatus(id, status);
+        if (e.dataTransfer) {
+            const id = e.dataTransfer.getData('text/plain');
+            if (id) updateStatus(id, status);
+        }
         draggedId = null;
     }
 
+    /** @param {string} taskId */
     function toggleTaskStatus(taskId) {
-        tasks.update(ts => ts.map(t => {
+        tasks.update((/** @type {any[]} */ ts) => ts.map((/** @type {any} */ t) => {
             if (t.id === taskId) {
                 const nextStatus = t.status === 'done' ? 'todo' : 'done';
                 return {...t, status: nextStatus};
@@ -55,13 +64,13 @@
              class:drag-over={draggedId !== null}>
             <div class="column-header">
                 <span class="column-title">{col.title}</span>
-                <span class="column-count">{$tasks.filter(t => t.status === col.id).length}</span>
+                <span class="column-count">{$tasks.filter((/** @type {any} */ t) => t.status === col.id).length}</span>
             </div>
 
             <div class="task-list">
-                {#each $tasks.filter(t => t.status === col.id && !t.parentId) as parent (parent.id)}
+                {#each $tasks.filter((/** @type {any} */ t) => t.status === col.id && !t.parentId) as parent (parent.id)}
                     {@const cc = getCategoryColor(parent.category)}
-                    {@const children = $tasks.filter(c => c.parentId === parent.id)}
+                    {@const children = $tasks.filter((/** @type {any} */ c) => c.parentId === parent.id)}
                     
                     <div class="card stack-card" 
                          role="listitem"
