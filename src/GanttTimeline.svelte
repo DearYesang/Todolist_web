@@ -35,8 +35,8 @@
         let maxDate = new Date('2000-01-01');
 
         visibleTasks.forEach((task) => {
-            const start = new Date(task.startDate);
-            const end = new Date(task.endDate);
+            const start = parseLocalDate(task.startDate);
+            const end = parseLocalDate(task.endDate);
             if (start < minDate) minDate = new Date(start);
             if (end > maxDate) maxDate = new Date(end);
         });
@@ -53,7 +53,7 @@
             headerDays.push({
                 key: date.toISOString(),
                 label: `${date.getMonth() + 1}/${date.getDate()}`,
-                isToday: date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]
+                isToday: formatDate(date) === formatDate(new Date())
             });
         }
 

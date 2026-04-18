@@ -360,6 +360,14 @@ export function updateTask(taskId, patch) {
                 const parent = current.find((candidate) => candidate.id === nextTask.parentId);
                 if (!parent || !canAssignParent(current, taskId, nextTask.parentId)) {
                     nextTask.parentId = null;
+                } else if (
+                    Object.prototype.hasOwnProperty.call(patch, 'status')
+                    && patch.status
+                    && patch.status !== parent.status
+                ) {
+                    // Changing a child's status moves it out of the parent's lane,
+                    // so detach it instead of silently snapping the value back.
+                    nextTask.parentId = null;
                 } else {
                     nextTask.status = parent.status;
                 }

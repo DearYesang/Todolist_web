@@ -27,6 +27,19 @@
             onclose();
         }
     }
+
+    /**
+     * @param {KeyboardEvent} event
+     */
+    function handleDialogKeydown(event) {
+        if (event.key === 'Escape') {
+            event.stopPropagation();
+            onclose();
+            return;
+        }
+
+        event.stopPropagation();
+    }
 </script>
 
 {#if task}
@@ -43,7 +56,7 @@
             aria-modal="true"
             tabindex="0"
             onclick={(event) => event.stopPropagation()}
-            onkeydown={(event) => event.stopPropagation()}
+            onkeydown={handleDialogKeydown}
             transition:fly={{ x: 320, duration: 260 }}>
             <div class="panel-header">
                 <div>
@@ -161,6 +174,9 @@
                             <option value="doing">진행 중</option>
                             <option value="done">완료</option>
                         </select>
+                        {#if parentTask}
+                            <small class="field-hint">상태를 바꾸면 상위 작업에서 분리됩니다.</small>
+                        {/if}
                     </div>
                 </div>
             </div>
