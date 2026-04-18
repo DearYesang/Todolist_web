@@ -1,191 +1,121 @@
 <script>
-    import { tasks, getCategoryColor } from './store.js';
-    import { flip } from 'svelte/animate';
-    import { fade, slide } from 'svelte/transition';
+    import { assignParent, buildColumnHierarchy, canAssignParent, filters, moveTask, tasks } from './store.js';
+    import TaskTreeCard from './TaskTreeCard.svelte';
 
     let { openTask } = $props();
 
     const columns = [
-        { id: 'todo', title: '할 일' },
-        { id: 'doing', title: '진행 중' },
-        { id: 'done', title: '완료' }
+        { id: 'todo', title: '할 일', emptyIcon: '📋' },
+        { id: 'doing', title: '진행 중', emptyIcon: '⚡' },
+        { id: 'done', title: '완료', emptyIcon: '🎉' }
     ];
-
-    /** @param {string} taskId @param {string} newStatus */
-    function updateStatus(taskId, newStatus) {
-        tasks.update((/** @type {any[]} */ ts) => {
-            const task = ts.find((/** @type {any} */ t) => t.id === taskId);
-            if (task) task.status = newStatus;
-            return ts;
-        });
-    }
 
     /** @type {string | null} */
     let draggedId = $state(null);
+    /** @type {string | null} */
+    let hoveredColumn = $state(null);
 
-    /** @param {DragEvent} e @param {string} id */
-    function onDragStart(e, id) {
-        draggedId = id;
-        if (e.dataTransfer) {
-            e.dataTransfer.setData('text/plain', id);
-            e.dataTransfer.effectAllowed = 'move';
+    const columnData = $derived.by(() =>
+        columns.map((column) => ({
+            ...column,
+            ...buildColumnHierarchy($tasks, /** @type {'todo' | 'doing' | 'done'} */ (column.id), $filters)
+        }))
+    );
+
+    /**
+     * @param {DragEvent} event
+     * @param {string} taskId
+     */
+    function onDragStart(event, taskId) {
+        draggedId = taskId;
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', taskId);
         }
     }
 
-    /** @param {DragEvent} e @param {string} status */
-    function onDrop(e, status) {
-        e.preventDefault();
-        if (e.dataTransfer) {
-            const id = e.dataTransfer.getData('text/plain');
-            if (id) updateStatus(id, status);
-        }
+    function onDragEnd() {
         draggedId = null;
+        hoveredColumn = null;
     }
 
-    /** @param {string} taskId */
-    function toggleTaskStatus(taskId) {
-        tasks.update((/** @type {any[]} */ ts) => ts.map((/** @type {any} */ t) => {
-            if (t.id === taskId) {
-                const nextStatus = t.status === 'done' ? 'todo' : 'done';
-                return {...t, status: nextStatus};
-            }
-            return t;
-        }));
+    /**
+     * @param {DragEvent} event
+     * @param {'todo' | 'doing' | 'done'} status
+     */
+    function onDropOnColumn(event, status) {
+        event.preventDefault();
+        const taskId = event.dataTransfer?.getData('text/plain');
+        if (!taskId) return;
+
+        assignParent(taskId, null);
+        moveTask(taskId, status);
+        draggedId = null;
+        hoveredColumn = null;
+    }
+
+    /**
+     * @param {DragEvent} event
+     * @param {string} targetTaskId
+     */
+    function onDropOnTask(event, targetTaskId) {
+        const taskId = event.dataTransfer?.getData('text/plain');
+        if (!taskId || taskId === targetTaskId) return;
+
+        if (!canAssignParent($tasks, taskId, targetTaskId)) {
+            alert('하위 작업을 해당 작업의 부모로 설정할 수 없습니다.');
+            draggedId = null;
+            return;
+        }
+
+        assignParent(taskId, targetTaskId);
+        draggedId = null;
+        hoveredColumn = null;
     }
 </script>
 
 <div class="board">
-    {#each columns as col}
-        <div class="column"
-             role="list"
-             aria-label={col.title}
-             ondragover={(e) => e.preventDefault()}
-             ondrop={(e) => onDrop(e, col.id)}
-             class:drag-over={draggedId !== null}>
+    {#each columnData as column (column.id)}
+        <div class="column" id={`col-${column.id}`}>
             <div class="column-header">
-                <span class="column-title">{col.title}</span>
-                <span class="column-count">{$tasks.filter((/** @type {any} */ t) => t.status === col.id).length}</span>
+                <div class="column-dot"></div>
+                <span class="column-title">{column.title}</span>
+                <span class="column-count">{column.columnTasks.length}</span>
             </div>
 
-            <div class="task-list">
-                {#each $tasks.filter((/** @type {any} */ t) => t.status === col.id && !t.parentId) as parent (parent.id)}
-                    {@const cc = getCategoryColor(parent.category)}
-                    {@const children = $tasks.filter((/** @type {any} */ c) => c.parentId === parent.id)}
-                    
-                    <div class="card stack-card" 
-                         role="listitem"
-                         draggable="true" 
-                         ondragstart={(e) => onDragStart(e, parent.id)} 
-                         animate:flip={{duration:250}} out:fade>
-                        
-                        <div class="card-header">
-                            <span class="card-text" 
-                                  role="button" 
-                                  tabindex="0"
-                                  onclick={(e) => { e.stopPropagation(); openTask(parent.id); }}
-                                  onkeydown={(e) => e.key === 'Enter' && openTask(parent.id)}>
-                                {parent.status === 'done' ? '✅' : '📄'} {parent.text}
-                            </span>
-                            {#if parent.category}
-                                <span class="card-category" style="background:{cc.bg}; color:{cc.fg}; border:1px solid {cc.border}">
-                                    {parent.category}
-                                </span>
-                            {/if}
-                        </div>
-                        
-                        <div class="card-meta">
-                            <span class="importance-badge {parent.priority}" title="중요도: {parent.priority}">
-                                {parent.priority === 'high' ? '🔴 긴급' : parent.priority === 'medium' ? '🟡 보통' : '🟢 낮음'}
-                            </span>
-                            <span class="date-tag" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); openTask(parent.id); }} onkeydown={(e) => e.key === 'Enter' && openTask(parent.id)}>
-                                📅 {parent.startDate} ~ {parent.endDate}
-                            </span>
-                        </div>
-
-                        {#if children.length > 0}
-                            <div class="stacked-children">
-                                {#each children as child}
-                                    <div class="child-card" 
-                                         role="button"
-                                         tabindex="0"
-                                         onclick={() => toggleTaskStatus(child.id)}
-                                         onkeydown={(e) => e.key === 'Enter' && toggleTaskStatus(child.id)}
-                                         transition:slide>
-                                        <span class="child-status {child.status === 'done' ? 'done' : ''}">
-                                            {child.status === 'done' ? '☑️' : '⬜'} {child.text}
-                                        </span>
-                                    </div>
-                                {/each}
-                            </div>
-                        {/if}
-
+            <div
+                class="task-list"
+                class:drag-over-col={hoveredColumn === column.id && draggedId !== null}
+                role="list"
+                aria-label={`${column.title} 작업 목록`}
+                ondragover={(event) => event.preventDefault()}
+                ondragenter={(event) => {
+                    event.preventDefault();
+                    hoveredColumn = column.id;
+                }}
+                ondragleave={() => {
+                    if (hoveredColumn === column.id) hoveredColumn = null;
+                }}
+                ondrop={(event) => onDropOnColumn(event, /** @type {'todo' | 'doing' | 'done'} */ (column.id))}>
+                {#if column.roots.length === 0}
+                    <div class="empty-state">
+                        <div class="icon">{column.emptyIcon}</div>
+                        <div>작업이 없습니다</div>
                     </div>
-                {/each}
+                {:else}
+                    {#each column.roots as task (task.id)}
+                        <TaskTreeCard
+                            allTasks={$tasks}
+                            childrenByParent={column.childrenByParent}
+                            draggedId={draggedId}
+                            openTask={openTask}
+                            onDragEnd={onDragEnd}
+                            onDragStart={onDragStart}
+                            onDropOnTask={onDropOnTask}
+                            task={task} />
+                    {/each}
+                {/if}
             </div>
         </div>
     {/each}
 </div>
-
-<style>
-    .board {
-        display: flex; gap: 20px; margin: 0 auto; max-width: 1400px;
-        padding-bottom: 40px;
-    }
-    .column {
-        flex: 1; background: rgba(22, 27, 34, 0.5); border: 1px solid var(--border); border-radius: 12px;
-        padding: 16px; display: flex; flex-direction: column; min-height: 600px;
-        backdrop-filter: blur(10px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .column.drag-over { 
-        background: rgba(88, 166, 255, 0.1); 
-        border-color: var(--accent);
-        transform: scale(1.01);
-    }
-    .column-header { 
-        display: flex; justify-content: space-between; align-items: center; 
-        padding: 0 4px 16px; border-bottom: 1px solid var(--border-light); margin-bottom: 16px;
-    }
-    .column-title { font-size: 14px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-    .column-count { background: var(--surface-raised); padding: 2px 8px; border-radius: 10px; font-size: 12px; color: var(--text-muted); }
-    
-    .stack-card {
-        background: var(--surface-raised); border: 1px solid var(--border); border-radius: 10px;
-        padding: 16px; margin-bottom: 20px; cursor: grab; position: relative;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1;
-    }
-    .stack-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-    .stack-card:active { cursor: grabbing; transform: scale(0.98); }
-    
-    /* 종이 겹침 디자인 트릭 (고급스러운 레이어드 효과) */
-    .stack-card::before, .stack-card::after {
-        content: ''; position: absolute; left: 8px; right: 8px; height: 12px;
-        background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px;
-        z-index: -1; transition: all 0.3s;
-    }
-    .stack-card::before { top: -6px; opacity: 0.6; transform: scaleX(0.97); }
-    .stack-card::after { top: -12px; opacity: 0.3; transform: scaleX(0.94); }
-    
-    .stack-card:hover::before { top: -8px; opacity: 0.8; }
-    .stack-card:hover::after { top: -16px; opacity: 0.5; }
-    
-    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-    .card-text { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; }
-    .card-category { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
-    
-    .card-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    
-    .importance-badge {
-        font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;
-        background: var(--surface-hover); border: 1px solid var(--border);
-    }
-    .importance-badge.high { color: var(--priority-high); border-color: var(--priority-high); background: var(--priority-high-bg); }
-    .importance-badge.medium { color: var(--priority-medium); border-color: var(--priority-medium); background: var(--priority-medium-bg); }
-    .importance-badge.low { color: var(--priority-low); border-color: var(--priority-low); background: var(--priority-low-bg); }
-
-    .date-tag {
-        display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; 
-        background: var(--bg); border: 1px solid var(--border); border-radius: 4px; cursor: pointer;
-    }
-    .date-tag:hover { border-color: var(--accent); color: var(--text); }
-</style>

@@ -1,136 +1,174 @@
 <script>
-    import { tasks, getCategoryColor } from './store.js';
+    import { deleteTaskCascade, getCategoryColor, tasks, updateTask } from './store.js';
     import { fade, fly } from 'svelte/transition';
 
     let { taskId, onclose } = $props();
-    
-    // 선택된 태스크 구독 (Svelte 5 룬 사용)
-    let task = $derived($tasks.find((/** @type {any} */ t) => t.id === taskId));
 
-    /** @param {string} field @param {any} value */
+    const task = $derived($tasks.find((candidate) => candidate.id === taskId) || null);
+    const parentTask = $derived(task?.parentId ? $tasks.find((candidate) => candidate.id === task.parentId) || null : null);
+    const childCount = $derived(task ? $tasks.filter((candidate) => candidate.parentId === task.id).length : 0);
+    const categoryColor = $derived(task ? getCategoryColor(task.category) : null);
+
+    /**
+     * @param {'text' | 'startDate' | 'endDate' | 'priority' | 'urgency' | 'category' | 'status'} field
+     * @param {string} value
+     */
     function updateField(field, value) {
-        tasks.update((/** @type {any[]} */ ts) => ts.map((/** @type {any} */ t) => t.id === taskId ? { ...t, [field]: value } : t));
+        updateTask(taskId, { [field]: value });
     }
 
     function deleteTask() {
-        if (confirm('이 작업을 삭제하시겠습니까?')) {
-            tasks.update((/** @type {any[]} */ ts) => ts.filter((/** @type {any} */ t) => t.id !== taskId));
+        const message = childCount > 0
+            ? `이 작업에는 ${childCount}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`
+            : '이 작업을 삭제하시겠습니까?';
+
+        if (confirm(message)) {
+            deleteTaskCascade(taskId);
             onclose();
         }
     }
 </script>
 
 {#if task}
-<div class="modal-backdrop" 
-     role="button"
-     tabindex="-1"
-     onclick={onclose} 
-     onkeydown={(e) => e.key === 'Escape' && onclose()}
-     transition:fade={{duration: 200}}>
-    <div class="side-panel" 
-         role="dialog"
-         aria-modal="true"
-         tabindex="0"
-         onclick={(e) => e.stopPropagation()} 
-         onkeydown={(e) => e.stopPropagation()}
-         transition:fly={{ x: 400, duration: 300 }}>
-        <div class="panel-header">
-            <h2>작업 상세 정보</h2>
-            <button class="close-btn" onclick={onclose}>✕</button>
-        </div>
-
-        <div class="panel-body">
-            <div class="form-section">
-                <label for="modal-task-text">작업명</label>
-                <input id="modal-task-text" type="text" value={task.text} oninput={(e) => updateField('text', (/** @type {HTMLInputElement} */ (e.target)).value)} />
-            </div>
-
-            <div class="form-grid">
-                <div class="form-section">
-                    <label for="modal-start-date">시작일</label>
-                    <input id="modal-start-date" type="date" value={task.startDate} oninput={(e) => updateField('startDate', (/** @type {HTMLInputElement} */ (e.target)).value)} />
+    <div
+        class="modal-backdrop"
+        role="button"
+        tabindex="-1"
+        onclick={onclose}
+        onkeydown={(event) => event.key === 'Escape' && onclose()}
+        transition:fade={{ duration: 180 }}>
+        <div
+            class="side-panel"
+            role="dialog"
+            aria-modal="true"
+            tabindex="0"
+            onclick={(event) => event.stopPropagation()}
+            onkeydown={(event) => event.stopPropagation()}
+            transition:fly={{ x: 320, duration: 260 }}>
+            <div class="panel-header">
+                <div>
+                    <p class="panel-eyebrow">작업 상세 정보</p>
+                    <h2>{task.text || '새 작업'}</h2>
                 </div>
+                <button class="close-btn" onclick={onclose}>✕</button>
+            </div>
+
+            <div class="panel-body">
+                <div class="summary-row">
+                    <span class="summary-chip status-chip {task.status}">{task.status === 'todo' ? '할 일' : task.status === 'doing' ? '진행 중' : '완료'}</span>
+                    <span class="summary-chip priority-chip {task.priority}">
+                        {task.priority === 'high' ? '🔴 높음' : task.priority === 'medium' ? '🟡 보통' : '🟢 낮음'}
+                    </span>
+                    <span class="summary-chip urgency-chip {task.urgency}">
+                        {task.urgency === 'urgent' ? '🔥 시급' : '⏳ 여유'}
+                    </span>
+                    {#if task.category && categoryColor}
+                        <span class="summary-chip category-chip" style={`background:${categoryColor.bg}; color:${categoryColor.fg}; border-color:${categoryColor.border};`}>
+                            {task.category}
+                        </span>
+                    {/if}
+                </div>
+
+                {#if parentTask || childCount > 0}
+                    <div class="meta-panel">
+                        {#if parentTask}
+                            <div class="meta-line">
+                                <span class="meta-label">상위 작업</span>
+                                <span class="meta-value">{parentTask.text}</span>
+                            </div>
+                        {/if}
+                        {#if childCount > 0}
+                            <div class="meta-line">
+                                <span class="meta-label">하위 작업</span>
+                                <span class="meta-value">{childCount}개</span>
+                            </div>
+                        {/if}
+                    </div>
+                {/if}
+
                 <div class="form-section">
-                    <label for="modal-end-date">마감일</label>
-                    <input id="modal-end-date" type="date" value={task.endDate} oninput={(e) => updateField('endDate', (/** @type {HTMLInputElement} */ (e.target)).value)} />
+                    <label for="modal-task-text">작업명</label>
+                    <input
+                        id="modal-task-text"
+                        type="text"
+                        value={task.text}
+                        oninput={(event) => updateField('text', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-section">
+                        <label for="modal-start-date">시작일</label>
+                        <input
+                            id="modal-start-date"
+                            type="date"
+                            value={task.startDate}
+                            oninput={(event) => updateField('startDate', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
+                    </div>
+
+                    <div class="form-section">
+                        <label for="modal-end-date">마감일</label>
+                        <input
+                            id="modal-end-date"
+                            type="date"
+                            value={task.endDate}
+                            oninput={(event) => updateField('endDate', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-section">
+                        <label for="modal-priority">중요도</label>
+                        <select
+                            id="modal-priority"
+                            value={task.priority}
+                            onchange={(event) => updateField('priority', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
+                            <option value="high">🔴 높음</option>
+                            <option value="medium">🟡 보통</option>
+                            <option value="low">🟢 낮음</option>
+                        </select>
+                    </div>
+
+                    <div class="form-section">
+                        <label for="modal-urgency">시급성</label>
+                        <select
+                            id="modal-urgency"
+                            value={task.urgency}
+                            onchange={(event) => updateField('urgency', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
+                            <option value="urgent">🔥 시급</option>
+                            <option value="normal">⏳ 여유</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-section">
+                        <label for="modal-category">카테고리</label>
+                        <input
+                            id="modal-category"
+                            type="text"
+                            value={task.category}
+                            placeholder="예: 개발, 기획"
+                            oninput={(event) => updateField('category', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
+                    </div>
+
+                    <div class="form-section">
+                        <label for="modal-status">상태</label>
+                        <select
+                            id="modal-status"
+                            value={task.status}
+                            onchange={(event) => updateField('status', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
+                            <option value="todo">할 일</option>
+                            <option value="doing">진행 중</option>
+                            <option value="done">완료</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <div class="form-section">
-                <label for="modal-priority">중요도</label>
-                <select id="modal-priority" value={task.priority} onchange={(e) => updateField('priority', (/** @type {HTMLSelectElement} */ (e.target)).value)}>
-                    <option value="high">🔴 긴급</option>
-                    <option value="medium">🟡 보통</option>
-                    <option value="low">🟢 낮음</option>
-                </select>
+            <div class="panel-footer">
+                <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
+                <button class="btn btn-primary" onclick={onclose}>완료</button>
             </div>
-
-            <div class="form-section">
-                <label for="modal-category">카테고리</label>
-                <input id="modal-category" type="text" value={task.category} oninput={(e) => updateField('category', (/** @type {HTMLInputElement} */ (e.target)).value)} placeholder="예: 개발, 기획" />
-            </div>
-
-            <div class="form-section">
-                <label for="modal-status">상태</label>
-                <select id="modal-status" value={task.status} onchange={(e) => updateField('status', (/** @type {HTMLSelectElement} */ (e.target)).value)}>
-                    <option value="todo">할 일</option>
-                    <option value="doing">진행 중</option>
-                    <option value="done">완료</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="panel-footer">
-            <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
-            <button class="btn btn-primary" style="margin-left: auto;" onclick={onclose}>완료</button>
         </div>
     </div>
-</div>
 {/if}
-
-<style>
-    .modal-backdrop {
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
-        z-index: 1000; display: flex; justify-content: flex-end;
-    }
-    .side-panel {
-        width: 400px; height: 100%; background: var(--surface-raised);
-        border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(0,0,0,0.5);
-        display: flex; flex-direction: column; overflow-y: auto;
-    }
-    .panel-header {
-        padding: 24px; border-bottom: 1px solid var(--border);
-        display: flex; justify-content: space-between; align-items: center;
-    }
-    .panel-header h2 { font-size: 18px; font-weight: 700; color: var(--text); }
-    .close-btn { background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; }
-    .close-btn:hover { color: var(--text); }
-
-    .panel-body { padding: 24px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
-    
-    .form-section { display: flex; flex-direction: column; gap: 8px; }
-    .form-section label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-    .form-section input, .form-section select {
-        padding: 12px; background: var(--bg); border: 1px solid var(--border);
-        border-radius: var(--radius-sm); color: var(--text); font-size: 14px;
-        transition: border-color 0.2s;
-    }
-    .form-section input:focus, .form-section select:focus { outline: none; border-color: var(--accent); }
-
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-    .panel-footer {
-        padding: 24px; border-top: 1px solid var(--border);
-        display: flex; gap: 12px; margin-top: auto;
-    }
-    
-    .btn {
-        padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
-        display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;
-    }
-    .btn-danger { background: rgba(248, 81, 73, 0.1); color: var(--priority-high); border: 1px solid var(--border); }
-    .btn-danger:hover { background: var(--priority-high); color: white; border-color: var(--priority-high); }
-    .btn-primary { background: var(--accent); color: white; border: none; }
-    .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
-</style>
