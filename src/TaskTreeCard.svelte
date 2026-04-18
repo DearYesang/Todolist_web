@@ -98,6 +98,51 @@
             renameSubtask(task.id, subtask.id, nextText);
         }
     }
+
+    /**
+     * @param {string} text
+     */
+    function getSubtaskParts(text) {
+        const urlPattern = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+        /** @type {{ type: 'text' | 'url'; value: string }[]} */
+        const parts = [];
+        let lastIndex = 0;
+
+        for (const match of text.matchAll(urlPattern)) {
+            const value = match[0];
+            const index = match.index ?? 0;
+
+            if (index > lastIndex) {
+                parts.push({
+                    type: 'text',
+                    value: text.slice(lastIndex, index)
+                });
+            }
+
+            parts.push({
+                type: 'url',
+                value
+            });
+
+            lastIndex = index + value.length;
+        }
+
+        if (lastIndex < text.length) {
+            parts.push({
+                type: 'text',
+                value: text.slice(lastIndex)
+            });
+        }
+
+        return parts.length > 0 ? parts : [{ type: 'text', value: text }];
+    }
+
+    /**
+     * @param {string} url
+     */
+    function getHref(url) {
+        return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+    }
 </script>
 
 <div
@@ -186,7 +231,22 @@
                             checked={subtask.done}
                             onchange={() => toggleSubtask(task.id, subtask.id)}
                             onclick={(event) => event.stopPropagation()} />
-                        <span class="subtask-text" class:done={subtask.done}>{subtask.text}</span>
+                        <span class="subtask-text" class:done={subtask.done}>
+                            {#each getSubtaskParts(subtask.text) as part, index (`${subtask.id}-${index}`)}
+                                {#if part.type === 'url'}
+                                    <a
+                                        class="subtask-link"
+                                        href={getHref(part.value)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onclick={(event) => event.stopPropagation()}>
+                                        {part.value}
+                                    </a>
+                                {:else}
+                                    {part.value}
+                                {/if}
+                            {/each}
+                        </span>
                         <button class="subtask-action edit" onclick={(event) => handleRenameSubtask(subtask, event)}>✏️</button>
                         <button class="subtask-action delete" onclick={(event) => {
                             event.stopPropagation();
