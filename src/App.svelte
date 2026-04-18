@@ -5,14 +5,16 @@
     import TaskForm from './TaskForm.svelte';
     import TaskModal from './TaskModal.svelte';
 
+    /** @type {string | null} */
     let selectedTaskId = $state(null);
 
-    // 파일 업로드 핸들러
+    /** @param {any} e */
     function importData(e) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (evt) => {
+            if (!evt.target || typeof evt.target.result !== 'string') return;
             try {
                 const data = JSON.parse(evt.target.result);
                 if (Array.isArray(data)) {
@@ -45,7 +47,10 @@
     </div>
     <div class="header-actions">
         <input type="file" id="import-file" accept=".json" style="display:none;" onchange={importData}>
-        <button class="btn" onclick={() => document.getElementById('import-file').click()} title="데이터 불러오기">📂 불러오기</button>
+        <button class="btn" onclick={() => {
+            const input = /** @type {HTMLInputElement | null} */ (document.getElementById('import-file'));
+            if (input) input.click();
+        }} title="데이터 불러오기">📂 불러오기</button>
         <button class="btn" onclick={exportData} title="데이터 내보내기">💾 내보내기</button>
     </div>
 </div>
@@ -53,9 +58,9 @@
 <TaskForm />
 
 {#if $currentView === 'kanban'}
-    <KanbanBoard openTask={(id) => selectedTaskId = id} />
+    <KanbanBoard openTask={(/** @type {string} */ id) => selectedTaskId = id} />
 {:else}
-    <GanttTimeline openTask={(id) => selectedTaskId = id} />
+    <GanttTimeline openTask={(/** @type {string} */ id) => selectedTaskId = id} />
 {/if}
 
 {#if selectedTaskId}

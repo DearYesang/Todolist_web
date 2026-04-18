@@ -8,7 +8,7 @@
         let minDate = new Date('2099-12-31');
         let maxDate = new Date('2000-01-01');
 
-        $tasks.forEach(t => {
+        $tasks.forEach((/** @type {any} */ t) => {
             const s = new Date(t.startDate);
             const e = new Date(t.endDate);
             if (s < minDate) minDate = new Date(s);
@@ -23,7 +23,7 @@
         minDate.setDate(minDate.getDate() - 3);
         maxDate.setDate(maxDate.getDate() + 5);
 
-        const totalDays = Math.round((maxDate - minDate) / 86400000);
+        const totalDays = Math.round((maxDate.getTime() - minDate.getTime()) / 86400000);
 
         const headerDays = [];
         for (let i = 0; i <= totalDays; i++) {
@@ -36,10 +36,11 @@
         }
 
         // --- Row Packing ---
+        /** @type {any[][]} */
         let packedRows = [];
-        let sortedTasks = [...$tasks].sort((a,b) => new Date(a.startDate) - new Date(b.startDate));
+        let sortedTasks = [...$tasks].sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
-        sortedTasks.forEach(task => {
+        sortedTasks.forEach((/** @type {any} */ task) => {
             const sTime = new Date(task.startDate).getTime();
             const eTime = new Date(task.endDate).getTime();
             
@@ -64,11 +65,12 @@
 
     const dayWidth = 48; // px
 
+    /** @param {any} task */
     function getCoords(task) {
         const s = new Date(task.startDate);
         const e = new Date(task.endDate);
-        const offsetDays = (s - ganttData.minDate) / 86400000;
-        const durationDays = (e - s) / 86400000 + 1;
+        const offsetDays = (s.getTime() - ganttData.minDate.getTime()) / 86400000;
+        const durationDays = (e.getTime() - s.getTime()) / 86400000 + 1;
         return {
             left: offsetDays * dayWidth,
             width: durationDays * dayWidth

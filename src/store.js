@@ -16,8 +16,8 @@ const endDayObj = new Date();
 endDayObj.setDate(endDayObj.getDate() + 2);
 const endStr = endDayObj.toISOString().split('T')[0];
 
-initialTasks = initialTasks.map(t => ({
-    id: t.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
+initialTasks = initialTasks.map((/** @type {any} */ t) => ({
+    id: t.id || Date.now().toString() + Math.random().toString(36).substring(2, 7),
     text: t.text || '',
     status: t.status || 'todo',
     startDate: t.startDate || todayStr,
@@ -53,8 +53,9 @@ export const CATEGORY_COLORS = [
     { bg: 'rgba(255,166,87,0.15)', fg: '#ffa657', border: '#ffa657' },
 ];
 
+/** @param {string} category */
 export function getCategoryColor(category) {
-    if (!category) return null;
+    if (!category) return { bg: 'rgba(110, 118, 129, 0.1)', fg: '#8b949e', border: '#30363d' };
     let hash = 0;
     for (let i = 0; i < category.length; i++) hash = category.charCodeAt(i) + ((hash << 5) - hash);
     return CATEGORY_COLORS[Math.abs(hash) % CATEGORY_COLORS.length];
