@@ -12,6 +12,10 @@
     <!-- 헤더 -->
     <div class="header">
         <h1>🚀 나의 칸반 보드</h1>
+        <div class="view-toggle" style="display: flex; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin-left: auto; margin-right: 16px;">
+            <button id="btn-view-kanban" class="view-btn active" onclick="switchView('kanban')">📋 칸반 뷰</button>
+            <button id="btn-view-gantt" class="view-btn" onclick="switchView('gantt')">📊 간트 뷰</button>
+        </div>
         <div class="header-actions">
             <!-- 데이터 불러오기 파일 인풋 (숨김) -->
             <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(event)">
@@ -28,6 +32,14 @@
             <div class="form-row">
                 <label class="form-label">작업명</label>
                 <input type="text" class="form-input" id="new-task-input" placeholder="무엇을 해야 하나요?">
+            </div>
+            <div class="form-row">
+                <label class="form-label">일정</label>
+                <div style="display:flex; gap: 8px; align-items:center;">
+                    <input type="date" class="form-input" id="start-date-input" style="flex:1; font-size:12px; padding:6px" placeholder="시작일">
+                    <span style="color:var(--text-muted)">~</span>
+                    <input type="date" class="form-input" id="end-date-input" style="flex:1; font-size:12px; padding:6px" placeholder="마감일">
+                </div>
             </div>
             <div class="form-row">
                 <label class="form-label">중요도</label>
@@ -81,7 +93,7 @@
     </div>
 
     <!-- 보드 -->
-    <div class="board">
+    <div class="board" id="kanban-board">
         <div class="column" id="col-todo">
             <div class="column-header">
                 <div class="column-dot"></div>
@@ -106,6 +118,12 @@
             </div>
             <div class="task-list" id="list-done"></div>
         </div>
+    </div>
+
+    <!-- 간트 차트 보드 -->
+    <div class="gantt-board" id="gantt-board" style="display: none;">
+        <div class="gantt-header-row" id="gantt-header-row"></div>
+        <div class="gantt-timeline" id="gantt-timeline"></div>
     </div>
 
     <script src="kanban.js"></script>

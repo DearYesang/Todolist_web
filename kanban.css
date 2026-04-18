@@ -593,3 +593,96 @@
             font-size: 13px;
         }
         .empty-state .icon { font-size: 28px; margin-bottom: 8px; }
+
+        /* ===== 뷰 스위처 ===== */
+        .view-btn {
+            flex: 1; border: none; padding: 6px 12px; font-size: 13px; font-family: inherit;
+            background: transparent; cursor: pointer; color: var(--text-muted); font-weight: 500;
+            transition: all var(--transition);
+        }
+        .view-btn:hover { color: var(--text); }
+        .view-btn.active { background: var(--surface-hover); color: var(--text); font-weight: 600; }
+
+        /* ===== 간트 차트 뷰 ===== */
+        .gantt-board {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 0 24px 30px;
+            overflow-x: auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .gantt-header-row {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--surface);
+            z-index: 10;
+            min-width: max-content;
+        }
+        .gantt-day-header {
+            flex-shrink: 0;
+            width: 48px;
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-muted);
+            padding: 8px 0;
+            border-right: 1px dashed var(--border);
+        }
+        .gantt-day-header.today {
+            color: var(--accent);
+            font-weight: 600;
+            background: rgba(88, 166, 255, 0.1);
+        }
+        .gantt-timeline {
+            position: relative;
+            padding-top: 10px;
+            padding-bottom: 20px;
+            min-width: max-content;
+        }
+        .gantt-row {
+            display: flex;
+            align-items: center;
+            min-height: 36px;
+            position: relative;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .gantt-row:hover {
+            background: var(--surface-hover);
+        }
+        .gantt-bar-wrapper {
+            position: absolute;
+            height: 24px;
+            top: 6px;
+            display: flex;
+            align-items: center;
+            transition: all var(--transition);
+        }
+        .gantt-bar {
+            height: 100%;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.1s;
+            position: relative;
+            min-width: 48px;
+        }
+        .gantt-bar:hover {
+            transform: scaleY(1.1);
+            filter: brightness(1.1);
+        }
+        .gantt-label {
+            margin-left: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .gantt-label.done {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
