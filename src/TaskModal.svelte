@@ -5,15 +5,16 @@
     let { taskId, onclose } = $props();
     
     // 선택된 태스크 구독 (Svelte 5 룬 사용)
-    let task = $derived($tasks.find(t => t.id === taskId));
+    let task = $derived($tasks.find((/** @type {any} */ t) => t.id === taskId));
 
+    /** @param {string} field @param {any} value */
     function updateField(field, value) {
-        tasks.update(ts => ts.map(t => t.id === taskId ? { ...t, [field]: value } : t));
+        tasks.update((/** @type {any[]} */ ts) => ts.map((/** @type {any} */ t) => t.id === taskId ? { ...t, [field]: value } : t));
     }
 
     function deleteTask() {
         if (confirm('이 작업을 삭제하시겠습니까?')) {
-            tasks.update(ts => ts.filter(t => t.id !== taskId));
+            tasks.update((/** @type {any[]} */ ts) => ts.filter((/** @type {any} */ t) => t.id !== taskId));
             onclose();
         }
     }
@@ -29,6 +30,7 @@
     <div class="side-panel" 
          role="dialog"
          aria-modal="true"
+         tabindex="0"
          onclick={(e) => e.stopPropagation()} 
          onkeydown={(e) => e.stopPropagation()}
          transition:fly={{ x: 400, duration: 300 }}>
@@ -40,23 +42,23 @@
         <div class="panel-body">
             <div class="form-section">
                 <label for="modal-task-text">작업명</label>
-                <input id="modal-task-text" type="text" value={task.text} oninput={(e) => updateField('text', e.target.value)} />
+                <input id="modal-task-text" type="text" value={task.text} oninput={(e) => updateField('text', (/** @type {HTMLInputElement} */ (e.target)).value)} />
             </div>
 
             <div class="form-grid">
                 <div class="form-section">
                     <label for="modal-start-date">시작일</label>
-                    <input id="modal-start-date" type="date" value={task.startDate} oninput={(e) => updateField('startDate', e.target.value)} />
+                    <input id="modal-start-date" type="date" value={task.startDate} oninput={(e) => updateField('startDate', (/** @type {HTMLInputElement} */ (e.target)).value)} />
                 </div>
                 <div class="form-section">
                     <label for="modal-end-date">마감일</label>
-                    <input id="modal-end-date" type="date" value={task.endDate} oninput={(e) => updateField('endDate', e.target.value)} />
+                    <input id="modal-end-date" type="date" value={task.endDate} oninput={(e) => updateField('endDate', (/** @type {HTMLInputElement} */ (e.target)).value)} />
                 </div>
             </div>
 
             <div class="form-section">
                 <label for="modal-priority">중요도</label>
-                <select id="modal-priority" value={task.priority} onchange={(e) => updateField('priority', e.target.value)}>
+                <select id="modal-priority" value={task.priority} onchange={(e) => updateField('priority', (/** @type {HTMLSelectElement} */ (e.target)).value)}>
                     <option value="high">🔴 긴급</option>
                     <option value="medium">🟡 보통</option>
                     <option value="low">🟢 낮음</option>
@@ -65,12 +67,12 @@
 
             <div class="form-section">
                 <label for="modal-category">카테고리</label>
-                <input id="modal-category" type="text" value={task.category} oninput={(e) => updateField('category', e.target.value)} placeholder="예: 개발, 기획" />
+                <input id="modal-category" type="text" value={task.category} oninput={(e) => updateField('category', (/** @type {HTMLInputElement} */ (e.target)).value)} placeholder="예: 개발, 기획" />
             </div>
 
             <div class="form-section">
                 <label for="modal-status">상태</label>
-                <select id="modal-status" value={task.status} onchange={(e) => updateField('status', e.target.value)}>
+                <select id="modal-status" value={task.status} onchange={(e) => updateField('status', (/** @type {HTMLSelectElement} */ (e.target)).value)}>
                     <option value="todo">할 일</option>
                     <option value="doing">진행 중</option>
                     <option value="done">완료</option>

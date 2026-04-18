@@ -19,11 +19,11 @@
     function addTask() {
         if (!newTaskText.trim()) return;
 
-        tasks.update(ts => {
+        tasks.update((/** @type {any[]} */ ts) => {
             const newTask = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
                 text: newTaskText.trim(),
-                status: parentId ? (ts.find(t => t.id === parentId)?.status || 'todo') : 'todo',
+                status: parentId ? (ts.find((/** @type {any} */ t) => t.id === parentId)?.status || 'todo') : 'todo',
                 priority: selectedPriority,
                 urgency: selectedUrgency,
                 category: category.trim(),
@@ -66,7 +66,7 @@
             <label class="form-label" for="parent-id">상위 작업 (선택)</label>
             <select id="parent-id" class="form-select" bind:value={parentId}>
                 <option value="">없음 (최상위)</option>
-                {#each $tasks.filter(t => !t.parentId) as t}
+                {#each $tasks.filter((/** @type {any} */ t) => !t.parentId) as t}
                     <option value={t.id}>{t.text}</option>
                 {/each}
             </select>
