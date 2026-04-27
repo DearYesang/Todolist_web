@@ -827,6 +827,13 @@ select {
     background: rgba(22, 27, 34, 0.82);
     border: 1px solid var(--border);
     border-radius: 0 var(--radius) var(--radius) 0;
+    cursor: grab;
+    user-select: none;
+    touch-action: pan-y;
+}
+
+.gantt-timeline-area.panning {
+    cursor: grabbing;
 }
 
 .gantt-header-row {
@@ -893,6 +900,7 @@ select {
     color: #fff;
     cursor: pointer;
     opacity: 0.92;
+    user-select: none;
 }
 
 .gantt-bar:hover {

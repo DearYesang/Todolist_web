@@ -9,6 +9,9 @@
     /** @type {HTMLDivElement | null} */
     let timelineArea = $state(null);
     let hasPositionedTimeline = $state(false);
+    let isPanning = $state(false);
+    let panStartX = 0;
+    let panStartScrollLeft = 0;
 
     const ganttData = $derived.by(() => {
         const visibleTasks = getFilteredTasks($tasks, $filters);
@@ -133,6 +136,49 @@
         };
     }
 
+    /**
+     * @param {EventTarget | null} target
+     */
+    function isTimelineControl(target) {
+        return target instanceof Element && Boolean(target.closest('.gantt-bar, button, input, select, textarea, a'));
+    }
+
+    /**
+     * @param {PointerEvent} event
+     */
+    function handlePanStart(event) {
+        if (!timelineArea || timelineArea.scrollWidth <= timelineArea.clientWidth) return;
+        if (event.button !== 0 || isTimelineControl(event.target)) return;
+
+        isPanning = true;
+        panStartX = event.clientX;
+        panStartScrollLeft = timelineArea.scrollLeft;
+        timelineArea.setPointerCapture(event.pointerId);
+        event.preventDefault();
+    }
+
+    /**
+     * @param {PointerEvent} event
+     */
+    function handlePanMove(event) {
+        if (!isPanning || !timelineArea) return;
+
+        timelineArea.scrollLeft = panStartScrollLeft - (event.clientX - panStartX);
+        event.preventDefault();
+    }
+
+    /**
+     * @param {PointerEvent} event
+     */
+    function handlePanEnd(event) {
+        if (!isPanning || !timelineArea) return;
+
+        isPanning = false;
+        if (timelineArea.hasPointerCapture(event.pointerId)) {
+            timelineArea.releasePointerCapture(event.pointerId);
+        }
+    }
+
     $effect(() => {
         if (hasPositionedTimeline || !timelineArea || ganttData.displayList.length === 0) return;
 
@@ -177,7 +223,15 @@
 
     <div
         class="gantt-timeline-area"
-        bind:this={timelineArea}>
+        class:panning={isPanning}
+        role="region"
+        aria-label="간트 기간 이동 영역"
+        bind:this={timelineArea}
+        onpointerdown={handlePanStart}
+        onpointermove={handlePanMove}
+        onpointerup={handlePanEnd}
+        onpointercancel={handlePanEnd}
+        onlostpointercapture={() => isPanning = false}>
         <div class="gantt-header-row" style={`width:${ganttData.gridWidth}px;`}>
             {#each ganttData.headerDays as day (day.key)}
                 <div class="gantt-day-header" class:today={day.isToday}>{day.label}</div>
