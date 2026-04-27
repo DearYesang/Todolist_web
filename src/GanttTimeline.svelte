@@ -1,16 +1,20 @@
 <script>
+    import { tick } from 'svelte';
     import { buildHierarchy, filters, getCategoryColor, getFilteredTasks, tasks } from './store.js';
 
     let { openTask } = $props();
 
     const dayWidth = 48;
+    const timelinePaddingDays = 60;
     /** @type {HTMLDivElement | null} */
     let timelineArea = $state(null);
+    let hasPositionedTimeline = $state(false);
 
     const ganttData = $derived.by(() => {
         const visibleTasks = getFilteredTasks($tasks, $filters);
         if (visibleTasks.length === 0) {
             return {
+                anchorLeft: 0,
                 displayList: [],
                 gridWidth: dayWidth,
                 headerDays: [],
@@ -29,8 +33,10 @@
             if (end > maxDate) maxDate = new Date(end);
         });
 
-        minDate.setDate(minDate.getDate() - 3);
-        maxDate.setDate(maxDate.getDate() + 5);
+        const firstTaskDate = new Date(minDate);
+
+        minDate.setDate(minDate.getDate() - timelinePaddingDays);
+        maxDate.setDate(maxDate.getDate() + timelinePaddingDays);
 
         const totalDays = Math.round((maxDate.getTime() - minDate.getTime()) / 86400000);
         const headerDays = [];
@@ -66,6 +72,10 @@
         addToDisplay(roots, 0);
 
         return {
+            anchorLeft: Math.max(
+                0,
+                ((firstTaskDate.getTime() - minDate.getTime()) / 86400000 - 4) * dayWidth
+            ),
             displayList,
             gridWidth: Math.max((totalDays + 1) * dayWidth, dayWidth),
             headerDays,
@@ -94,7 +104,9 @@
      */
     function handleTimelineWheel(event) {
         if (!timelineArea || timelineArea.scrollWidth <= timelineArea.clientWidth) return;
-        if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
+        const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+        if (rawDelta === 0) return;
 
         event.preventDefault();
 
@@ -103,16 +115,36 @@
             : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
                 ? timelineArea.clientWidth
                 : 1;
-        const scrollDelta = event.deltaY * deltaMultiplier;
+        const scrollDelta = rawDelta * deltaMultiplier;
 
-        timelineArea.scrollBy({
-            left: scrollDelta,
-            behavior: Math.abs(scrollDelta) > dayWidth * 2 ? 'smooth' : 'auto'
-        });
+        timelineArea.scrollLeft += scrollDelta;
     }
+
+    /**
+     * @param {HTMLDivElement} node
+     */
+    function timelineWheel(node) {
+        node.addEventListener('wheel', handleTimelineWheel, { passive: false });
+
+        return {
+            destroy() {
+                node.removeEventListener('wheel', handleTimelineWheel);
+            }
+        };
+    }
+
+    $effect(() => {
+        if (hasPositionedTimeline || !timelineArea || ganttData.displayList.length === 0) return;
+
+        tick().then(() => {
+            if (!timelineArea) return;
+            timelineArea.scrollLeft = ganttData.anchorLeft;
+            hasPositionedTimeline = true;
+        });
+    });
 </script>
 
-<div class="gantt-board">
+<div class="gantt-board" use:timelineWheel>
     <div class="gantt-sidebar">
         <div class="gantt-sidebar-header">작업 목록</div>
         <div class="gantt-sidebar-rows">
@@ -145,8 +177,7 @@
 
     <div
         class="gantt-timeline-area"
-        bind:this={timelineArea}
-        onwheel={handleTimelineWheel}>
+        bind:this={timelineArea}>
         <div class="gantt-header-row" style={`width:${ganttData.gridWidth}px;`}>
             {#each ganttData.headerDays as day (day.key)}
                 <div class="gantt-day-header" class:today={day.isToday}>{day.label}</div>
