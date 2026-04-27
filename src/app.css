@@ -898,13 +898,21 @@ select {
     border-radius: 6px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
     color: #fff;
-    cursor: pointer;
+    cursor: grab;
     opacity: 0.92;
+    touch-action: none;
     user-select: none;
 }
 
 .gantt-bar:hover {
     filter: brightness(1.1);
+}
+
+.gantt-bar.dragging {
+    cursor: grabbing;
+    filter: brightness(1.15);
+    opacity: 1;
+    z-index: 3;
 }
 
 .gantt-bar.done {

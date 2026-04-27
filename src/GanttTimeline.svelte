@@ -1,6 +1,6 @@
 <script>
     import { tick } from 'svelte';
-    import { buildHierarchy, filters, getCategoryColor, getFilteredTasks, tasks } from './store.js';
+    import { buildHierarchy, filters, getCategoryColor, getFilteredTasks, tasks, updateTask } from './store.js';
 
     let { openTask } = $props();
 
@@ -12,6 +12,12 @@
     let isPanning = $state(false);
     let panStartX = 0;
     let panStartScrollLeft = 0;
+    /** @type {{ taskId: string; startX: number; startDate: string; endDate: string; deltaDays: number; hasMoved: boolean; pointerId: number | null } | null} */
+    let draggingTask = $state(null);
+    /** @type {HTMLElement | null} */
+    let draggingTaskElement = null;
+    /** @type {string | null} */
+    let suppressOpenTaskId = null;
 
     const ganttData = $derived.by(() => {
         const visibleTasks = getFilteredTasks($tasks, $filters);
@@ -100,6 +106,212 @@
             left: offsetDays * dayWidth,
             width: Math.max(durationDays * dayWidth, 24)
         };
+    }
+
+    /**
+     * @param {string} dateString
+     * @param {number} days
+     */
+    function addDays(dateString, days) {
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        date.setDate(date.getDate() + days);
+
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-');
+    }
+
+    /**
+     * @param {import('./store.js').Task} task
+     * @param {number} clientX
+     * @param {number | null} pointerId
+     * @param {HTMLElement} target
+     */
+    function startTaskDrag(task, clientX, pointerId, target) {
+        if (draggingTask) return;
+
+        draggingTask = {
+            taskId: task.id,
+            startX: clientX,
+            startDate: task.startDate,
+            endDate: task.endDate,
+            deltaDays: 0,
+            hasMoved: false,
+            pointerId
+        };
+
+        draggingTaskElement = target;
+    }
+
+    /**
+     * @param {number} clientX
+     */
+    function updateTaskDrag(clientX) {
+        if (!draggingTask) return;
+
+        const deltaPixels = clientX - draggingTask.startX;
+        const deltaDays = Math.round(deltaPixels / dayWidth);
+        draggingTask = {
+            ...draggingTask,
+            deltaDays,
+            hasMoved: draggingTask.hasMoved || Math.abs(deltaPixels) > 4
+        };
+    }
+
+    /**
+     * @param {number | null} pointerId
+     */
+    function finishTaskDrag(pointerId) {
+        if (!draggingTask || draggingTask.pointerId !== pointerId) return;
+
+        const finishedDrag = draggingTask;
+        draggingTask = null;
+        window.removeEventListener('pointermove', handleTaskDragMove);
+        window.removeEventListener('pointerup', handleTaskDragEnd);
+        window.removeEventListener('pointercancel', handleTaskDragEnd);
+        window.removeEventListener('mousemove', handleTaskMouseMove);
+        window.removeEventListener('mouseup', handleTaskMouseEnd);
+
+        if (pointerId !== null && draggingTaskElement?.hasPointerCapture(pointerId)) {
+            draggingTaskElement.releasePointerCapture(pointerId);
+        }
+        draggingTaskElement = null;
+
+        if (finishedDrag.hasMoved) {
+            suppressOpenTaskId = finishedDrag.taskId;
+            setTimeout(() => {
+                if (suppressOpenTaskId === finishedDrag.taskId) {
+                    suppressOpenTaskId = null;
+                }
+            }, 0);
+        }
+
+        if (!finishedDrag.hasMoved || finishedDrag.deltaDays === 0) return;
+
+        updateTask(finishedDrag.taskId, {
+            startDate: addDays(finishedDrag.startDate, finishedDrag.deltaDays),
+            endDate: addDays(finishedDrag.endDate, finishedDrag.deltaDays)
+        });
+    }
+
+    /**
+     * @param {PointerEvent} event
+     * @param {import('./store.js').Task} task
+     */
+    function handleTaskDragStart(event, task) {
+        if (event.button !== 0) return;
+
+        event.stopPropagation();
+        const target = /** @type {HTMLElement} */ (event.currentTarget);
+        startTaskDrag(task, event.clientX, event.pointerId, target);
+        target.setPointerCapture(event.pointerId);
+        window.addEventListener('pointermove', handleTaskDragMove);
+        window.addEventListener('pointerup', handleTaskDragEnd);
+        window.addEventListener('pointercancel', handleTaskDragEnd);
+    }
+
+    /**
+     * @param {PointerEvent} event
+     */
+    function handleTaskDragMove(event) {
+        if (!draggingTask || draggingTask.pointerId !== event.pointerId) return;
+
+        updateTaskDrag(event.clientX);
+        if (draggingTask?.hasMoved) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+
+    /**
+     * @param {PointerEvent} event
+     */
+    function handleTaskDragEnd(event) {
+        finishTaskDrag(event.pointerId);
+    }
+
+    /**
+     * @param {MouseEvent} event
+     * @param {import('./store.js').Task} task
+     */
+    function handleTaskMouseStart(event, task) {
+        if (event.button !== 0 || draggingTask) return;
+
+        event.stopPropagation();
+        startTaskDrag(task, event.clientX, null, /** @type {HTMLElement} */ (event.currentTarget));
+        window.addEventListener('mousemove', handleTaskMouseMove);
+        window.addEventListener('mouseup', handleTaskMouseEnd);
+    }
+
+    /**
+     * @param {MouseEvent} event
+     */
+    function handleTaskMouseMove(event) {
+        if (!draggingTask || draggingTask.pointerId !== null) return;
+
+        updateTaskDrag(event.clientX);
+        if (draggingTask?.hasMoved) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+
+    /**
+     * @param {MouseEvent} event
+     */
+    function handleTaskMouseEnd(event) {
+        event.stopPropagation();
+        finishTaskDrag(null);
+    }
+
+    /**
+     * @param {DragEvent} event
+     * @param {import('./store.js').Task} task
+     */
+    function handleNativeTaskDragStart(event, task) {
+        event.stopPropagation();
+        startTaskDrag(task, event.clientX, null, /** @type {HTMLElement} */ (event.currentTarget));
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', task.id);
+        }
+    }
+
+    /**
+     * @param {DragEvent} event
+     */
+    function handleNativeTaskDrag(event) {
+        if (!draggingTask || draggingTask.pointerId !== null || event.clientX === 0) return;
+        updateTaskDrag(event.clientX);
+    }
+
+    /**
+     * @param {DragEvent} event
+     */
+    function handleNativeTaskDragEnd(event) {
+        event.stopPropagation();
+        if (draggingTask && event.clientX !== 0) {
+            updateTaskDrag(event.clientX);
+        }
+        finishTaskDrag(null);
+    }
+
+    /**
+     * @param {MouseEvent} event
+     * @param {string} taskId
+     */
+    function handleTaskClick(event, taskId) {
+        if (suppressOpenTaskId === taskId) {
+            event.preventDefault();
+            event.stopPropagation();
+            suppressOpenTaskId = null;
+            return;
+        }
+
+        openTask(taskId);
     }
 
     /**
@@ -253,12 +465,22 @@
                             <div
                                 class="gantt-bar"
                                 class:done={item.task.status === 'done'}
+                                class:dragging={draggingTask?.taskId === item.task.id}
+                                draggable="true"
                                 role="button"
                                 tabindex="0"
                                 title={`${item.task.text} (${item.task.startDate} ~ ${item.task.endDate})`}
-                                onclick={() => openTask(item.task.id)}
+                                ondragstart={(event) => handleNativeTaskDragStart(event, item.task)}
+                                ondrag={handleNativeTaskDrag}
+                                ondragend={handleNativeTaskDragEnd}
+                                onpointerdown={(event) => handleTaskDragStart(event, item.task)}
+                                onpointermove={handleTaskDragMove}
+                                onpointerup={handleTaskDragEnd}
+                                onpointercancel={handleTaskDragEnd}
+                                onmousedown={(event) => handleTaskMouseStart(event, item.task)}
+                                onclick={(event) => handleTaskClick(event, item.task.id)}
                                 onkeydown={(event) => event.key === 'Enter' && openTask(item.task.id)}
-                                style={`background:${color.fg}; border-color:${color.border};`}>
+                                style={`background:${color.fg}; border-color:${color.border}; transform: translateX(${draggingTask?.taskId === item.task.id ? draggingTask.deltaDays * dayWidth : 0}px);`}>
                                 <span class="bar-inner-text">{item.task.text}</span>
                             </div>
                         </div>
