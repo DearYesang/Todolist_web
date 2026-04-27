@@ -1,5 +1,13 @@
 <script>
-    import { tasks } from './store.js';
+    import {
+        categories,
+        createId,
+        getDefaultDateRange,
+        normalizeDateRange,
+        PRIORITY_LABELS,
+        tasks,
+        URGENCY_LABELS
+    } from './store.js';
 
     let isFormOpen = $state(false);
     let newTaskText = $state('');
@@ -8,77 +16,151 @@
     let category = $state('');
     let parentId = $state('');
 
-    let today = new Date().toISOString().split('T')[0];
-    let endDay = new Date();
-    endDay.setDate(endDay.getDate() + 2);
-    let futureStr = endDay.toISOString().split('T')[0];
+    const defaults = getDefaultDateRange();
+    let startDate = $state(defaults.startDate);
+    let endDate = $state(defaults.endDate);
 
-    let startDate = $state(today);
-    let endDate = $state(futureStr);
+    function resetForm() {
+        const range = getDefaultDateRange();
+        newTaskText = '';
+        selectedPriority = 'medium';
+        selectedUrgency = 'normal';
+        category = '';
+        parentId = '';
+        startDate = range.startDate;
+        endDate = range.endDate;
+        isFormOpen = false;
+    }
 
     function addTask() {
-        if (!newTaskText.trim()) return;
+        const text = newTaskText.trim();
+        if (!text) return;
 
-        tasks.update((/** @type {any[]} */ ts) => {
-            const newTask = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                text: newTaskText.trim(),
-                status: parentId ? (ts.find((/** @type {any} */ t) => t.id === parentId)?.status || 'todo') : 'todo',
-                priority: selectedPriority,
-                urgency: selectedUrgency,
-                category: category.trim(),
-                parentId: parentId || null,
-                startDate,
-                endDate,
-                subtasks: [],
-                collapsed: false,
-                createdAt: Date.now()
-            };
-            return [...ts, newTask];
+        tasks.update((current) => {
+            const parent = parentId ? current.find((task) => task.id === parentId) : null;
+            const normalizedRange = normalizeDateRange(startDate, endDate);
+
+            return [
+                ...current,
+                {
+                    id: createId(),
+                    text,
+                    status: parent?.status || 'todo',
+                    startDate: normalizedRange.startDate,
+                    endDate: normalizedRange.endDate,
+                    priority: selectedPriority,
+                    urgency: selectedUrgency,
+                    category: category.trim(),
+                    parentId: parent?.id || null,
+                    subtasks: [],
+                    collapsed: false,
+                    createdAt: Date.now()
+                }
+            ];
         });
 
-        newTaskText = '';
-        category = '';
-        isFormOpen = false;
+        resetForm();
+    }
+
+    function handleTaskInputKeydown(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addTask();
+        }
     }
 </script>
 
-<div class="add-panel" style="max-width: 1320px; margin: 0 auto; margin-bottom: 24px;">
-    <button class="add-toggle" onclick={() => isFormOpen = !isFormOpen}>
+<div class="add-panel">
+    <button class="add-toggle" class:active={isFormOpen} onclick={() => isFormOpen = !isFormOpen}>
         {isFormOpen ? '－ 닫기' : '＋ 새 작업 추가...'}
     </button>
-    
+
     {#if isFormOpen}
-    <div class="add-form" style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px;">
-        <div class="form-row">
-            <label class="form-label" for="task-text">작업명</label>
-            <input type="text" id="task-text" class="form-input" bind:value={newTaskText} placeholder="무엇을 해야 하나요?">
-        </div>
-        <div class="form-row">
-            <label class="form-label" for="start-date">일정</label>
-            <div style="display:flex; gap: 8px; align-items:center;">
-                <input type="date" id="start-date" class="form-input" bind:value={startDate} style="flex:1; font-size:12px; padding:6px">
-                <span style="color:var(--text-muted)">~</span>
-                <input type="date" id="end-date" class="form-input" bind:value={endDate} style="flex:1; font-size:12px; padding:6px">
+        <div class="add-form active">
+            <div class="form-grid">
+                <div class="form-row form-row-stretch">
+                    <label class="form-label" for="task-text">작업명</label>
+                    <input
+                        id="task-text"
+                        class="form-input"
+                        type="text"
+                        bind:value={newTaskText}
+                        placeholder="무엇을 해야 하나요?"
+                        onkeydown={handleTaskInputKeydown} />
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label" for="parent-id">상위 작업</label>
+                    <select id="parent-id" class="form-select" bind:value={parentId}>
+                        <option value="">없음 (최상위)</option>
+                        {#each $tasks as task (task.id)}
+                            <option value={task.id}>
+                                {task.status === 'todo' ? '📋' : task.status === 'doing' ? '🔄' : '✅'} {task.text}
+                            </option>
+                        {/each}
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label" for="start-date">일정</label>
+                    <div class="date-range">
+                        <input id="start-date" class="form-input form-date-input" type="date" bind:value={startDate} />
+                        <span class="range-separator">~</span>
+                        <input id="end-date" class="form-input form-date-input" type="date" bind:value={endDate} />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label" for="category">카테고리</label>
+                    <input
+                        id="category"
+                        class="form-input"
+                        type="text"
+                        bind:value={category}
+                        placeholder="예: 개발, 디자인, 마케팅"
+                        list="category-list" />
+                    <datalist id="category-list">
+                        {#each $categories as categoryOption}
+                            <option value={categoryOption}></option>
+                        {/each}
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="pill-section">
+                <span class="form-label">중요도</span>
+                <div class="priority-pills">
+                    {#each Object.entries(PRIORITY_LABELS) as [value, label]}
+                        <button
+                            class="priority-pill"
+                            class:active={selectedPriority === value}
+                            data-p={value}
+                            onclick={() => selectedPriority = value}>
+                            {label}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+
+            <div class="pill-section">
+                <span class="form-label">시급성</span>
+                <div class="urgency-pills">
+                    {#each Object.entries(URGENCY_LABELS) as [value, label]}
+                        <button
+                            class="urgency-pill"
+                            class:active={selectedUrgency === value}
+                            data-u={value}
+                            onclick={() => selectedUrgency = value}>
+                            {label}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn" onclick={resetForm}>취소</button>
+                <button class="btn btn-primary" onclick={addTask}>✚ 작업 추가</button>
             </div>
         </div>
-        <div class="form-row">
-            <label class="form-label" for="parent-id">상위 작업 (선택)</label>
-            <select id="parent-id" class="form-select" bind:value={parentId}>
-                <option value="">없음 (최상위)</option>
-                {#each $tasks.filter((/** @type {any} */ t) => !t.parentId) as t}
-                    <option value={t.id}>{t.text}</option>
-                {/each}
-            </select>
-        </div>
-        <div class="form-row">
-            <label class="form-label" for="category">카테고리</label>
-            <input type="text" id="category" class="form-input" bind:value={category} placeholder="예: 개발, 기획">
-        </div>
-        
-        <div class="form-row" style="margin-left: auto; justify-content: flex-end; align-items: flex-end;">
-            <button class="btn btn-primary" onclick={addTask}>✚ 작업 추가</button>
-        </div>
-    </div>
     {/if}
 </div>
