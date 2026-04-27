@@ -823,9 +823,11 @@ select {
 .gantt-timeline-area {
     flex: 1;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
     background: rgba(22, 27, 34, 0.82);
     border: 1px solid var(--border);
     border-radius: 0 var(--radius) var(--radius) 0;
+    scroll-behavior: smooth;
 }
 
 .gantt-header-row {

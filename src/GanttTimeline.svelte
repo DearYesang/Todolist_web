@@ -4,6 +4,8 @@
     let { openTask } = $props();
 
     const dayWidth = 48;
+    /** @type {HTMLDivElement | null} */
+    let timelineArea = $state(null);
 
     const ganttData = $derived.by(() => {
         const visibleTasks = getFilteredTasks($tasks, $filters);
@@ -86,6 +88,28 @@
             width: Math.max(durationDays * dayWidth, 24)
         };
     }
+
+    /**
+     * @param {WheelEvent} event
+     */
+    function handleTimelineWheel(event) {
+        if (!timelineArea || timelineArea.scrollWidth <= timelineArea.clientWidth) return;
+        if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
+        event.preventDefault();
+
+        const deltaMultiplier = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? 16
+            : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                ? timelineArea.clientWidth
+                : 1;
+        const scrollDelta = event.deltaY * deltaMultiplier;
+
+        timelineArea.scrollBy({
+            left: scrollDelta,
+            behavior: Math.abs(scrollDelta) > dayWidth * 2 ? 'smooth' : 'auto'
+        });
+    }
 </script>
 
 <div class="gantt-board">
@@ -119,7 +143,10 @@
         </div>
     </div>
 
-    <div class="gantt-timeline-area">
+    <div
+        class="gantt-timeline-area"
+        bind:this={timelineArea}
+        onwheel={handleTimelineWheel}>
         <div class="gantt-header-row" style={`width:${ganttData.gridWidth}px;`}>
             {#each ganttData.headerDays as day (day.key)}
                 <div class="gantt-day-header" class:today={day.isToday}>{day.label}</div>
