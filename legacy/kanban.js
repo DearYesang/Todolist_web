@@ -7,11 +7,18 @@
         let selectedUrgency = 'normal';
         let filters = { priority: 'all', urgency: 'all', category: 'all' };
 
-        // 기존 데이터 마이그레이션
+        // 기존 데이터 마이그레이션 (날짜 기본값: 오늘부터 3일간)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const endDayObj = new Date();
+        endDayObj.setDate(endDayObj.getDate() + 2); // 3일간 (오늘, 내일, 모레)
+        const endStr = endDayObj.toISOString().split('T')[0];
+
         tasks = tasks.map(t => ({
             id: t.id || Date.now().toString(),
             text: t.text || '',
             status: t.status || 'todo',
+            startDate: t.startDate || todayStr,
+            endDate: t.endDate || endStr,
             priority: t.priority || 'medium',
             urgency: t.urgency || 'normal',
             category: t.category || '',
@@ -238,7 +245,139 @@
         // ==========================================
         // 렌더링
         // ==========================================
+        let currentView = 'kanban';
+
+        function switchView(type) {
+            currentView = type;
+            document.getElementById('btn-view-kanban').classList.toggle('active', type === 'kanban');
+            document.getElementById('btn-view-gantt').classList.toggle('active', type === 'gantt');
+            
+            document.getElementById('kanban-board').style.display = type === 'kanban' ? 'flex' : 'none';
+            document.getElementById('gantt-board').style.display = type === 'gantt' ? 'block' : 'none';
+            
+            refreshView();
+        }
+
         function renderBoard() {
+            refreshView();
+        }
+
+        function refreshView() {
+            if (currentView === 'kanban') {
+                _renderBoard();
+            } else {
+                renderGantt();
+            }
+        }
+
+        function renderGantt() {
+            const headerContainer = document.getElementById('gantt-header-row');
+            const timelineContainer = document.getElementById('gantt-timeline');
+            
+            const visibleTasks = tasks.filter(t => passesFilter(t));
+
+            if (visibleTasks.length === 0) {
+                headerContainer.innerHTML = '';
+                timelineContainer.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>일정을 그릴 작업이 없습니다.</p></div>`;
+                return;
+            }
+
+            let minDate = new Date('2099-12-31');
+            let maxDate = new Date('2000-01-01');
+
+            visibleTasks.forEach(t => {
+                const s = new Date(t.startDate);
+                const e = new Date(t.endDate);
+                if (s < minDate) minDate = s;
+                if (e > maxDate) maxDate = e;
+            });
+
+            minDate.setDate(minDate.getDate() - 3);
+            maxDate.setDate(maxDate.getDate() + 5);
+
+            const totalDays = Math.round((maxDate - minDate) / 86400000);
+            
+            let headerHTML = '';
+            for (let i = 0; i <= totalDays; i++) {
+                const d = new Date(minDate);
+                d.setDate(d.getDate() + i);
+                const isToday = d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+                headerHTML += `<div class="gantt-day-header ${isToday ? 'today' : ''}">${d.getMonth()+1}/${d.getDate()}</div>`;
+            }
+            headerContainer.innerHTML = headerHTML;
+
+            const childrenMap = {};
+            const rootTasks = [];
+            visibleTasks.forEach(t => {
+                if (t.parentId && visibleTasks.find(p => p.id === t.parentId)) {
+                    if (!childrenMap[t.parentId]) childrenMap[t.parentId] = [];
+                    childrenMap[t.parentId].push(t);
+                } else {
+                    rootTasks.push(t);
+                }
+            });
+
+            const displayList = [];
+            function addToList(taskArr, depth) {
+                taskArr.forEach(t => {
+                    displayList.push({task: t, depth});
+                    if (childrenMap[t.id] && !t.collapsed) addToList(childrenMap[t.id], depth + 1);
+                });
+            }
+            addToList(rootTasks, 0);
+
+            let timelineHTML = '';
+            let sidebarHTML = '';
+
+            displayList.forEach(({task, depth}) => {
+                const s = new Date(task.startDate);
+                const e = new Date(task.endDate);
+                const dayWidth = 48;
+                
+                const offsetDays = (s - minDate) / 86400000;
+                const durationDays = (e - s) / 86400000 + 1;
+
+                const leftPx = offsetDays * dayWidth;
+                const widthPx = durationDays * dayWidth;
+
+                const cc = getCategoryColor(task.category) || { bg: 'var(--surface-hover)', fg: 'var(--text-secondary)', border: 'var(--border)' };
+                const isDone = task.status === 'done';
+
+                sidebarHTML += `
+                <div class="gantt-sidebar-item ${isDone ? 'done' : ''}" style="padding-left: ${16 + depth * 24}px">
+                    ${depth > 0 ? '<div class="gantt-link-line"></div>' : ''}
+                    <span onclick="editTaskName('${task.id}')" title="${escapeHTML(task.text)}">
+                        ${isDone ? '☑️' : '🗓️'} ${escapeHTML(task.text)}
+                    </span>
+                </div>`;
+
+                timelineHTML += `
+                <div class="gantt-row">
+                    <div class="gantt-bar-wrapper" style="left: ${leftPx}px; width: ${widthPx}px;">
+                        <div class="gantt-bar ${isDone ? 'done' : ''}" onclick="editTaskDates('${task.id}')" style="background:${cc.fg}; border: 1px solid ${cc.border};" title="시작: ${task.startDate} / 마감: ${task.endDate}"></div>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('gantt-sidebar-rows').innerHTML = sidebarHTML;
+            timelineContainer.innerHTML = timelineHTML;
+        }
+
+        function editTaskDates(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const newStart = prompt('시작일을 수정하세요 (YYYY-MM-DD):', task.startDate);
+            if (newStart !== null) {
+                const newEnd = prompt('마감일을 수정하세요 (YYYY-MM-DD):', task.endDate || newStart);
+                if (newEnd !== null) {
+                    task.startDate = newStart.trim() || task.startDate;
+                    task.endDate = newEnd.trim() || task.endDate;
+                    saveTasks();
+                    refreshView();
+                }
+            }
+        }
+
+        function _renderBoard() {
             const statuses = ['todo', 'doing', 'done'];
             statuses.forEach(status => {
                 const list = document.getElementById(`list-${status}`);
@@ -361,7 +500,7 @@
 
             // 체크리스트 (서브태스크)
             let subtaskHTML = '';
-            if (task.subtasks.length > 0 || true) {
+            { // 항상 추가 폼 렌더링을 위해 블록 유지
                 const doneCount = task.subtasks.filter(s => s.done).length;
                 const total = task.subtasks.length;
                 const pct = total > 0 ? (doneCount / total * 100) : 0;

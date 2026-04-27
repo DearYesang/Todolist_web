@@ -1,172 +1,43 @@
-# 🚀 나의 칸반 보드
+# Svelte + Vite
 
-크로스 플랫폼 칸반 보드 — 계층형 작업 관리 도구
+This template should help get you started developing with Svelte in Vite.
 
-![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)
-![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+## Recommended IDE Setup
 
----
+[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
 
-## 📋 소개
+## Need an official Svelte framework?
 
-별도의 서버나 설치 없이 **브라우저만으로 동작**하는 경량 칸반 보드입니다.  
-단순한 할 일 관리를 넘어 **계층형 작업 구조**, **체크리스트**, **중요도/카테고리 분류** 기능을 제공합니다.
+Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
 
-> 모든 데이터는 브라우저의 `localStorage`에 자동 저장되므로 새로고침 후에도 유지됩니다.
+## Technical considerations
 
----
+**Why use this over SvelteKit?**
 
-## ✨ 주요 기능
+- It brings its own routing solution which might not be preferable for some users.
+- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
 
-### 📌 칸반 보드 기본
-| 기능 | 설명 |
-|------|------|
-| 3단계 워크플로우 | **할 일 → 진행 중 → 완료** 칼럼 간 이동 |
-| 실시간 저장 | `localStorage` 기반 자동 저장 |
-| 반응형 디자인 | 데스크톱 · 태블릿 · 모바일 대응 |
-| 다크 테마 | GitHub 스타일 프리미엄 다크 UI |
+This template contains as little as possible to get started with Vite + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
 
-### ✅ 체크리스트 (Sub-tasks)
-- 각 카드 내부에 **체크리스트 항목** 추가 가능
-- 체크박스로 항목 완료/미완료 토글 및 ✏️ 버튼으로 빠른 인라인 수정
-- 텍스트 드래그(복사) 지원 및 텍스트 내 웹사이트 주소 **자동 하이퍼링크** 파싱
-- **진행률 바**로 완료 현황 시각화 및 항목별 개별 삭제 지원
+Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
 
-### 🌳 부모-자식 트리 구조
-- 작업 생성 시 **상위 작업**을 지정하여 계층 구조 형성
-- 같은 칼럼 내 자식 카드는 **들여쓰기 + 연결선**으로 표시
-- 자식이 다른 칼럼으로 이동하면 **↳ 부모 참조 태그** 자동 표시
-- 부모 카드에서 **▼ 접기/펼치기** 토글 지원
-- 부모 카드에 `📎 하위 작업 N개 (완료 X/N)` 진행 현황 표시
-- 부모 삭제 시 하위 작업 일괄 삭제 확인
+**Why include `.vscode/extensions.json`?**
 
-### 🎯 중요도, 시급성 & 카테고리
-- **중요도 3단계**: 🔴 높음 · 🟡 보통 · 🟢 낮음
-  - 카드 좌측 컬러 바 + 뱃지로 시각적 구분
-- **시급성 여부**: 🔥 시급 · ⏳ 여유
-  - 뱃지로 긴급한 작업 여부 표시
-- **카테고리 태그**: 자유 입력 (예: 개발, 디자인, 마케팅)
-  - 등록된 카테고리 태그를 마우스로 직접 클릭하여 바로 수정/삭제 가능
-  - 카테고리가 없는 카드는 `+ 카테고리` 버튼으로 즉시 단일 카테고리 부여
-- **필터 바**: 중요도 · 시급성 · 카테고리별 실시간 필터링
+Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
 
-### 🧹 기타
-- **인라인 수정**: 작업명 텍스트를 직접 클릭해 별도 메뉴 없이 이름 수정
-- **데이터 백업/복원**: `💾 내보내기`, `📂 불러오기` 버튼 지원. 브라우저 간 데이터 이동(Chrome → Brave 등) 가능
-- **완료 작업 일괄 정리** 기능
-- 부드러운 **애니메이션**, 커스텀 스크롤바 등 프리미엄 다크 테마 적용
+**Why enable `checkJs` in the JS template?**
 
----
+It is likely that most cases of changing variable types in runtime are likely to be accidental, rather than deliberate. This provides advanced typechecking out of the box. Should you like to take advantage of the dynamically-typed nature of JavaScript, it is trivial to change the configuration.
 
-## 🚀 시작하기
+**Why is HMR not preserving my local component state?**
 
-### 실행 방법
+HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/sveltejs/svelte-hmr/tree/master/packages/svelte-hmr#preservation-of-local-state).
 
-별도의 설치가 필요 없습니다!
+If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
 
-```bash
-# 1. 저장소 클론
-git clone https://github.com/DearYesang/-.git
-
-# 2. 브라우저에서 열기
-open kanban.html        # macOS
-start kanban.html       # Windows
-xdg-open kanban.html    # Linux
+```js
+// store.js
+// An extremely simple external store
+import { writable } from 'svelte/store'
+export default writable(0)
 ```
-
-또는 `kanban.html` 파일을 **브라우저로 드래그 & 드롭**하면 바로 사용할 수 있습니다.
-
-### 요구 사항
-
-- 모던 웹 브라우저 (Chrome, Firefox, Safari, Edge)
-- 인터넷 연결 (Google Fonts 로드용, 오프라인에서도 시스템 폰트로 동작)
-
----
-
-## 🎮 사용 가이드
-
-### 작업 추가
-
-1. 상단의 **"＋ 새 작업 추가..."** 클릭
-2. **작업명** 입력
-3. **중요도** 선택 (높음 / 보통 / 낮음)
-4. **시급성** 선택 (시급 / 여유)
-5. **카테고리** 입력 (선택사항)
-6. **상위 작업** 선택 (선택사항, 계층 구조 형성)
-7. **"✚ 작업 추가"** 클릭 또는 Enter
-
-### 작업 이동
-
-각 카드의 하단 버튼으로 칼럼 간 이동:
-- `할 일` → **진행 중으로 →**
-- `진행 중` → **← 할 일** 또는 **완료 →**
-- `완료` → **← 진행 중**
-
-### 체크리스트 관리
-
-1. 카드 내 **"+ 체크리스트 추가..."** 입력란에 항목 입력 후 Enter
-2. 체크박스 클릭으로 완료/미완료 토글
-3. 항목에 마우스를 올리면 **× 삭제** 버튼 표시
-
-### 필터링
-
-상단 필터 바에서:
-- **중요도별**: 전체 / 🔴 높음 / 🟡 보통 / 🟢 낮음
-- **시급성별**: 전체 / 🔥 시급 / ⏳ 여유
-- **카테고리별**: 전체 / 개별 카테고리 선택
-
----
-
-## 🏗️ 기술 스택
-
-| 기술 | 용도 |
-|------|------|
-| **HTML5** | 시맨틱 마크업 |
-| **CSS3** | 다크 테마, 애니메이션, 반응형 레이아웃 |
-| **Vanilla JS** | 상태 관리, DOM 조작, 이벤트 처리 |
-| **localStorage** | 클라이언트 데이터 영속성 |
-| **Google Fonts (Inter)** | 타이포그래피 |
-
-> 프레임워크나 외부 라이브러리 **없이** 순수 웹 기술만으로 구현되었습니다.
-
----
-
-## 📁 프로젝트 구조
-
-```
-Todolist/
-├── kanban.html    # 앱 구조 및 마크업 (HTML)
-├── kanban.css     # 스타일링 및 컴포넌트 디자인 (CSS)
-├── kanban.js      # 기능 로직, 데이터 관리, 상태 제어 (JS)
-└── README.md      # 프로젝트 문서
-```
-
----
-
-## 📊 데이터 구조
-
-각 작업은 아래 구조로 `localStorage`에 JSON 형태로 저장됩니다:
-
-```javascript
-{
-  id: "1713280000000",      // 고유 ID (타임스탬프 기반)
-  text: "작업 내용",         // 작업명
-  status: "todo",           // 상태: "todo" | "doing" | "done"
-  priority: "medium",       // 중요도: "high" | "medium" | "low"
-  urgency: "normal",        // 시급성: "urgent" | "normal"
-  category: "개발",          // 카테고리 (빈 문자열 가능)
-  parentId: null,           // 상위 작업 ID (null이면 최상위)
-  subtasks: [               // 체크리스트 항목 배열
-    { id: "...", text: "항목", done: false }
-  ],
-  collapsed: false,         // 자식 접기 상태
-  createdAt: 1713280000000  // 생성 시간
-}
-```
-
----
-
-## 📄 라이선스
-
-이 프로젝트는 자유롭게 사용, 수정, 배포할 수 있습니다.

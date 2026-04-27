@@ -593,3 +593,160 @@
             font-size: 13px;
         }
         .empty-state .icon { font-size: 28px; margin-bottom: 8px; }
+
+        /* ===== 뷰 스위처 ===== */
+        .view-btn {
+            flex: 1; border: none; padding: 6px 12px; font-size: 13px; font-family: inherit;
+            background: transparent; cursor: pointer; color: var(--text-muted); font-weight: 500;
+            transition: all var(--transition);
+        }
+        .view-btn:hover { color: var(--text); }
+        .view-btn.active { background: var(--surface-hover); color: var(--text); font-weight: 600; }
+
+        /* ===== 간트 차트 뷰 ===== */
+        .gantt-board {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 0 24px 30px;
+            display: flex;
+            align-items: flex-start;
+        }
+        .gantt-sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-right: none;
+            border-radius: var(--radius) 0 0 var(--radius);
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .gantt-sidebar-header {
+            height: 34px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--surface-raised);
+        }
+        .gantt-sidebar-rows {
+            padding-top: 10px;
+            padding-bottom: 20px;
+        }
+        .gantt-timeline-area {
+            flex: 1;
+            overflow-x: auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            position: relative;
+        }
+        .gantt-header-row {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--surface-raised);
+            z-index: 10;
+            min-width: max-content;
+        }
+        .gantt-day-header {
+            flex-shrink: 0;
+            width: 48px;
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-muted);
+            padding: 8px 0;
+            border-right: 1px dashed var(--border);
+        }
+        .gantt-day-header.today {
+            color: var(--accent);
+            font-weight: 600;
+            background: rgba(88, 166, 255, 0.1);
+        }
+        .gantt-timeline {
+            position: relative;
+            padding-top: 10px;
+            padding-bottom: 20px;
+            min-width: max-content;
+            /* 세로 줄무늬 배경 (Grid) */
+            background-image: linear-gradient(to right, var(--border) 1px, transparent 1px);
+            background-size: 48px 100%;
+        }
+        .gantt-row {
+            display: flex;
+            align-items: center;
+            height: 36px;
+            position: relative;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .gantt-row:hover { background: var(--surface-hover); }
+        
+        .gantt-sidebar-item {
+            display: flex;
+            align-items: center;
+            height: 36px;
+            padding-right: 12px;
+            border-bottom: 1px solid var(--border-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gantt-sidebar-item:hover { background: var(--surface-hover); }
+        .gantt-sidebar-item span {
+            font-size: 13px;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .gantt-sidebar-item.done span {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .gantt-bar-wrapper {
+            position: absolute;
+            height: 20px;
+            top: 8px;
+            display: flex;
+            align-items: center;
+            transition: all var(--transition);
+        }
+        .gantt-bar {
+            width: 100%;
+            height: 100%;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.1s;
+            position: relative;
+            min-width: 24px;
+            opacity: 0.9;
+        }
+        .gantt-bar:hover {
+            transform: scaleY(1.1);
+            filter: brightness(1.2);
+            opacity: 1;
+        }
+        .gantt-bar.done {
+            background: #484f58 !important; /* 무채색 조기 */
+            border-color: var(--border) !important;
+            opacity: 0.5;
+            box-shadow: none;
+        }
+        .gantt-link-line {
+            width: 16px;
+            height: 16px;
+            border-left: 2px solid var(--border);
+            border-bottom: 2px solid var(--border);
+            margin-right: 6px;
+            display: inline-block;
+            margin-bottom: 6px;
+            border-bottom-left-radius: 4px;
+        }
