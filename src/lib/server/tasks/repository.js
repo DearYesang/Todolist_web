@@ -3,8 +3,11 @@ import { getDb, schema } from '$lib/server/db/index.js';
 import { mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
 import {
 	assertValidTaskDateRange,
+	parseChecklistItemIdParam,
 	parseCreateTaskInput,
+	parseCreateChecklistItemInput,
 	parseTaskIdParam,
+	parseUpdateChecklistItemInput,
 	parseUpdateTaskInput,
 	TaskWriteError
 } from './validation.js';
@@ -182,6 +185,99 @@ export async function deleteTaskCascadeForUser(userId, taskId) {
 		.returning({ id: schema.tasks.id });
 
 	return deletedRows.length;
+}
+
+/**
+ * @param {string} userId
+ * @param {unknown} taskId
+ * @param {unknown} payload
+ */
+export async function createChecklistItemForUser(userId, taskId, payload) {
+	const id = parseTaskIdParam(taskId);
+	const input = parseCreateChecklistItemInput(payload);
+	const db = getDb();
+	const task = await getWritableTaskForUser(db, userId, id);
+	if (!task) {
+		throw new TaskWriteError('Task was not found.', 404);
+	}
+
+	const now = new Date();
+	const [created] = await db
+		.insert(schema.checklistItems)
+		.values({
+			taskId: task.id,
+			text: input.text,
+			done: false,
+			position: String(now.getTime()),
+			createdAt: now,
+			updatedAt: now
+		})
+		.returning();
+
+	if (!created) {
+		throw new TaskWriteError('Checklist item could not be created.', 500);
+	}
+
+	return mapTaskRowToClientTask(task, await getChecklistRowsForTask(db, task.id));
+}
+
+/**
+ * @param {string} userId
+ * @param {unknown} taskId
+ * @param {unknown} itemId
+ * @param {unknown} payload
+ */
+export async function updateChecklistItemForUser(userId, taskId, itemId, payload) {
+	const id = parseTaskIdParam(taskId);
+	const checklistItemId = parseChecklistItemIdParam(itemId);
+	const input = parseUpdateChecklistItemInput(payload);
+	const db = getDb();
+	const task = await getWritableTaskForUser(db, userId, id);
+	if (!task) {
+		throw new TaskWriteError('Task was not found.', 404);
+	}
+
+	const [updated] = await db
+		.update(schema.checklistItems)
+		.set({
+			...(typeof input.text === 'string' ? { text: input.text } : {}),
+			...(typeof input.done === 'boolean' ? { done: input.done } : {}),
+			updatedAt: new Date()
+		})
+		.where(and(eq(schema.checklistItems.id, checklistItemId), eq(schema.checklistItems.taskId, task.id)))
+		.returning();
+
+	if (!updated) {
+		throw new TaskWriteError('Checklist item was not found.', 404);
+	}
+
+	return mapTaskRowToClientTask(task, await getChecklistRowsForTask(db, task.id));
+}
+
+/**
+ * @param {string} userId
+ * @param {unknown} taskId
+ * @param {unknown} itemId
+ */
+export async function deleteChecklistItemForUser(userId, taskId, itemId) {
+	const id = parseTaskIdParam(taskId);
+	const checklistItemId = parseChecklistItemIdParam(itemId);
+	const db = getDb();
+	const task = await getWritableTaskForUser(db, userId, id);
+	if (!task) {
+		throw new TaskWriteError('Task was not found.', 404);
+	}
+
+	const [deleted] = await db
+		.delete(schema.checklistItems)
+		.where(and(eq(schema.checklistItems.id, checklistItemId), eq(schema.checklistItems.taskId, task.id)))
+		.returning({ id: schema.checklistItems.id });
+
+	if (!deleted) {
+		throw new TaskWriteError('Checklist item was not found.', 404);
+	}
+
+	return mapTaskRowToClientTask(task, await getChecklistRowsForTask(db, task.id));
 }
 
 /**

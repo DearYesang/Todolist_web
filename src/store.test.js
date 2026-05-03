@@ -7,12 +7,22 @@ import {
     normalizeTaskList
 } from './lib/shared/task-domain.js';
 import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
-import { createServerTask, deleteServerTask, listServerTasks, updateServerTask } from './lib/client/task-api.js';
+import {
+    createServerChecklistItem,
+    createServerTask,
+    deleteServerChecklistItem,
+    deleteServerTask,
+    listServerTasks,
+    updateServerChecklistItem,
+    updateServerTask
+} from './lib/client/task-api.js';
 import { buildTaskCreateDraft, createLocalTaskFromDraft } from './lib/client/task-create.js';
 import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
 import {
     assertValidTaskDateRange,
     parseCreateTaskInput,
+    parseCreateChecklistItemInput,
+    parseUpdateChecklistItemInput,
     parseTaskIdParam,
     parseUpdateTaskInput,
     TaskWriteError
@@ -357,6 +367,53 @@ describe('client task creation', () => {
             expect.objectContaining({ method: 'DELETE' })
         );
     });
+
+    it('calls checklist mutation endpoints', async () => {
+        const serverTask = normalizeTask({
+            id: '66666666-6666-4666-8666-666666666666',
+            text: 'Task with checklist',
+            subtasks: [{ id: '77777777-7777-4777-8777-777777777777', text: 'Check item', done: false }]
+        });
+        const fetcher = vi.fn(async () => new Response(JSON.stringify({ task: serverTask }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        await expect(createServerChecklistItem(serverTask.id, 'Check item', fetcher)).resolves.toEqual({
+            ok: true,
+            task: serverTask
+        });
+        expect(fetcher).toHaveBeenLastCalledWith(
+            `/api/tasks/${serverTask.id}/checklist`,
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ text: 'Check item' })
+            })
+        );
+
+        await expect(updateServerChecklistItem(serverTask.id, '77777777-7777-4777-8777-777777777777', {
+            done: true
+        }, fetcher)).resolves.toEqual({
+            ok: true,
+            task: serverTask
+        });
+        expect(fetcher).toHaveBeenLastCalledWith(
+            `/api/tasks/${serverTask.id}/checklist/77777777-7777-4777-8777-777777777777`,
+            expect.objectContaining({
+                method: 'PATCH',
+                body: JSON.stringify({ done: true })
+            })
+        );
+
+        await expect(deleteServerChecklistItem(serverTask.id, '77777777-7777-4777-8777-777777777777', fetcher)).resolves.toEqual({
+            ok: true,
+            task: serverTask
+        });
+        expect(fetcher).toHaveBeenLastCalledWith(
+            `/api/tasks/${serverTask.id}/checklist/77777777-7777-4777-8777-777777777777`,
+            expect.objectContaining({ method: 'DELETE' })
+        );
+    });
 });
 
 describe('calendar export', () => {
@@ -518,5 +575,17 @@ describe('server task validation', () => {
         expect(() => parseUpdateTaskInput({ status: 'blocked' })).toThrow('Invalid status.');
         expect(() => parseUpdateTaskInput({ parentId: 'local-parent' })).toThrow('parentId must be a UUID.');
         expect(() => assertValidTaskDateRange('2026-05-04', '2026-05-03')).toThrow('Invalid task date range.');
+    });
+
+    it('validates checklist create and update payloads', () => {
+        expect(parseCreateChecklistItemInput({ text: '  Read docs  ' })).toEqual({ text: 'Read docs' });
+        expect(parseUpdateChecklistItemInput({ text: '  Review  ', done: true })).toEqual({
+            text: 'Review',
+            done: true
+        });
+
+        expect(() => parseCreateChecklistItemInput({ text: '' })).toThrow('Checklist text is required.');
+        expect(() => parseUpdateChecklistItemInput({})).toThrow('At least one checklist field is required.');
+        expect(() => parseUpdateChecklistItemInput({ done: 'yes' })).toThrow('done must be a boolean.');
     });
 });
