@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
+import { planTaskImport } from './import-planner.js';
 import { mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
 import {
 	assertValidTaskDateRange,
@@ -90,6 +91,62 @@ export async function createTaskForUser(userId, payload) {
 	}
 
 	return mapTaskRowToClientTask(created, []);
+}
+
+/**
+ * @param {string} userId
+ * @param {unknown} payload
+ */
+export async function importTasksForUser(userId, payload) {
+	const { plans, summary } = planTaskImport(payload);
+	if (plans.length === 0) {
+		return { tasks: [], summary };
+	}
+
+	const db = getDb();
+	const board = await getOrCreatePersonalBoardForUser(db, userId);
+	const now = new Date();
+	const createdTaskRows = await db
+		.insert(schema.tasks)
+		.values(plans.map((plan, index) => ({
+			id: plan.id,
+			boardId: board.id,
+			parentTaskId: plan.parentTaskId,
+			title: plan.task.text.trim(),
+			status: plan.task.status,
+			priority: plan.task.priority,
+			urgency: plan.task.urgency,
+			category: plan.task.category,
+			startDate: plan.task.startDate,
+			endDate: plan.task.endDate,
+			position: String(now.getTime() + index),
+			createdBy: userId,
+			createdAt: new Date(plan.task.createdAt),
+			updatedAt: now,
+			completedAt: plan.task.status === 'done' ? now : null,
+			deletedAt: null
+		})))
+		.returning();
+
+	const checklistValues = plans.flatMap((plan) =>
+		plan.checklistItems.map((item, index) => ({
+			id: item.id,
+			taskId: plan.id,
+			text: item.text,
+			done: item.done,
+			position: String(now.getTime() + index),
+			createdAt: now,
+			updatedAt: now
+		}))
+	);
+	const createdChecklistRows = checklistValues.length > 0
+		? await db.insert(schema.checklistItems).values(checklistValues).returning()
+		: [];
+
+	return {
+		tasks: mapTaskRowsToClientTasks(createdTaskRows, createdChecklistRows),
+		summary
+	};
 }
 
 /**

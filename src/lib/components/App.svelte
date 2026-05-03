@@ -1,6 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { get } from 'svelte/store';
+    import { exportServerTasks, importServerTasks } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
         clearDoneTasks,
@@ -40,24 +41,37 @@
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (loadEvent) => {
-            const result = loadEvent.target?.result;
-            if (typeof result !== 'string') return;
+        reader.onload = async (loadEvent) => {
+            const fileText = loadEvent.target?.result;
+            if (typeof fileText !== 'string') return;
 
             try {
-                const parsed = JSON.parse(result);
+                const parsed = JSON.parse(fileText);
                 if (!Array.isArray(parsed)) {
                     alert('올바른 칸반 데이터 형식이 아닙니다.');
                     return;
                 }
 
-                if (get(tasks).length > 0 && !confirm('기존 데이터를 덮어쓰고 불러오시겠습니까?')) {
+                if (get(tasks).length > 0 && !confirm('가져온 데이터를 현재 목록에 추가하시겠습니까?')) {
                     return;
                 }
 
-                replaceTasks(parsed);
-                resetFilters();
-                alert('데이터를 성공적으로 불러왔습니다.');
+                const result = await importServerTasks(parsed);
+                if (result.ok) {
+                    replaceTasks([...get(tasks), ...result.tasks]);
+                    resetFilters();
+                    alert(`데이터를 성공적으로 불러왔습니다. 가져온 작업: ${result.summary.importedTasks}개`);
+                    return;
+                }
+
+                if (result.fallback) {
+                    replaceTasks([...get(tasks), ...parsed]);
+                    resetFilters();
+                    alert('데이터를 성공적으로 불러왔습니다.');
+                    return;
+                }
+
+                alert(result.message);
             } catch (error) {
                 alert('파일을 읽는 중 오류가 발생했습니다.');
             } finally {
@@ -68,8 +82,10 @@
         reader.readAsText(file);
     }
 
-    function exportData() {
-        const data = JSON.stringify(get(tasks), null, 2);
+    async function exportData() {
+        const result = await exportServerTasks();
+        const sourceTasks = result.ok ? result.tasks : get(tasks);
+        const data = JSON.stringify(sourceTasks, null, 2);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
