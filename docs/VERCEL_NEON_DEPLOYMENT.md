@@ -38,6 +38,38 @@ CALENDAR_SYNC_MAX_TASKS="250"
 
 `onboarding@resend.dev` is Resend's testing sender and can only deliver to the email address associated with the Resend account. For both allowed emails to receive codes independently, verify a custom email domain later and switch `EMAIL_FROM` to that domain.
 
+Generate secret values locally:
+
+```bash
+npm run secrets
+```
+
+The command prints values for:
+
+- `BETTER_AUTH_SECRET`
+- `ACCOUNT_RECOVERY_SECRET`
+- `CALENDAR_TOKEN_SECRET`
+- `CALENDAR_OAUTH_ENCRYPTION_KEY`
+- `EMAIL_DELIVERY_WEBHOOK_SECRET` if webhook delivery is used later
+
+Do not save these generated values in git. Paste only the required values into Vercel Production environment variables.
+
+## Free Deployment Runbook
+
+1. Merge the PR into `main`.
+2. Create a Neon project in an Asia region and copy the pooled Postgres URL.
+3. Create a Vercel project from this GitHub repository with project name `todokanban`.
+4. Confirm the deployment URL is exactly `https://todokanban.vercel.app`.
+5. Generate deployment secrets with `npm run secrets`.
+6. Add the Vercel Production environment variables listed above.
+7. Create or open a Resend account using one of the allowed emails.
+8. Set `RESEND_API_KEY` from Resend and keep `EMAIL_FROM=Todokanban <onboarding@resend.dev>` for the first free deployment.
+9. Locally set `DATABASE_URL` to the Neon production URL and run `npm run db:migrate`.
+10. Trigger a Vercel production deploy from `main`.
+11. Run the smoke test below.
+
+If Vercel cannot allocate the `todokanban` project name, stop before registering passkeys and update the four passkey origin values to the actual `*.vercel.app` host.
+
 ## Manual Migration
 
 Run migrations locally against the Neon production branch after confirming `DATABASE_URL` points at production:
