@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,
-	loadOfflineQueue
+	loadOfflineQueue,
+	setOfflineQueueOwner
 } from './offline-write-queue.js';
 import { normalizeTask } from '../shared/task-domain.js';
 
@@ -27,6 +28,7 @@ describe('offline write queue conflict behavior', () => {
 	});
 
 	afterEach(() => {
+		setOfflineQueueOwner(null);
 		Reflect.deleteProperty(globalThis, 'localStorage');
 	});
 
@@ -48,6 +50,11 @@ describe('offline write queue conflict behavior', () => {
 			flushed: 1,
 			remaining: 0,
 			blocked: false
+		});
+		expect(result.conflicts).toHaveLength(1);
+		expect(result.conflicts[0]).toMatchObject({
+			type: 'task.patch',
+			taskId: '99999999-9999-4999-8999-999999999999'
 		});
 		expect(loadOfflineQueue()).toEqual([]);
 	});
@@ -89,5 +96,48 @@ describe('offline write queue conflict behavior', () => {
 		});
 		expect(loadOfflineQueue().map((item) => item.type)).toEqual(['task.delete', 'task.patch']);
 		expect(loadOfflineQueue()[0].attempts).toBe(1);
+	});
+
+	it('keeps queued mutations scoped to the active user', () => {
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({
+			type: 'task.patch',
+			taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+			patch: { text: 'A' }
+		});
+
+		setOfflineQueueOwner('user-b');
+		expect(loadOfflineQueue()).toEqual([]);
+		enqueueOfflineMutation({
+			type: 'task.delete',
+			taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+		});
+
+		expect(loadOfflineQueue()).toHaveLength(1);
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			ownerUserId: 'user-b',
+			type: 'task.delete'
+		});
+
+		setOfflineQueueOwner('user-a');
+		expect(loadOfflineQueue()).toHaveLength(1);
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			ownerUserId: 'user-a',
+			type: 'task.patch'
+		});
+	});
+
+	it('ignores corrupted queue records from another owner', () => {
+		setOfflineQueueOwner('user-a');
+		storage.set('kanbanOfflineWriteQueue:user-a', JSON.stringify([{
+			id: 'mutation-id',
+			ownerUserId: 'user-b',
+			type: 'task.delete',
+			taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+			createdAt: Date.now(),
+			attempts: 0
+		}]));
+
+		expect(loadOfflineQueue()).toEqual([]);
 	});
 });

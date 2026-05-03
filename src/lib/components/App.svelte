@@ -1,6 +1,8 @@
 <script>
     import { onMount } from 'svelte';
     import { get } from 'svelte/store';
+    import { authClient } from '$lib/client/auth-client.js';
+    import { setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { exportServerTasks, importServerTasks } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
@@ -8,6 +10,7 @@
         currentView,
         replaceTasks,
         resetFilters,
+        setTaskStorageOwner,
         tasks
     } from '$lib/client/task-store.js';
     import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
@@ -22,11 +25,29 @@
 
     /** @type {string | null} */
     let selectedTaskId = $state(null);
+    const session = authClient.useSession();
+    /** @type {string | null} */
+    let scopedUserId = null;
+
+    $effect(() => {
+        const userId = $session.data?.user?.id ?? null;
+        if (userId === scopedUserId) {
+            return;
+        }
+
+        scopedUserId = userId;
+        setTaskStorageOwner(userId);
+        setOfflineQueueOwner(userId);
+        if (userId) {
+            void syncServerTasks();
+        }
+    });
 
     onMount(() => {
-        void syncServerTasks();
         const handleOnline = () => {
-            void syncServerTasks();
+            if ($session.data?.user) {
+                void syncServerTasks();
+            }
         };
         window.addEventListener('online', handleOnline);
         return () => {

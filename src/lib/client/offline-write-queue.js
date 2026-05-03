@@ -8,6 +8,9 @@ import {
 } from './task-api.js';
 
 const OFFLINE_QUEUE_KEY = 'kanbanOfflineWriteQueue';
+const DEFAULT_QUEUE_OWNER = 'anonymous';
+
+let queueOwnerId = DEFAULT_QUEUE_OWNER;
 
 /**
  * @typedef {{
@@ -44,6 +47,7 @@ const OFFLINE_QUEUE_KEY = 'kanbanOfflineWriteQueue';
  *
  * @typedef {OfflineMutationInput & {
  *   id: string;
+ *   ownerUserId?: string;
  *   createdAt: number;
  *   attempts: number;
  * }} OfflineMutation
@@ -54,6 +58,7 @@ const OFFLINE_QUEUE_KEY = 'kanbanOfflineWriteQueue';
  *   blocked: boolean;
  *   syncedTasks: import('../shared/task-domain.js').Task[];
  *   createdTasks: { localTaskId: string; task: import('../shared/task-domain.js').Task }[];
+ *   conflicts: OfflineMutation[];
  * }} OfflineFlushResult
  */
 
@@ -65,6 +70,7 @@ export function enqueueOfflineMutation(input) {
 	const mutation = {
 		...input,
 		id: input.id ?? createMutationId(),
+		ownerUserId: queueOwnerId,
 		createdAt: Date.now(),
 		attempts: 0
 	};
@@ -75,6 +81,13 @@ export function enqueueOfflineMutation(input) {
 
 export function getOfflineQueueSize() {
 	return loadOfflineQueue().length;
+}
+
+/**
+ * @param {string | null | undefined} ownerId
+ */
+export function setOfflineQueueOwner(ownerId) {
+	queueOwnerId = normalizeQueueOwner(ownerId);
 }
 
 /**
@@ -97,6 +110,8 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 	const syncedTasks = [];
 	/** @type {{ localTaskId: string; task: import('../shared/task-domain.js').Task }[]} */
 	const createdTasks = [];
+	/** @type {OfflineMutation[]} */
+	const conflicts = [];
 	let flushed = 0;
 	let blocked = false;
 
@@ -122,6 +137,9 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 			break;
 		}
 
+		if (result.status === 409) {
+			conflicts.push(mutation);
+		}
 		flushed += 1;
 	}
 
@@ -131,7 +149,8 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 		remaining: remaining.length,
 		blocked,
 		syncedTasks,
-		createdTasks
+		createdTasks,
+		conflicts
 	};
 }
 
@@ -232,13 +251,15 @@ export function loadOfflineQueue() {
 			return [];
 		}
 
-		const raw = storage.getItem(OFFLINE_QUEUE_KEY);
+		const raw = storage.getItem(getOfflineQueueKey()) ?? readLegacyQueue(storage);
 		if (!raw) {
 			return [];
 		}
 
 		const parsed = JSON.parse(raw);
-		return Array.isArray(parsed) ? parsed.filter(isOfflineMutation) : [];
+		return Array.isArray(parsed)
+			? parsed.filter(isOfflineMutation).filter(isCurrentOwnerMutation)
+			: [];
 	} catch {
 		return [];
 	}
@@ -254,15 +275,33 @@ function saveOfflineQueue(queue) {
 			return;
 		}
 
+		const key = getOfflineQueueKey();
 		if (queue.length === 0) {
-			storage.removeItem(OFFLINE_QUEUE_KEY);
+			storage.removeItem(key);
+			if (queueOwnerId === DEFAULT_QUEUE_OWNER) {
+				storage.removeItem(OFFLINE_QUEUE_KEY);
+			}
 			return;
 		}
 
-		storage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+		storage.setItem(key, JSON.stringify(queue));
+		if (queueOwnerId === DEFAULT_QUEUE_OWNER) {
+			storage.removeItem(OFFLINE_QUEUE_KEY);
+		}
 	} catch {
 		// Keeping the in-memory UI responsive matters more than surfacing storage failures here.
 	}
+}
+
+function getOfflineQueueKey() {
+	return `${OFFLINE_QUEUE_KEY}:${queueOwnerId}`;
+}
+
+/**
+ * @param {Storage} storage
+ */
+function readLegacyQueue(storage) {
+	return queueOwnerId === DEFAULT_QUEUE_OWNER ? storage.getItem(OFFLINE_QUEUE_KEY) : null;
 }
 
 /**
@@ -291,8 +330,16 @@ function isOfflineMutation(value) {
 	const mutation = /** @type {Record<string, unknown>} */ (value);
 	return typeof mutation.id === 'string'
 		&& typeof mutation.type === 'string'
+		&& (mutation.ownerUserId === undefined || typeof mutation.ownerUserId === 'string')
 		&& typeof mutation.createdAt === 'number'
 		&& typeof mutation.attempts === 'number';
+}
+
+/**
+ * @param {OfflineMutation} mutation
+ */
+function isCurrentOwnerMutation(mutation) {
+	return (mutation.ownerUserId ?? DEFAULT_QUEUE_OWNER) === queueOwnerId;
 }
 
 /**
@@ -306,8 +353,17 @@ function createFlushResult(queue, blocked) {
 		remaining: queue.length,
 		blocked,
 		syncedTasks: [],
-		createdTasks: []
+		createdTasks: [],
+		conflicts: []
 	};
+}
+
+/**
+ * @param {string | null | undefined} ownerId
+ */
+function normalizeQueueOwner(ownerId) {
+	const trimmed = ownerId?.trim();
+	return trimmed || DEFAULT_QUEUE_OWNER;
 }
 
 function createMutationId() {
