@@ -112,6 +112,23 @@ export const passkey = pgTable(
 	]
 );
 
+export const accountRecoveryCodes = pgTable(
+	'account_recovery_codes',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		codeHash: text('code_hash').notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+		usedAt: timestamp('used_at', { withTimezone: true })
+	},
+	(table) => [
+		index('account_recovery_codes_user_id_idx').on(table.userId),
+		uniqueIndex('account_recovery_codes_code_hash_uidx').on(table.codeHash)
+	]
+);
+
 export const workspaces = pgTable(
 	'workspaces',
 	{
