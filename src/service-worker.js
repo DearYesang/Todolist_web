@@ -12,7 +12,9 @@ sw.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches
 			.open(CACHE_NAME)
-			.then((cache) => cache.addAll(STATIC_ASSETS))
+			.then((cache) => cache.addAll(
+				STATIC_ASSETS.map((asset) => new Request(asset, { cache: 'reload' }))
+			))
 			.then(() => sw.skipWaiting())
 	);
 });
@@ -44,6 +46,11 @@ sw.addEventListener('fetch', (event) => {
 		return;
 	}
 
+	if (shouldRefreshStaticAsset(request)) {
+		event.respondWith(networkFirst(request, request.url));
+		return;
+	}
+
 	event.respondWith(cacheFirst(request));
 });
 
@@ -53,6 +60,27 @@ sw.addEventListener('fetch', (event) => {
 function shouldBypass(request) {
 	const url = new URL(request.url);
 	return url.origin !== sw.location.origin || url.pathname.startsWith(`${base}/api/`);
+}
+
+/**
+ * @param {Request} request
+ */
+function shouldRefreshStaticAsset(request) {
+	const url = new URL(request.url);
+	if (!url.pathname.startsWith(`${base}/`) || url.pathname.includes('/_app/immutable/')) {
+		return false;
+	}
+
+	return [
+		'/manifest.webmanifest',
+		'/favicon.svg',
+		'/apple-touch-icon.png',
+		'/apple-touch-icon-20260504.png',
+		'/pwa-icon-192.png',
+		'/pwa-icon-192-20260504.png',
+		'/pwa-icon-512.png',
+		'/pwa-icon-512-20260504.png'
+	].some((path) => url.pathname === `${base}${path}`);
 }
 
 /**

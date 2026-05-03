@@ -83,6 +83,20 @@
             applyStorageScope(cachedAuthScope.id);
         }
 
+        let reloadedForServiceWorkerUpdate = false;
+        const handleServiceWorkerUpdate = () => {
+            if (reloadedForServiceWorkerUpdate) return;
+            reloadedForServiceWorkerUpdate = true;
+            window.location.reload();
+        };
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready
+                .then((registration) => registration.update())
+                .catch(() => {});
+            navigator.serviceWorker.addEventListener('controllerchange', handleServiceWorkerUpdate);
+        }
+
         const handleOnline = () => {
             isOnline = true;
             void $session.refetch();
@@ -98,6 +112,7 @@
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
+            navigator.serviceWorker?.removeEventListener('controllerchange', handleServiceWorkerUpdate);
         };
     });
 
