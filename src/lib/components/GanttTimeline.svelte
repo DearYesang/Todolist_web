@@ -1,5 +1,5 @@
 <script>
-    import { onDestroy } from 'svelte';
+    import { onDestroy, tick } from 'svelte';
     import { filters, tasks, updateTask } from '$lib/client/task-store.js';
     import { buildHierarchy, getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
 
@@ -7,7 +7,11 @@
 
     const dayWidth = 48;
     const dayMs = 86400000;
+    const todayCenterPaddingDays = 18;
     let suppressBarClick = $state(false);
+    /** @type {HTMLDivElement | null} */
+    let timelineArea = $state(null);
+    let hasCenteredToday = $state(false);
 
     /** @type {null | {
      *   taskId: string;
@@ -32,8 +36,9 @@
             };
         }
 
-        let minDate = new Date('2099-12-31');
-        let maxDate = new Date('2000-01-01');
+        const today = parseLocalDate(formatDate(new Date()));
+        let minDate = new Date(today);
+        let maxDate = new Date(today);
 
         visibleTasks.forEach((task) => {
             const start = parseLocalDate(task.startDate);
@@ -45,6 +50,13 @@
         minDate.setDate(minDate.getDate() - 3);
         maxDate.setDate(maxDate.getDate() + 5);
 
+        const todayWindowStart = new Date(today);
+        todayWindowStart.setDate(todayWindowStart.getDate() - todayCenterPaddingDays);
+        const todayWindowEnd = new Date(today);
+        todayWindowEnd.setDate(todayWindowEnd.getDate() + todayCenterPaddingDays);
+        if (todayWindowStart < minDate) minDate = todayWindowStart;
+        if (todayWindowEnd > maxDate) maxDate = todayWindowEnd;
+
         const totalDays = Math.round((maxDate.getTime() - minDate.getTime()) / 86400000);
         const headerDays = [];
 
@@ -54,7 +66,7 @@
             headerDays.push({
                 key: date.toISOString(),
                 label: `${date.getMonth() + 1}/${date.getDate()}`,
-                isToday: formatDate(date) === formatDate(new Date())
+                isToday: formatDate(date) === formatDate(today)
             });
         }
 
@@ -87,6 +99,16 @@
         };
     });
 
+    $effect(() => {
+        if (hasCenteredToday || !timelineArea || ganttData.headerDays.length === 0) {
+            return;
+        }
+
+        void tick().then(() => {
+            centerTodayInTimeline();
+        });
+    });
+
     /**
      * @param {import('$lib/shared/task-domain.js').Task} task
      */
@@ -101,6 +123,20 @@
             left: offsetDays * dayWidth,
             width: Math.max(durationDays * dayWidth, 24)
         };
+    }
+
+    function centerTodayInTimeline() {
+        if (hasCenteredToday || !timelineArea) return;
+
+        const todayIndex = ganttData.headerDays.findIndex((day) => day.isToday);
+        if (todayIndex === -1) return;
+
+        const todayCenter = todayIndex * dayWidth + dayWidth / 2;
+        const maxScrollLeft = Math.max(timelineArea.scrollWidth - timelineArea.clientWidth, 0);
+        const nextScrollLeft = Math.min(Math.max(todayCenter - timelineArea.clientWidth / 2, 0), maxScrollLeft);
+
+        timelineArea.scrollTo({ left: nextScrollLeft, behavior: 'auto' });
+        hasCenteredToday = true;
     }
 
     /**
@@ -282,7 +318,7 @@
         </div>
     </div>
 
-    <div class="gantt-timeline-area">
+    <div class="gantt-timeline-area" bind:this={timelineArea}>
         <div class="gantt-header-row" style={`width:${ganttData.gridWidth}px;`}>
             {#each ganttData.headerDays as day (day.key)}
                 <div class="gantt-day-header" class:today={day.isToday}>{day.label}</div>
