@@ -1,5 +1,7 @@
 <script>
+    import { onMount } from 'svelte';
     import { get } from 'svelte/store';
+    import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
         clearDoneTasks,
         currentView,
@@ -16,6 +18,10 @@
 
     /** @type {string | null} */
     let selectedTaskId = $state(null);
+
+    onMount(() => {
+        void syncServerTasks();
+    });
 
     /**
      * @param {string} id

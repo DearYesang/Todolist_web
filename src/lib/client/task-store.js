@@ -113,6 +113,21 @@ export function replaceTasks(nextTasks) {
 }
 
 /**
+ * @param {unknown[]} nextTasks
+ */
+export function mergeTasks(nextTasks) {
+    const incoming = normalizeTaskList(nextTasks);
+    tasks.update((current) => {
+        const merged = new Map(current.map((task) => [task.id, task]));
+        incoming.forEach((task) => {
+            merged.set(task.id, task);
+        });
+
+        return normalizeTaskList([...merged.values()]);
+    });
+}
+
+/**
  * @param {string} taskId
  * @param {string} nextStatus
  */
