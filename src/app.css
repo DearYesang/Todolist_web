@@ -1343,6 +1343,16 @@ select {
     border-top: 1px solid var(--border);
 }
 
+.locked-app-state {
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+}
+
+.locked-app-state .auth-panel {
+    max-width: 960px;
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

@@ -1,4 +1,7 @@
 const MIN_SECRET_LENGTH = 32;
+const resendConfigured = Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_FROM);
+const webhookConfigured = Boolean(process.env.EMAIL_DELIVERY_WEBHOOK_URL);
+const emailDeliveryRequired = process.env.EMAIL_VERIFICATION_DEV_CODES !== 'true';
 const checks = [
 	checkDatabaseUrl(),
 	checkSecret('BETTER_AUTH_SECRET', process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET, true),
@@ -6,8 +9,12 @@ const checks = [
 	checkUrlList('BETTER_AUTH_TRUSTED_ORIGINS', process.env.BETTER_AUTH_TRUSTED_ORIGINS, true),
 	checkUrl('PASSKEY_ORIGIN', process.env.PASSKEY_ORIGIN, true),
 	checkValue('PASSKEY_RP_ID', process.env.PASSKEY_RP_ID, true),
+	checkEmailList('AUTH_ALLOWED_EMAILS', process.env.AUTH_ALLOWED_EMAILS, true),
 	checkSecret('ACCOUNT_RECOVERY_SECRET', process.env.ACCOUNT_RECOVERY_SECRET, true),
-	checkUrl('EMAIL_DELIVERY_WEBHOOK_URL', process.env.EMAIL_DELIVERY_WEBHOOK_URL, process.env.EMAIL_VERIFICATION_DEV_CODES !== 'true'),
+	checkUrl('EMAIL_DELIVERY_WEBHOOK_URL', process.env.EMAIL_DELIVERY_WEBHOOK_URL, emailDeliveryRequired && !resendConfigured),
+	checkSecret('EMAIL_DELIVERY_WEBHOOK_SECRET', process.env.EMAIL_DELIVERY_WEBHOOK_SECRET, false),
+	checkSecret('RESEND_API_KEY', process.env.RESEND_API_KEY, emailDeliveryRequired && !webhookConfigured),
+	checkValue('EMAIL_FROM', process.env.EMAIL_FROM, resendConfigured || (emailDeliveryRequired && !webhookConfigured)),
 	checkSecret('CALENDAR_TOKEN_SECRET', process.env.CALENDAR_TOKEN_SECRET, true),
 	checkSecret('CALENDAR_OAUTH_ENCRYPTION_KEY', process.env.CALENDAR_OAUTH_ENCRYPTION_KEY, hasCalendarProvider()),
 	checkValue('GOOGLE_CALENDAR_CLIENT_ID', process.env.GOOGLE_CALENDAR_CLIENT_ID, false),
@@ -69,6 +76,13 @@ function checkUrlList(key, value, required) {
 	if (!value) return createCheck(key, required, required ? 'missing' : 'optional', required ? 'required.' : 'optional.');
 	const invalid = value.split(',').map((item) => item.trim()).filter(Boolean).some((item) => checkUrl(key, item, true).status !== 'ok');
 	return createCheck(key, required, invalid ? 'invalid' : 'ok', invalid ? 'contains an invalid URL.' : 'configured.');
+}
+
+function checkEmailList(key, value, required) {
+	if (!value) return createCheck(key, required, required ? 'missing' : 'optional', required ? 'required.' : 'optional.');
+	const emails = value.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+	const invalid = emails.length === 0 || emails.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+	return createCheck(key, required, invalid ? 'invalid' : 'ok', invalid ? 'must contain comma-separated email addresses.' : 'configured.');
 }
 
 function checkValue(key, value, required) {
