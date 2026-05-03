@@ -1,13 +1,20 @@
 <script>
+    import { get } from 'svelte/store';
+    import { createServerTask } from '$lib/client/task-api.js';
+    import { buildTaskCreateDraft, createLocalTaskFromDraft } from '$lib/client/task-create.js';
     import { categories, tasks } from '$lib/client/task-store.js';
-    import { createId, getDefaultDateRange, normalizeTask, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
+    import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
 
     let isFormOpen = $state(false);
     let newTaskText = $state('');
+    /** @type {import('$lib/shared/task-domain.js').TaskPriority} */
     let selectedPriority = $state('medium');
+    /** @type {import('$lib/shared/task-domain.js').TaskUrgency} */
     let selectedUrgency = $state('normal');
     let category = $state('');
     let parentId = $state('');
+    let isSubmitting = $state(false);
+    let formError = $state('');
 
     const defaults = getDefaultDateRange();
     let startDate = $state(defaults.startDate);
@@ -22,36 +29,58 @@
         parentId = '';
         startDate = range.startDate;
         endDate = range.endDate;
+        isSubmitting = false;
+        formError = '';
         isFormOpen = false;
     }
 
-    function addTask() {
-        const text = newTaskText.trim();
-        if (!text) return;
+    /**
+     * @param {import('$lib/shared/task-domain.js').Task} task
+     */
+    function appendTask(task) {
+        tasks.update((current) => [...current, task]);
+    }
 
-        tasks.update((current) => {
-            const parent = parentId ? current.find((task) => task.id === parentId) : null;
+    async function addTask() {
+        if (isSubmitting) return;
 
-            return [
-                ...current,
-                normalizeTask({
-                    id: createId(),
-                    text,
-                    status: parent?.status || 'todo',
-                    startDate,
-                    endDate,
-                    priority: selectedPriority,
-                    urgency: selectedUrgency,
-                    category: category.trim(),
-                    parentId: parent?.id || null,
-                    subtasks: [],
-                    collapsed: false,
-                    createdAt: Date.now()
-                })
-            ];
+        const currentTasks = get(tasks);
+        const parent = parentId ? currentTasks.find((task) => task.id === parentId) ?? null : null;
+        const draft = buildTaskCreateDraft({
+            text: newTaskText,
+            priority: selectedPriority,
+            urgency: selectedUrgency,
+            category,
+            startDate,
+            endDate,
+            parent
         });
 
-        resetForm();
+        if (!draft) return;
+
+        formError = '';
+        isSubmitting = true;
+
+        try {
+            if (!draft.hasLocalParent) {
+                const result = await createServerTask(draft.payload);
+                if (result.ok) {
+                    appendTask(result.task);
+                    resetForm();
+                    return;
+                }
+
+                if (!result.fallback) {
+                    formError = '작업을 추가하지 못했습니다. 입력값을 확인해 주세요.';
+                    return;
+                }
+            }
+
+            appendTask(createLocalTaskFromDraft(draft.payload, draft.parent));
+            resetForm();
+        } finally {
+            isSubmitting = false;
+        }
     }
 
     /**
@@ -60,7 +89,7 @@
     function handleTaskInputKeydown(event) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            addTask();
+            void addTask();
         }
     }
 </script>
@@ -130,7 +159,7 @@
                             class="priority-pill"
                             class:active={selectedPriority === value}
                             data-p={value}
-                            onclick={() => selectedPriority = value}>
+                            onclick={() => selectedPriority = /** @type {import('$lib/shared/task-domain.js').TaskPriority} */ (value)}>
                             {label}
                         </button>
                     {/each}
@@ -145,7 +174,7 @@
                             class="urgency-pill"
                             class:active={selectedUrgency === value}
                             data-u={value}
-                            onclick={() => selectedUrgency = value}>
+                            onclick={() => selectedUrgency = /** @type {import('$lib/shared/task-domain.js').TaskUrgency} */ (value)}>
                             {label}
                         </button>
                     {/each}
@@ -153,8 +182,13 @@
             </div>
 
             <div class="form-actions">
+                {#if formError}
+                    <p class="form-error" role="alert">{formError}</p>
+                {/if}
                 <button class="btn" onclick={resetForm}>취소</button>
-                <button class="btn btn-primary" onclick={addTask}>✚ 작업 추가</button>
+                <button class="btn btn-primary" onclick={addTask} disabled={isSubmitting}>
+                    {isSubmitting ? '추가 중...' : '✚ 작업 추가'}
+                </button>
             </div>
         </div>
     {/if}
