@@ -1,6 +1,6 @@
 # Database Schema Draft
 
-Target stack: Neon Postgres + Drizzle + Better Auth. The app schema is scaffolded in `src/lib/server/db/schema.js`; generated migrations should be committed from `drizzle/`.
+Target stack: Neon Postgres + Drizzle + Better Auth. The app and auth schemas are scaffolded in `src/lib/server/db/schema.js`; generated migrations should be committed from `drizzle/`.
 
 ## Principles
 
@@ -12,15 +12,15 @@ Target stack: Neon Postgres + Drizzle + Better Auth. The app schema is scaffolde
 
 ## Auth Tables
 
-Better Auth should own its generated auth tables. Expected categories:
+Better Auth owns the auth tables. The current Drizzle schema includes:
 
 - `user`
 - `session`
 - `account`
 - `verification`
-- passkey/WebAuthn credential tables, depending on the Better Auth plugin output
+- `passkey`
 
-Do not hand-edit generated auth tables unless the adapter requires explicit schema ownership. App tables keep user IDs as text until Better Auth owns its generated schema, then foreign-key behavior can be revisited.
+When Better Auth or passkey plugin versions change, compare the schema against `npx auth@latest generate` before creating a new Drizzle migration. App tables keep user IDs as text; cross-table foreign keys can be tightened after task ownership services are implemented.
 
 ## App Tables
 
