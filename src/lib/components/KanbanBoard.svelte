@@ -1,5 +1,6 @@
 <script>
-    import { assignParent, buildColumnHierarchy, canAssignParent, filters, moveTask, tasks } from './store.js';
+    import { assignParent, filters, moveTask, tasks } from '$lib/client/task-store.js';
+    import { buildColumnHierarchy, canAssignParent } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
     let { openTask } = $props();

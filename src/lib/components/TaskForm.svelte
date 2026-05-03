@@ -1,5 +1,6 @@
 <script>
-    import { categories, createId, getDefaultDateRange, normalizeTask, PRIORITY_LABELS, tasks, URGENCY_LABELS } from './store.js';
+    import { categories, tasks } from '$lib/client/task-store.js';
+    import { createId, getDefaultDateRange, normalizeTask, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
 
     let isFormOpen = $state(false);
     let newTaskText = $state('');

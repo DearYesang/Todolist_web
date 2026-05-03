@@ -26,7 +26,7 @@ Browser
 
 Pure task validation now lives in `src/lib/shared/task-domain.js`. The writable stores, localStorage persistence, and client actions live in `src/lib/client/task-store.js`.
 
-`src/store.js` remains as a compatibility re-export for existing component imports. New code should import from the shared/client modules directly.
+Components now import directly from `src/lib/client/task-store.js` and `src/lib/shared/task-domain.js`. The temporary `src/store.js` compatibility re-export has been removed.
 
 ## Target Shape
 
@@ -60,16 +60,14 @@ src/routes/api/export/+server.ts
 
 ## Next Steps
 
-1. Move reusable components into `src/lib/components`.
-2. Replace compatibility imports from `src/store.js` with direct shared/client imports.
-3. Add SvelteKit route-level smoke tests or Playwright once UI flows stabilize.
-4. Add Better Auth and wire session data through `hooks.server.ts`.
-5. Add Drizzle and Neon connection under `$lib/server/db`.
-6. Implement server routes/actions for task CRUD.
-7. Switch client mutations from local store writes to server calls with optimistic updates.
-8. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.
-9. Add PWA manifest and offline read cache.
-10. Add read-only iCalendar feed after task data is server-backed.
+1. Add SvelteKit route-level smoke tests or Playwright once UI flows stabilize.
+2. Add Better Auth and wire session data through `hooks.server.ts`.
+3. Add Drizzle and Neon connection under `$lib/server/db`.
+4. Implement server routes/actions for task CRUD.
+5. Switch client mutations from local store writes to server calls with optimistic updates.
+6. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.
+7. Add PWA manifest and offline read cache.
+8. Add read-only iCalendar feed after task data is server-backed.
 
 ## Domain Boundaries
 

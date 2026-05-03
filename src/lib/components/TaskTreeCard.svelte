@@ -4,20 +4,22 @@
         addSubtask,
         deleteSubtask,
         deleteTaskCascade,
-        getCategoryColor,
         moveTask,
-        PRIORITY_LABELS,
         renameSubtask,
-        STATUS_LABELS,
         toggleCollapse,
-        toggleSubtask,
+        toggleSubtask
+    } from '$lib/client/task-store.js';
+    import {
+        getCategoryColor,
+        PRIORITY_LABELS,
+        STATUS_LABELS,
         URGENCY_LABELS
-    } from './store.js';
+    } from '$lib/shared/task-domain.js';
 
     /** @type {{
-     *   task: import('./store.js').Task;
-     *   allTasks: import('./store.js').Task[];
-     *   childrenByParent: Record<string, import('./store.js').Task[]>;
+     *   task: import('$lib/shared/task-domain.js').Task;
+     *   allTasks: import('$lib/shared/task-domain.js').Task[];
+     *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
      *   draggedId?: string | null;
      *   openTask: (id: string) => void;
