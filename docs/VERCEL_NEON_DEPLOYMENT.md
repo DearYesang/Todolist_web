@@ -2,15 +2,15 @@
 
 ## Decisions
 
-- App domain: `https://todokanban.vercel.app`
-- Passkey RP ID: `todokanban.vercel.app`
+- App domain: `https://todokanban-alpha.vercel.app`
+- Passkey RP ID: `todokanban-alpha.vercel.app`
 - Allowed registration emails: `scyea@naver.com`, `scyea1995@gmail.com`
 - Email delivery: Resend sandbox sender for the first free deployment
 - Primary calendar provider: Google Calendar
 - Runtime region: Vercel Tokyo (`hnd1`) close to a Neon Asia region
 - DB migrations: manual
 
-Because `vercel.app` is a shared public suffix, the passkey RP ID should be the exact project host: `todokanban.vercel.app`.
+Because `vercel.app` is a shared public suffix, the passkey RP ID should be the exact project host: `todokanban-alpha.vercel.app`.
 
 If the Vercel project name is unavailable and the deployment URL changes, update `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, `PASSKEY_ORIGIN`, and `PASSKEY_RP_ID` together before registering passkeys.
 
@@ -21,10 +21,10 @@ Set these in Vercel Production:
 ```env
 DATABASE_URL="postgresql://..."
 BETTER_AUTH_SECRET="..."
-BETTER_AUTH_URL="https://todokanban.vercel.app"
-BETTER_AUTH_TRUSTED_ORIGINS="https://todokanban.vercel.app"
-PASSKEY_ORIGIN="https://todokanban.vercel.app"
-PASSKEY_RP_ID="todokanban.vercel.app"
+BETTER_AUTH_URL="https://todokanban-alpha.vercel.app"
+BETTER_AUTH_TRUSTED_ORIGINS="https://todokanban-alpha.vercel.app"
+PASSKEY_ORIGIN="https://todokanban-alpha.vercel.app"
+PASSKEY_RP_ID="todokanban-alpha.vercel.app"
 AUTH_ALLOWED_EMAILS="scyea@naver.com,scyea1995@gmail.com"
 ACCOUNT_RECOVERY_SECRET="..."
 RESEND_API_KEY="..."
@@ -58,8 +58,8 @@ Do not save these generated values in git. Paste only the required values into V
 
 1. Merge the PR into `main`.
 2. Create a Neon project in an Asia region and copy the pooled Postgres URL.
-3. Create a Vercel project from this GitHub repository with project name `todokanban`.
-4. Confirm the deployment URL is exactly `https://todokanban.vercel.app`.
+3. Create a Vercel project from this GitHub repository with project name `todokanban-alpha`.
+4. Confirm the deployment URL is exactly `https://todokanban-alpha.vercel.app`.
 5. Generate deployment secrets with `npm run secrets`.
 6. Add the Vercel Production environment variables listed above.
 7. Create or open a Resend account using one of the allowed emails.
@@ -68,7 +68,7 @@ Do not save these generated values in git. Paste only the required values into V
 10. Trigger a Vercel production deploy from `main`.
 11. Run the smoke test below.
 
-If Vercel cannot allocate the `todokanban` project name, stop before registering passkeys and update the four passkey origin values to the actual `*.vercel.app` host.
+If Vercel cannot allocate the `todokanban-alpha` project name, stop before registering passkeys and update the four passkey origin values to the actual `*.vercel.app` host.
 
 ## Manual Migration
 
@@ -80,7 +80,7 @@ npm run db:migrate
 
 ## Smoke Test
 
-1. Open `https://todokanban.vercel.app/api/health?strict=true`.
+1. Open `https://todokanban-alpha.vercel.app/api/health?strict=true`.
 2. Confirm the board is hidden before login.
 3. Request a verification code for `scyea@naver.com`.
 4. Confirm an unlisted email is rejected.
