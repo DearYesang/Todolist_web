@@ -32,6 +32,7 @@ name text not null
 owner_user_id text not null
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
+unique (owner_user_id, name)
 ```
 
 Even for a personal app, `workspaces` keeps the future collaboration boundary clean.
@@ -55,6 +56,7 @@ name text not null
 default_view text not null default 'kanban' check (default_view in ('kanban', 'gantt'))
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
+unique (workspace_id, name)
 ```
 
 ### tasks
@@ -142,7 +144,9 @@ unique (connection_id, resource)
 
 ```txt
 workspace_members(user_id)
+workspaces(owner_user_id, name) unique
 boards(workspace_id)
+boards(workspace_id, name) unique
 tasks(board_id, status, position)
 tasks(board_id, start_date, end_date)
 tasks(parent_task_id)
@@ -168,3 +172,12 @@ sync_cursors(connection_id, resource)
 ## Export Strategy
 
 For now, keep exporting the current JSON shape. That keeps user backups portable while the backend evolves.
+
+## Implemented Server Services
+
+- Personal `Personal` workspace and `Inbox` board provisioning for first authenticated task creation.
+- Authenticated task list/create/update/soft-delete cascade.
+- Authenticated checklist create/update/delete.
+- Parent ownership and cycle validation in the service layer.
+
+Server import/export and calendar feed routes are still planned.
