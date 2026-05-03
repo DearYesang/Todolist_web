@@ -1,5 +1,11 @@
 import { derived, writable } from 'svelte/store';
-import { deleteServerTask, updateServerTask } from './task-api.js';
+import {
+    createServerChecklistItem,
+    deleteServerChecklistItem,
+    deleteServerTask,
+    updateServerChecklistItem,
+    updateServerTask
+} from './task-api.js';
 import { isServerTaskId } from './task-create.js';
 import {
     addSubtaskToList,
@@ -200,7 +206,11 @@ export function clearDoneTasks() {
  * @param {string} text
  */
 export function addSubtask(taskId, text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
     tasks.update((current) => addSubtaskToList(current, taskId, text));
+    syncChecklistCreate(taskId, trimmed);
 }
 
 /**
@@ -208,7 +218,17 @@ export function addSubtask(taskId, text) {
  * @param {string} subtaskId
  */
 export function toggleSubtask(taskId, subtaskId) {
-    tasks.update((current) => toggleSubtaskInList(current, taskId, subtaskId));
+    /** @type {boolean | null} */
+    let done = null;
+    tasks.update((current) => {
+        const next = toggleSubtaskInList(current, taskId, subtaskId);
+        done = next.find((task) => task.id === taskId)?.subtasks.find((subtask) => subtask.id === subtaskId)?.done ?? null;
+        return next;
+    });
+
+    if (done !== null) {
+        syncChecklistPatch(taskId, subtaskId, { done });
+    }
 }
 
 /**
@@ -217,7 +237,11 @@ export function toggleSubtask(taskId, subtaskId) {
  * @param {string} text
  */
 export function renameSubtask(taskId, subtaskId, text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
     tasks.update((current) => renameSubtaskInList(current, taskId, subtaskId, text));
+    syncChecklistPatch(taskId, subtaskId, { text: trimmed });
 }
 
 /**
@@ -226,6 +250,7 @@ export function renameSubtask(taskId, subtaskId, text) {
  */
 export function deleteSubtask(taskId, subtaskId) {
     tasks.update((current) => deleteSubtaskFromList(current, taskId, subtaskId));
+    syncChecklistDelete(taskId, subtaskId);
 }
 
 /**
@@ -248,6 +273,43 @@ function syncTaskDelete(taskId) {
     }
 
     void deleteServerTask(taskId).then(reportSyncFailure);
+}
+
+/**
+ * @param {string} taskId
+ * @param {string} text
+ */
+function syncChecklistCreate(taskId, text) {
+    if (!shouldSyncServerTask(taskId)) {
+        return;
+    }
+
+    void createServerChecklistItem(taskId, text).then(syncReturnedTask);
+}
+
+/**
+ * @param {string} taskId
+ * @param {string} subtaskId
+ * @param {{ text?: string; done?: boolean }} patch
+ */
+function syncChecklistPatch(taskId, subtaskId, patch) {
+    if (!shouldSyncServerTask(taskId) || !isServerTaskId(subtaskId)) {
+        return;
+    }
+
+    void updateServerChecklistItem(taskId, subtaskId, patch).then(syncReturnedTask);
+}
+
+/**
+ * @param {string} taskId
+ * @param {string} subtaskId
+ */
+function syncChecklistDelete(taskId, subtaskId) {
+    if (!shouldSyncServerTask(taskId) || !isServerTaskId(subtaskId)) {
+        return;
+    }
+
+    void deleteServerChecklistItem(taskId, subtaskId).then(syncReturnedTask);
 }
 
 /**
@@ -280,4 +342,16 @@ function reportSyncFailure(result) {
     if (!result.ok && !result.fallback) {
         console.error('Failed to sync task mutation', result.message);
     }
+}
+
+/**
+ * @param {{ ok: true; task: import('../shared/task-domain.js').Task } | { ok: false; fallback: boolean; message: string }} result
+ */
+function syncReturnedTask(result) {
+    if (result.ok) {
+        mergeTasks([result.task]);
+        return;
+    }
+
+    reportSyncFailure(result);
 }

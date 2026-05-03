@@ -186,6 +186,84 @@ export async function deleteServerTask(taskId, fetcher = globalThis.fetch) {
 }
 
 /**
+ * @param {string} taskId
+ * @param {string} text
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<UpdateServerTaskResult>}
+ */
+export async function createServerChecklistItem(taskId, text, fetcher = globalThis.fetch) {
+	return writeServerTask(`/api/tasks/${encodeURIComponent(taskId)}/checklist`, {
+		method: 'POST',
+		body: { text }
+	}, fetcher);
+}
+
+/**
+ * @param {string} taskId
+ * @param {string} itemId
+ * @param {{ text?: string; done?: boolean }} patch
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<UpdateServerTaskResult>}
+ */
+export async function updateServerChecklistItem(taskId, itemId, patch, fetcher = globalThis.fetch) {
+	return writeServerTask(`/api/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`, {
+		method: 'PATCH',
+		body: patch
+	}, fetcher);
+}
+
+/**
+ * @param {string} taskId
+ * @param {string} itemId
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<UpdateServerTaskResult>}
+ */
+export async function deleteServerChecklistItem(taskId, itemId, fetcher = globalThis.fetch) {
+	return writeServerTask(`/api/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`, {
+		method: 'DELETE'
+	}, fetcher);
+}
+
+/**
+ * @param {string} url
+ * @param {{ method: 'POST' | 'PATCH' | 'DELETE'; body?: unknown }} request
+ * @param {typeof fetch} fetcher
+ * @returns {Promise<UpdateServerTaskResult>}
+ */
+async function writeServerTask(url, request, fetcher) {
+	if (typeof fetcher !== 'function') {
+		return createFallbackResult('Task API is not available.');
+	}
+
+	try {
+		const response = await fetcher(url, {
+			method: request.method,
+			headers: request.body === undefined
+				? { accept: 'application/json' }
+				: { 'content-type': 'application/json' },
+			...(request.body === undefined ? {} : { body: JSON.stringify(request.body) })
+		});
+		const body = await readJsonBody(response);
+
+		if (response.ok && isTaskResponse(body)) {
+			return {
+				ok: true,
+				task: normalizeTask(body.task)
+			};
+		}
+
+		return {
+			ok: false,
+			fallback: FALLBACK_STATUSES.has(response.status),
+			status: response.status,
+			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
+		};
+	} catch {
+		return createFallbackResult('Task API request could not be completed.');
+	}
+}
+
+/**
  * @param {string} message
  * @returns {{ ok: false; fallback: true; status: 0; message: string }}
  */

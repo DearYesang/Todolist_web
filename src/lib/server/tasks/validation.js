@@ -6,6 +6,7 @@ const TASK_URGENCIES = new Set(['urgent', 'normal']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_TITLE_LENGTH = 300;
 const MAX_CATEGORY_LENGTH = 80;
+const MAX_CHECKLIST_TEXT_LENGTH = 500;
 
 export class TaskWriteError extends Error {
 	/**
@@ -53,6 +54,13 @@ export function parseCreateTaskInput(payload) {
  */
 export function parseTaskIdParam(taskId) {
 	return parseRequiredUuid(taskId, 'taskId');
+}
+
+/**
+ * @param {unknown} itemId
+ */
+export function parseChecklistItemIdParam(itemId) {
+	return parseRequiredUuid(itemId, 'itemId');
 }
 
 /**
@@ -115,6 +123,50 @@ export function assertValidTaskDateRange(startDate, endDate) {
 	if (normalized.startDate !== startDate || normalized.endDate !== endDate) {
 		throw new TaskWriteError('Invalid task date range.');
 	}
+}
+
+/**
+ * @param {unknown} payload
+ */
+export function parseCreateChecklistItemInput(payload) {
+	const source = /** @type {Record<string, unknown> | null} */ (payload);
+	if (!source || typeof source !== 'object' || Array.isArray(source)) {
+		throw new TaskWriteError('Checklist payload must be an object.');
+	}
+
+	return {
+		text: parseRequiredString(source.text, 'Checklist text', MAX_CHECKLIST_TEXT_LENGTH)
+	};
+}
+
+/**
+ * @param {unknown} payload
+ */
+export function parseUpdateChecklistItemInput(payload) {
+	const source = /** @type {Record<string, unknown> | null} */ (payload);
+	if (!source || typeof source !== 'object' || Array.isArray(source)) {
+		throw new TaskWriteError('Checklist payload must be an object.');
+	}
+
+	/** @type {{ text?: string; done?: boolean }} */
+	const patch = {};
+
+	if (hasField(source, 'text')) {
+		patch.text = parseRequiredString(source.text, 'Checklist text', MAX_CHECKLIST_TEXT_LENGTH);
+	}
+
+	if (hasField(source, 'done')) {
+		if (typeof source.done !== 'boolean') {
+			throw new TaskWriteError('done must be a boolean.');
+		}
+		patch.done = source.done;
+	}
+
+	if (Object.keys(patch).length === 0) {
+		throw new TaskWriteError('At least one checklist field is required.');
+	}
+
+	return patch;
 }
 
 /**
