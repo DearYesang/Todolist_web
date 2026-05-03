@@ -1,6 +1,6 @@
 import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
-import { auth, authDatabaseConfigured } from '$lib/server/auth/index.js';
+import { auth, authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
@@ -10,6 +10,10 @@ export async function handle({ event, resolve }) {
 		}
 
 		return resolve(event);
+	}
+
+	if (authConfigurationError && isAuthRoute(event.url.pathname)) {
+		return Response.json({ message: authConfigurationError }, { status: 500 });
 	}
 
 	return svelteKitHandler({ event, resolve, auth, building });
