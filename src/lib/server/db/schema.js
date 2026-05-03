@@ -120,7 +120,10 @@ export const workspaces = pgTable(
 		ownerUserId: text('owner_user_id').notNull(),
 		...timestamps()
 	},
-	(table) => [index('workspaces_owner_user_id_idx').on(table.ownerUserId)]
+	(table) => [
+		index('workspaces_owner_user_id_idx').on(table.ownerUserId),
+		uniqueIndex('workspaces_owner_name_uidx').on(table.ownerUserId, table.name)
+	]
 );
 
 export const workspaceMembers = pgTable(
@@ -153,6 +156,7 @@ export const boards = pgTable(
 	},
 	(table) => [
 		index('boards_workspace_id_idx').on(table.workspaceId),
+		uniqueIndex('boards_workspace_name_uidx').on(table.workspaceId, table.name),
 		check('boards_default_view_check', sql`${table.defaultView} in ('kanban', 'gantt')`)
 	]
 );
