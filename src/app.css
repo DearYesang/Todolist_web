@@ -145,6 +145,65 @@ select {
     font-size: 11px;
 }
 
+.passkey-manager {
+    display: grid;
+    gap: 8px;
+    width: min(520px, 100%);
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: rgba(13, 17, 23, 0.54);
+}
+
+.passkey-manager-header,
+.passkey-row,
+.passkey-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.passkey-manager-header {
+    justify-content: space-between;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.passkey-list {
+    display: grid;
+    gap: 8px;
+}
+
+.passkey-row {
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 8px;
+    border: 1px solid rgba(48, 54, 61, 0.7);
+    border-radius: var(--radius-sm);
+    background: rgba(22, 27, 34, 0.72);
+}
+
+.passkey-row-main {
+    display: grid;
+    flex: 1 1 220px;
+    gap: 4px;
+    min-width: 0;
+}
+
+.passkey-row-main small {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.passkey-name-input {
+    width: 100%;
+}
+
+.passkey-row-actions {
+    flex: 0 0 auto;
+}
+
 .calendar-feed-panel {
     position: relative;
 }
@@ -1576,6 +1635,23 @@ select {
     .auth-input {
         width: 170px;
         min-height: 44px;
+    }
+
+    .passkey-manager {
+        width: min(520px, calc(100vw - 24px));
+    }
+
+    .passkey-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .passkey-row-actions {
+        width: 100%;
+    }
+
+    .passkey-row-actions .btn {
+        flex: 1 1 0;
     }
 
     .calendar-feed-panel,
