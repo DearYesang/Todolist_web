@@ -160,6 +160,23 @@ updated_at timestamptz not null default now()
 unique (connection_id, resource)
 ```
 
+### calendar_sync_runs
+
+```txt
+id uuid primary key
+connection_id uuid not null references calendar_connections(id) on delete cascade
+user_id text not null references user(id) on delete cascade
+provider text not null
+status text not null
+started_at timestamptz not null default now()
+finished_at timestamptz
+task_count integer not null default 0
+upserted integer not null default 0
+deleted integer not null default 0
+failed integer not null default 0
+message text
+```
+
 ## Recommended Indexes
 
 ```txt
@@ -180,6 +197,8 @@ calendar_subscription_tokens(board_id)
 calendar_subscription_tokens(token_hash) unique
 calendar_event_links(task_id)
 sync_cursors(connection_id, resource)
+calendar_sync_runs(user_id, started_at)
+calendar_sync_runs(connection_id, started_at)
 ```
 
 ## Import Strategy
@@ -205,7 +224,7 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Authenticated read-only `/api/calendar.ics` download backed by server tasks.
 - Revocable token-based `/api/calendar/subscriptions/[token].ics` feed backed by token hashes.
 - OAuth-backed Google/Microsoft calendar connections with encrypted provider tokens.
-- Manual calendar provider sync that upserts/deletes linked all-day events.
+- Manual calendar provider sync that upserts/deletes linked all-day events and records durable sync runs.
 - Email-code passkey onboarding and hashed recovery codes.
 - Offline client write queue for retryable server mutations.
 - Parent ownership and cycle validation in the service layer.

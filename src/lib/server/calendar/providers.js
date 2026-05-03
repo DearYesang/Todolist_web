@@ -188,6 +188,31 @@ export async function deleteProviderCalendarEvent(provider, accessToken, eventId
 }
 
 /**
+ * @param {string} provider
+ * @param {string | null} token
+ */
+export async function revokeProviderCalendarToken(provider, token) {
+	if (!token) {
+		return;
+	}
+
+	if (provider !== 'google') {
+		return;
+	}
+
+	const response = await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`, {
+		method: 'POST',
+		headers: {
+			'content-type': 'application/x-www-form-urlencoded'
+		}
+	});
+
+	if (!response.ok && response.status !== 400) {
+		throw new CalendarProviderError(`Calendar provider revoke failed with status ${response.status}.`);
+	}
+}
+
+/**
  * @param {string} tokenUrl
  * @param {URLSearchParams} body
  */

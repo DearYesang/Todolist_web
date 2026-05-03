@@ -839,7 +839,8 @@ describe('calendar provider sync helpers', () => {
 
         await expect(listCalendarProvidersRequest(listFetcher)).resolves.toEqual({
             ok: true,
-            ...providerBody
+            ...providerBody,
+            syncRuns: []
         });
         expect(listFetcher).toHaveBeenCalledWith('/api/calendar/providers', expect.objectContaining({
             headers: { accept: 'application/json' }

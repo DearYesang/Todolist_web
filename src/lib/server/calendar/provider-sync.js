@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 import { ensurePersonalBoardForUser, listTasksForUser } from '$lib/server/tasks/repository.js';
 import {
@@ -14,10 +14,14 @@ import {
 	fetchCalendarProviderAccount,
 	listCalendarProviders,
 	refreshCalendarToken,
+	revokeProviderCalendarToken,
 	upsertProviderCalendarEvent
 } from './providers.js';
 
 const OAUTH_STATE_PREFIX = 'calendar-oauth-state:';
+const DEFAULT_SYNC_TASK_LIMIT = 250;
+/** @type {Set<string>} */
+const syncLocks = new Set();
 
 /**
  * @param {string} userId
@@ -27,10 +31,23 @@ export async function listCalendarProviderConnections(userId) {
 		.select()
 		.from(schema.calendarConnections)
 		.where(eq(schema.calendarConnections.userId, userId));
+	const runs = await getDb()
+		.select()
+		.from(schema.calendarSyncRuns)
+		.where(eq(schema.calendarSyncRuns.userId, userId))
+		.orderBy(desc(schema.calendarSyncRuns.startedAt))
+		.limit(10);
 
 	return {
 		providers: listCalendarProviders(),
-		connections: rows.map(toConnectionResponse)
+		connections: rows.map((row) => {
+			const latestSync = runs.find((run) => run.connectionId === row.id);
+			return {
+				...toConnectionResponse(row),
+				latestSync: latestSync ? toSyncRunResponse(latestSync) : null
+			};
+		}),
+		syncRuns: runs.map(toSyncRunResponse)
 	};
 }
 
@@ -134,6 +151,20 @@ export async function completeCalendarProviderAuthorization(provider, code, stat
  * @param {string} connectionId
  */
 export async function deleteCalendarProviderConnection(userId, connectionId) {
+	const [connection] = await getDb()
+		.select()
+		.from(schema.calendarConnections)
+		.where(and(eq(schema.calendarConnections.id, connectionId), eq(schema.calendarConnections.userId, userId)))
+		.limit(1);
+	if (!connection) {
+		throw new CalendarSyncError('Calendar connection was not found.', 404);
+	}
+
+	const associatedData = createConnectionAssociatedData(connection);
+	const refreshToken = decryptCalendarToken(connection.encryptedRefreshToken, associatedData);
+	const accessToken = decryptCalendarToken(connection.encryptedAccessToken, associatedData);
+	await revokeProviderCalendarToken(connection.provider, refreshToken ?? accessToken);
+
 	const [deleted] = await getDb()
 		.delete(schema.calendarConnections)
 		.where(and(eq(schema.calendarConnections.id, connectionId), eq(schema.calendarConnections.userId, userId)))
@@ -150,17 +181,38 @@ export async function deleteCalendarProviderConnection(userId, connectionId) {
  * @param {string} userId
  */
 export async function syncCalendarProvidersForUser(userId) {
+	if (syncLocks.has(userId)) {
+		throw new CalendarSyncError('Calendar sync is already running for this user.', 409);
+	}
+
+	syncLocks.add(userId);
+	try {
+		return await syncCalendarProvidersForUserUnlocked(userId);
+	} finally {
+		syncLocks.delete(userId);
+	}
+}
+
+/**
+ * @param {string} userId
+ */
+async function syncCalendarProvidersForUserUnlocked(userId) {
 	const db = getDb();
 	const connections = await db
 		.select()
 		.from(schema.calendarConnections)
 		.where(eq(schema.calendarConnections.userId, userId));
 	const tasks = await listTasksForUser(userId);
+	const taskLimit = getSyncTaskLimit();
+	if (tasks.length > taskLimit) {
+		throw new CalendarSyncError(`Calendar sync is limited to ${taskLimit} tasks per run.`, 413);
+	}
+
 	const activeTaskIds = new Set(tasks.map((task) => task.id));
 	const summaries = [];
 
 	for (const connection of connections) {
-		const accessToken = await getFreshAccessToken(connection);
+		const run = await createSyncRun(connection, tasks.length);
 		const links = await db
 			.select()
 			.from(schema.calendarEventLinks)
@@ -169,43 +221,60 @@ export async function syncCalendarProvidersForUser(userId) {
 		let upserted = 0;
 		let deleted = 0;
 		let failed = 0;
+		let message = '';
 
-		for (const task of tasks) {
-			try {
-				const link = linksByTaskId.get(task.id);
-				const event = await upsertProviderCalendarEvent(
-					connection.provider,
-					accessToken,
-					link?.syncStatus === 'active' ? link.externalEventId : null,
-					task
-				);
-				if (!event.id) {
-					throw new CalendarSyncError('Calendar provider did not return an event id.', 502);
+		try {
+			const accessToken = await getFreshAccessToken(connection);
+			for (const task of tasks) {
+				try {
+					const link = linksByTaskId.get(task.id);
+					const event = await upsertProviderCalendarEvent(
+						connection.provider,
+						accessToken,
+						link?.syncStatus === 'active' ? link.externalEventId : null,
+						task
+					);
+					if (!event.id) {
+						throw new CalendarSyncError('Calendar provider did not return an event id.', 502);
+					}
+
+					await upsertEventLink(connection.id, task.id, event.id, event.etag ?? null);
+					upserted += 1;
+				} catch (error) {
+					await markTaskLinkErrored(connection.id, task.id);
+					failed += 1;
+					message = readErrorMessage(error) ?? message;
 				}
-
-				await upsertEventLink(connection.id, task.id, event.id, event.etag ?? null);
-				upserted += 1;
-			} catch {
-				await markTaskLinkErrored(connection.id, task.id);
-				failed += 1;
 			}
-		}
 
-		const staleLinks = links.filter((link) => link.syncStatus === 'active' && !activeTaskIds.has(link.taskId));
-		for (const link of staleLinks) {
-			try {
-				await deleteProviderCalendarEvent(connection.provider, accessToken, link.externalEventId);
-				await db
-					.update(schema.calendarEventLinks)
-					.set({
-						syncStatus: 'deleted',
-						lastSyncedAt: new Date()
-					})
-					.where(eq(schema.calendarEventLinks.id, link.id));
-				deleted += 1;
-			} catch {
-				failed += 1;
+			const staleLinks = links.filter((link) => link.syncStatus === 'active' && !activeTaskIds.has(link.taskId));
+			for (const link of staleLinks) {
+				try {
+					await deleteProviderCalendarEvent(connection.provider, accessToken, link.externalEventId);
+					await db
+						.update(schema.calendarEventLinks)
+						.set({
+							syncStatus: 'deleted',
+							lastSyncedAt: new Date()
+						})
+						.where(eq(schema.calendarEventLinks.id, link.id));
+					deleted += 1;
+				} catch (error) {
+					failed += 1;
+					message = readErrorMessage(error) ?? message;
+				}
 			}
+		} catch (error) {
+			failed += tasks.length;
+			message = readErrorMessage(error) ?? 'Calendar sync failed.';
+		} finally {
+			await finishSyncRun(run.id, {
+				status: failed === 0 ? 'success' : upserted > 0 || deleted > 0 ? 'partial' : 'error',
+				upserted,
+				deleted,
+				failed,
+				message
+			});
 		}
 
 		summaries.push({
@@ -213,7 +282,9 @@ export async function syncCalendarProvidersForUser(userId) {
 			provider: connection.provider,
 			upserted,
 			deleted,
-			failed
+			failed,
+			status: failed === 0 ? 'success' : upserted > 0 || deleted > 0 ? 'partial' : 'error',
+			message
 		});
 	}
 
@@ -222,6 +293,47 @@ export async function syncCalendarProvidersForUser(userId) {
 		tasks: tasks.length,
 		summaries
 	};
+}
+
+/**
+ * @param {typeof schema.calendarConnections.$inferSelect} connection
+ * @param {number} taskCount
+ */
+async function createSyncRun(connection, taskCount) {
+	const [created] = await getDb()
+		.insert(schema.calendarSyncRuns)
+		.values({
+			connectionId: connection.id,
+			userId: connection.userId,
+			provider: connection.provider,
+			status: 'running',
+			taskCount,
+			upserted: 0,
+			deleted: 0,
+			failed: 0,
+			startedAt: new Date()
+		})
+		.returning();
+
+	return created;
+}
+
+/**
+ * @param {string} runId
+ * @param {{ status: 'success' | 'partial' | 'error'; upserted: number; deleted: number; failed: number; message?: string }} result
+ */
+async function finishSyncRun(runId, result) {
+	await getDb()
+		.update(schema.calendarSyncRuns)
+		.set({
+			status: result.status,
+			finishedAt: new Date(),
+			upserted: result.upserted,
+			deleted: result.deleted,
+			failed: result.failed,
+			message: result.message || null
+		})
+		.where(eq(schema.calendarSyncRuns.id, runId));
 }
 
 /**
@@ -403,6 +515,37 @@ function toConnectionResponse(row) {
 		updatedAt: row.updatedAt.toISOString(),
 		expiresAt: row.expiresAt?.toISOString() ?? null
 	};
+}
+
+/**
+ * @param {typeof schema.calendarSyncRuns.$inferSelect} row
+ */
+function toSyncRunResponse(row) {
+	return {
+		id: row.id,
+		connectionId: row.connectionId,
+		provider: row.provider,
+		status: row.status,
+		startedAt: row.startedAt.toISOString(),
+		finishedAt: row.finishedAt?.toISOString() ?? null,
+		taskCount: row.taskCount,
+		upserted: row.upserted,
+		deleted: row.deleted,
+		failed: row.failed,
+		message: row.message
+	};
+}
+
+function getSyncTaskLimit() {
+	const configured = Number(process.env.CALENDAR_SYNC_MAX_TASKS ?? DEFAULT_SYNC_TASK_LIMIT);
+	return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : DEFAULT_SYNC_TASK_LIMIT;
+}
+
+/**
+ * @param {unknown} error
+ */
+function readErrorMessage(error) {
+	return error instanceof Error && error.message ? error.message : null;
 }
 
 export class CalendarSyncError extends Error {

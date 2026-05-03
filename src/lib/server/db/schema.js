@@ -319,6 +319,33 @@ export const calendarEventLinks = pgTable(
 	]
 );
 
+export const calendarSyncRuns = pgTable(
+	'calendar_sync_runs',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		connectionId: uuid('connection_id')
+			.notNull()
+			.references(() => calendarConnections.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		provider: text('provider').notNull(),
+		status: text('status').notNull(),
+		startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+		finishedAt: timestamp('finished_at', { withTimezone: true }),
+		taskCount: integer('task_count').notNull().default(0),
+		upserted: integer('upserted').notNull().default(0),
+		deleted: integer('deleted').notNull().default(0),
+		failed: integer('failed').notNull().default(0),
+		message: text('message')
+	},
+	(table) => [
+		index('calendar_sync_runs_user_started_idx').on(table.userId, table.startedAt),
+		index('calendar_sync_runs_connection_started_idx').on(table.connectionId, table.startedAt),
+		check('calendar_sync_runs_status_check', sql`${table.status} in ('running', 'success', 'partial', 'error')`)
+	]
+);
+
 export const syncCursors = pgTable(
 	'sync_cursors',
 	{
