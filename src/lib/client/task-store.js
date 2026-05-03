@@ -1,4 +1,6 @@
 import { derived, writable } from 'svelte/store';
+import { deleteServerTask, updateServerTask } from './task-api.js';
+import { isServerTaskId } from './task-create.js';
 import {
     addSubtaskToList,
     assignParentInList,
@@ -132,7 +134,14 @@ export function mergeTasks(nextTasks) {
  * @param {string} nextStatus
  */
 export function moveTask(taskId, nextStatus) {
-    tasks.update((current) => moveTaskInList(current, taskId, nextStatus));
+    /** @type {import('../shared/task-domain.js').Task | null} */
+    let syncedTask = null;
+    tasks.update((current) => {
+        const next = moveTaskInList(current, taskId, nextStatus);
+        syncedTask = next.find((task) => task.id === taskId) ?? null;
+        return next;
+    });
+    syncTaskSnapshot(syncedTask);
 }
 
 /**
@@ -140,7 +149,14 @@ export function moveTask(taskId, nextStatus) {
  * @param {string | null} nextParentId
  */
 export function assignParent(taskId, nextParentId) {
-    tasks.update((current) => assignParentInList(current, taskId, nextParentId));
+    /** @type {import('../shared/task-domain.js').Task | null} */
+    let syncedTask = null;
+    tasks.update((current) => {
+        const next = assignParentInList(current, taskId, nextParentId);
+        syncedTask = next.find((task) => task.id === taskId) ?? null;
+        return next;
+    });
+    syncTaskSnapshot(syncedTask);
 }
 
 /**
@@ -148,7 +164,14 @@ export function assignParent(taskId, nextParentId) {
  * @param {Partial<import('../shared/task-domain.js').Task>} patch
  */
 export function updateTask(taskId, patch) {
-    tasks.update((current) => updateTaskInList(current, taskId, patch));
+    /** @type {import('../shared/task-domain.js').Task | null} */
+    let syncedTask = null;
+    tasks.update((current) => {
+        const next = updateTaskInList(current, taskId, patch);
+        syncedTask = next.find((task) => task.id === taskId) ?? null;
+        return next;
+    });
+    syncTaskSnapshot(syncedTask);
 }
 
 /**
@@ -165,6 +188,7 @@ export function toggleCollapse(taskId) {
  */
 export function deleteTaskCascade(taskId) {
     tasks.update((current) => deleteTaskCascadeFromList(current, taskId));
+    syncTaskDelete(taskId);
 }
 
 export function clearDoneTasks() {
@@ -202,4 +226,58 @@ export function renameSubtask(taskId, subtaskId, text) {
  */
 export function deleteSubtask(taskId, subtaskId) {
     tasks.update((current) => deleteSubtaskFromList(current, taskId, subtaskId));
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task | null} task
+ */
+function syncTaskSnapshot(task) {
+    if (!task || !shouldSyncServerTask(task.id)) {
+        return;
+    }
+
+    void updateServerTask(task.id, toServerTaskPatch(task)).then(reportSyncFailure);
+}
+
+/**
+ * @param {string} taskId
+ */
+function syncTaskDelete(taskId) {
+    if (!shouldSyncServerTask(taskId)) {
+        return;
+    }
+
+    void deleteServerTask(taskId).then(reportSyncFailure);
+}
+
+/**
+ * @param {string} taskId
+ */
+function shouldSyncServerTask(taskId) {
+    return typeof window !== 'undefined' && isServerTaskId(taskId);
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task} task
+ */
+function toServerTaskPatch(task) {
+    return {
+        text: task.text,
+        status: task.status,
+        startDate: task.startDate,
+        endDate: task.endDate,
+        priority: task.priority,
+        urgency: task.urgency,
+        category: task.category,
+        parentId: isServerTaskId(task.parentId) ? task.parentId : null
+    };
+}
+
+/**
+ * @param {{ ok: true } | { ok: false; fallback: boolean; message: string }} result
+ */
+function reportSyncFailure(result) {
+    if (!result.ok && !result.fallback) {
+        console.error('Failed to sync task mutation', result.message);
+    }
 }
