@@ -12,6 +12,7 @@ test('opens an offline cached board and centers the Gantt timeline on today', as
 	await seedOfflineBoard(page);
 
 	await page.goto('/');
+	await expect(page.getByRole('button', { name: /새로고침/ })).toBeVisible();
 	await page.getByRole('button', { name: /간트 뷰/ }).click();
 
 	const timeline = page.locator('.gantt-timeline-area');

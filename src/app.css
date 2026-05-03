@@ -412,6 +412,17 @@ select {
     color: var(--text);
 }
 
+.refresh-btn {
+    border-color: rgba(88, 166, 255, 0.35);
+    color: var(--accent);
+    background: rgba(88, 166, 255, 0.08);
+}
+
+.refresh-btn:hover {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.16);
+}
+
 .add-panel,
 .filter-bar,
 .board,

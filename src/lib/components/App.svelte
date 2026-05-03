@@ -44,6 +44,7 @@
     let syncedSessionUserId = null;
     /** @type {string | null} */
     let syncNotice = $state(null);
+    let isRefreshing = $state(false);
     let conflictDetailsOpen = $state(false);
     let syncConflicts = $state(/** @type {import('$lib/client/offline-conflicts.js').OfflineConflictSummary[]} */ ([]));
     const appUnlocked = $derived(Boolean($session.data?.user?.id || (!isOnline && cachedAuthScope?.id)));
@@ -120,8 +121,16 @@
         selectedTaskId = id;
     }
 
-    async function runServerSync() {
+    async function runServerSync({ showSuccess = false } = {}) {
         const result = await syncServerTasks();
+        handleServerSyncResult(result, { showSuccess });
+    }
+
+    /**
+     * @param {Awaited<ReturnType<typeof syncServerTasks>>} result
+     * @param {{ showSuccess?: boolean }} options
+     */
+    function handleServerSyncResult(result, { showSuccess = false } = {}) {
         const conflicts = Array.isArray(result.offlineConflicts) ? result.offlineConflicts : [];
         if (conflicts.length > 0) {
             syncConflicts = conflicts.map((conflict) => summarizeOfflineConflict(conflict, get(tasks)));
@@ -129,7 +138,40 @@
             syncNotice = null;
         } else if (result.ok) {
             syncConflicts = [];
-            syncNotice = null;
+            syncNotice = showSuccess ? '최신 작업 목록으로 새로고침했습니다.' : null;
+        } else if (showSuccess) {
+            syncNotice = result.fallback
+                ? '지금은 서버에 연결할 수 없어 이 기기의 작업 목록을 유지합니다.'
+                : result.message;
+        }
+    }
+
+    async function refreshAppData() {
+        if (isRefreshing) return;
+
+        if (!navigator.onLine) {
+            isOnline = false;
+            syncNotice = '오프라인 상태입니다. 온라인으로 돌아오면 새로고침할 수 있습니다.';
+            return;
+        }
+
+        isRefreshing = true;
+        syncNotice = null;
+
+        try {
+            isOnline = true;
+            await $session.refetch();
+
+            if (!$session.data?.user?.id) {
+                syncNotice = '로그인 상태를 다시 확인한 뒤 새로고침해 주세요.';
+                return;
+            }
+
+            await runServerSync({ showSuccess: true });
+        } catch (error) {
+            syncNotice = '새로고침을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+        } finally {
+            isRefreshing = false;
         }
     }
 
@@ -257,6 +299,9 @@
             {:else}
                 <AuthPanel />
             {/if}
+            <button class="btn refresh-btn" onclick={refreshAppData} disabled={isRefreshing}>
+                {isRefreshing ? '⏳ 새로고침 중' : '🔄 새로고침'}
+            </button>
             <CalendarFeedPanel />
             <CalendarSyncPanel />
             <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
