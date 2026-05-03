@@ -2,6 +2,11 @@
     import { onMount } from 'svelte';
     import { get } from 'svelte/store';
     import { authClient } from '$lib/client/auth-client.js';
+    import {
+        cacheAuthScope,
+        clearCachedAuthScope,
+        readCachedAuthScope
+    } from '$lib/client/auth-session-scope.js';
     import { setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { exportServerTasks, importServerTasks } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
@@ -26,11 +31,70 @@
     /** @type {string | null} */
     let selectedTaskId = $state(null);
     const session = authClient.useSession();
+    let cachedAuthScope = $state(readCachedAuthScope());
+    let isOnline = $state(true);
     /** @type {string | null} */
     let scopedUserId = null;
+    /** @type {string | null} */
+    let syncedSessionUserId = null;
+    const appUnlocked = $derived(Boolean($session.data?.user?.id || (!isOnline && cachedAuthScope?.id)));
 
     $effect(() => {
-        const userId = $session.data?.user?.id ?? null;
+        const sessionUser = $session.data?.user;
+        if (sessionUser?.id) {
+            const nextScope = cacheAuthScope(sessionUser);
+            cachedAuthScope = nextScope;
+            applyStorageScope(nextScope?.id ?? null);
+            if (nextScope?.id && syncedSessionUserId !== nextScope.id) {
+                syncedSessionUserId = nextScope.id;
+                void syncServerTasks();
+            }
+            return;
+        }
+
+        if ($session.isPending) {
+            return;
+        }
+
+        if (!isOnline && cachedAuthScope?.id) {
+            applyStorageScope(cachedAuthScope.id);
+            return;
+        }
+
+        clearCachedAuthScope();
+        cachedAuthScope = null;
+        syncedSessionUserId = null;
+        applyStorageScope(null);
+    });
+
+    onMount(() => {
+        isOnline = navigator.onLine;
+        if (!navigator.onLine && cachedAuthScope?.id) {
+            applyStorageScope(cachedAuthScope.id);
+        }
+
+        const handleOnline = () => {
+            isOnline = true;
+            void $session.refetch();
+            if ($session.data?.user) {
+                void syncServerTasks();
+            }
+        };
+        const handleOffline = () => {
+            isOnline = false;
+        };
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    });
+
+    /**
+     * @param {string | null} userId
+     */
+    function applyStorageScope(userId) {
         if (userId === scopedUserId) {
             return;
         }
@@ -38,22 +102,7 @@
         scopedUserId = userId;
         setTaskStorageOwner(userId);
         setOfflineQueueOwner(userId);
-        if (userId) {
-            void syncServerTasks();
-        }
-    });
-
-    onMount(() => {
-        const handleOnline = () => {
-            if ($session.data?.user) {
-                void syncServerTasks();
-            }
-        };
-        window.addEventListener('online', handleOnline);
-        return () => {
-            window.removeEventListener('online', handleOnline);
-        };
-    });
+    }
 
     /**
      * @param {string} id
@@ -153,36 +202,50 @@
 <div class="header">
     <h1>🚀 나의 칸반 보드</h1>
 
-    <div class="view-toggle">
-        <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => $currentView = 'kanban'}>
-            📋 칸반 뷰
-        </button>
-        <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => $currentView = 'gantt'}>
-            📊 간트 뷰
-        </button>
-    </div>
+    {#if appUnlocked}
+        <div class="view-toggle">
+            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => $currentView = 'kanban'}>
+                📋 칸반 뷰
+            </button>
+            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => $currentView = 'gantt'}>
+                📊 간트 뷰
+            </button>
+        </div>
+    {/if}
 
     <div class="header-actions">
-        <AuthPanel />
-        <CalendarFeedPanel />
-        <CalendarSyncPanel />
-        <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
-        <button class="btn" onclick={() => document.getElementById('import-file')?.click()}>📂 불러오기</button>
-        <button class="btn" onclick={exportData}>💾 내보내기</button>
-        <button class="btn" onclick={exportCalendarData}>📅 캘린더</button>
-        <button class="btn" onclick={handleClearDone}>🧹 정리</button>
+        {#if appUnlocked}
+            {#if !$session.data?.user && !isOnline}
+                <span class="auth-status">오프라인</span>
+            {:else}
+                <AuthPanel />
+            {/if}
+            <CalendarFeedPanel />
+            <CalendarSyncPanel />
+            <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
+            <button class="btn" onclick={() => document.getElementById('import-file')?.click()}>📂 불러오기</button>
+            <button class="btn" onclick={exportData}>💾 내보내기</button>
+            <button class="btn" onclick={exportCalendarData}>📅 캘린더</button>
+            <button class="btn" onclick={handleClearDone}>🧹 정리</button>
+        {/if}
     </div>
 </div>
 
-<TaskForm />
-<FilterBar />
+{#if appUnlocked}
+    <TaskForm />
+    <FilterBar />
 
-{#if $currentView === 'kanban'}
-    <KanbanBoard openTask={openTask} />
+    {#if $currentView === 'kanban'}
+        <KanbanBoard openTask={openTask} />
+    {:else}
+        <GanttTimeline openTask={openTask} />
+    {/if}
+
+    {#if selectedTaskId}
+        <TaskModal taskId={selectedTaskId} onclose={() => selectedTaskId = null} />
+    {/if}
 {:else}
-    <GanttTimeline openTask={openTask} />
-{/if}
-
-{#if selectedTaskId}
-    <TaskModal taskId={selectedTaskId} onclose={() => selectedTaskId = null} />
+    <main class="locked-app-state">
+        <AuthPanel />
+    </main>
 {/if}

@@ -5,6 +5,7 @@ import { getDb, schema } from '$lib/server/db/index.js';
 const EMAIL_VERIFICATION_PREFIX = 'passkey-email-verification:';
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const RECOVERY_CODE_COUNT = 10;
+const DEFAULT_RESEND_FROM = 'Todolist <onboarding@resend.dev>';
 
 export class AccountSecurityConfigurationError extends Error {
 	/** @param {string} message */
@@ -12,6 +13,15 @@ export class AccountSecurityConfigurationError extends Error {
 		super(message);
 		this.name = 'AccountSecurityConfigurationError';
 		this.status = 503;
+	}
+}
+
+export class AccountSecurityPolicyError extends Error {
+	/** @param {string} message */
+	constructor(message) {
+		super(message);
+		this.name = 'AccountSecurityPolicyError';
+		this.status = 403;
 	}
 }
 
@@ -27,6 +37,21 @@ export function normalizeAccountEmail(value) {
  */
 export function isAccountEmail(value) {
 	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/**
+ * @param {string} email
+ */
+export function assertAllowedAccountEmail(email) {
+	const normalizedEmail = normalizeAccountEmail(email);
+	const allowed = getAllowedAccountEmails();
+	if (allowed.length > 0 && !allowed.includes(normalizedEmail)) {
+		throw new AccountSecurityPolicyError('This email is not allowed to create an account.');
+	}
+}
+
+export function getAllowedAccountEmails() {
+	return parseEmailList(process.env.AUTH_ALLOWED_EMAILS);
 }
 
 /**
@@ -50,6 +75,7 @@ export function parsePasskeyRegistrationContext(context) {
 	if (!isAccountEmail(email)) {
 		throw new Error('A valid email is required for passkey registration.');
 	}
+	assertAllowedAccountEmail(email);
 
 	return { email, name, emailVerificationCode, recoveryCode };
 }
@@ -62,6 +88,7 @@ export async function createPasskeyEmailVerification(input) {
 	if (!isAccountEmail(email)) {
 		throw new AccountSecurityConfigurationError('A valid email is required.');
 	}
+	assertAllowedAccountEmail(email);
 
 	const name = typeof input.name === 'string' && input.name.trim() ? input.name.trim() : email;
 	const code = createNumericCode();
@@ -335,6 +362,12 @@ function getAccountSecuritySecret() {
  * @param {{ email: string; name: string; code: string; expiresAt: Date }} message
  */
 async function deliverEmailVerification(message) {
+	const resendApiKey = process.env.RESEND_API_KEY;
+	if (resendApiKey) {
+		await sendResendVerificationEmail(message, resendApiKey);
+		return { previewCode: false };
+	}
+
 	const webhookUrl = process.env.EMAIL_DELIVERY_WEBHOOK_URL;
 	if (webhookUrl) {
 		const response = await fetch(webhookUrl, {
@@ -370,6 +403,40 @@ async function deliverEmailVerification(message) {
 }
 
 /**
+ * @param {{ email: string; name: string; code: string; expiresAt: Date }} message
+ * @param {string} apiKey
+ */
+async function sendResendVerificationEmail(message, apiKey) {
+	const from = process.env.EMAIL_FROM || DEFAULT_RESEND_FROM;
+	const response = await fetch('https://api.resend.com/emails', {
+		method: 'POST',
+		headers: {
+			authorization: `Bearer ${apiKey}`,
+			'content-type': 'application/json',
+			'user-agent': 'todokanban-email/1.0'
+		},
+		body: JSON.stringify({
+			from,
+			to: [message.email],
+			subject: 'Todokanban verification code',
+			text: [
+				`Hi ${message.name},`,
+				'',
+				`Your Todokanban verification code is ${message.code}.`,
+				`It expires at ${message.expiresAt.toISOString()}.`,
+				'',
+				'If you did not request this code, you can ignore this email.'
+			].join('\n'),
+			html: `<p>Hi ${escapeHtml(message.name)},</p><p>Your Todokanban verification code is <strong>${message.code}</strong>.</p><p>It expires at ${message.expiresAt.toISOString()}.</p><p>If you did not request this code, you can ignore this email.</p>`
+		})
+	});
+
+	if (!response.ok) {
+		throw new AccountSecurityConfigurationError('Email verification delivery failed.');
+	}
+}
+
+/**
  * @param {string} value
  */
 function isPlaceholderSecret(value) {
@@ -380,6 +447,28 @@ function randomId() {
 	return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
 		? crypto.randomUUID()
 		: `${Date.now()}-${randomBytes(8).toString('hex')}`;
+}
+
+/**
+ * @param {string | undefined} value
+ */
+function parseEmailList(value) {
+	return (value ?? '')
+		.split(',')
+		.map(normalizeAccountEmail)
+		.filter(isAccountEmail);
+}
+
+/**
+ * @param {string} value
+ */
+function escapeHtml(value) {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
 }
 
 /**

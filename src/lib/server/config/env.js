@@ -18,8 +18,11 @@ export function getRuntimeConfigReport() {
 		|| process.env.MICROSOFT_CALENDAR_CLIENT_ID
 		|| process.env.MICROSOFT_CALENDAR_CLIENT_SECRET
 	);
+	const resendConfigured = Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_FROM);
+	const webhookConfigured = Boolean(process.env.EMAIL_DELIVERY_WEBHOOK_URL);
 	const emailDeliveryRequired = process.env.NODE_ENV === 'production'
 		&& process.env.EMAIL_VERIFICATION_DEV_CODES !== 'true';
+	const calendarFeedRequired = process.env.NODE_ENV === 'production';
 	const checks = [
 		checkDatabaseUrl(),
 		checkSecret('BETTER_AUTH_SECRET', process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET, authRequired),
@@ -27,10 +30,13 @@ export function getRuntimeConfigReport() {
 		checkTrustedOrigins(),
 		checkUrl('PASSKEY_ORIGIN', process.env.PASSKEY_ORIGIN, process.env.NODE_ENV === 'production'),
 		checkValue('PASSKEY_RP_ID', process.env.PASSKEY_RP_ID, process.env.NODE_ENV === 'production'),
+		checkAllowedEmails(),
 		checkSecret('ACCOUNT_RECOVERY_SECRET', process.env.ACCOUNT_RECOVERY_SECRET, authRequired),
-		checkUrl('EMAIL_DELIVERY_WEBHOOK_URL', process.env.EMAIL_DELIVERY_WEBHOOK_URL, emailDeliveryRequired),
+		checkUrl('EMAIL_DELIVERY_WEBHOOK_URL', process.env.EMAIL_DELIVERY_WEBHOOK_URL, emailDeliveryRequired && !resendConfigured),
 		checkSecret('EMAIL_DELIVERY_WEBHOOK_SECRET', process.env.EMAIL_DELIVERY_WEBHOOK_SECRET, false),
-		checkSecret('CALENDAR_TOKEN_SECRET', process.env.CALENDAR_TOKEN_SECRET, false),
+		checkSecret('RESEND_API_KEY', process.env.RESEND_API_KEY, emailDeliveryRequired && !webhookConfigured),
+		checkValue('EMAIL_FROM', process.env.EMAIL_FROM, resendConfigured || (emailDeliveryRequired && !webhookConfigured)),
+		checkSecret('CALENDAR_TOKEN_SECRET', process.env.CALENDAR_TOKEN_SECRET, calendarFeedRequired),
 		checkSecret('CALENDAR_OAUTH_ENCRYPTION_KEY', process.env.CALENDAR_OAUTH_ENCRYPTION_KEY, calendarProviderConfigured),
 		checkValue('GOOGLE_CALENDAR_CLIENT_ID', process.env.GOOGLE_CALENDAR_CLIENT_ID, false),
 		checkSecret('GOOGLE_CALENDAR_CLIENT_SECRET', process.env.GOOGLE_CALENDAR_CLIENT_SECRET, false),
@@ -44,7 +50,11 @@ export function getRuntimeConfigReport() {
 		nodeEnv: process.env.NODE_ENV ?? 'development',
 		databaseConfigured: Boolean(process.env.DATABASE_URL),
 		authReady: authRequired && isCheckOk(checks, 'BETTER_AUTH_SECRET') && isCheckOk(checks, 'BETTER_AUTH_URL'),
-		emailDeliveryReady: isCheckOk(checks, 'EMAIL_DELIVERY_WEBHOOK_URL') || process.env.EMAIL_VERIFICATION_DEV_CODES === 'true',
+		emailDeliveryReady: (
+			isCheckOk(checks, 'EMAIL_DELIVERY_WEBHOOK_URL')
+			|| (isCheckOk(checks, 'RESEND_API_KEY') && isCheckOk(checks, 'EMAIL_FROM'))
+			|| process.env.EMAIL_VERIFICATION_DEV_CODES === 'true'
+		),
 		calendarFeedReady: isCheckOk(checks, 'CALENDAR_TOKEN_SECRET'),
 		calendarProviderReady: isCheckOk(checks, 'CALENDAR_OAUTH_ENCRYPTION_KEY') && (
 			hasProvider('GOOGLE_CALENDAR') || hasProvider('MICROSOFT_CALENDAR')
@@ -170,6 +180,25 @@ function checkTrustedOrigins() {
 		process.env.NODE_ENV === 'production',
 		invalid ? 'invalid' : 'ok',
 		invalid ? 'BETTER_AUTH_TRUSTED_ORIGINS contains an invalid origin.' : 'BETTER_AUTH_TRUSTED_ORIGINS is configured.'
+	);
+}
+
+function checkAllowedEmails() {
+	const value = process.env.AUTH_ALLOWED_EMAILS;
+	if (!value) {
+		return createCheck('AUTH_ALLOWED_EMAILS', process.env.NODE_ENV === 'production', process.env.NODE_ENV === 'production' ? 'missing' : 'optional', 'AUTH_ALLOWED_EMAILS should list the personal emails allowed to register.');
+	}
+
+	const emails = value
+		.split(',')
+		.map((email) => email.trim().toLowerCase())
+		.filter(Boolean);
+	const invalid = emails.length === 0 || emails.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+	return createCheck(
+		'AUTH_ALLOWED_EMAILS',
+		process.env.NODE_ENV === 'production',
+		invalid ? 'invalid' : 'ok',
+		invalid ? 'AUTH_ALLOWED_EMAILS must contain comma-separated email addresses.' : 'AUTH_ALLOWED_EMAILS is configured.'
 	);
 }
 

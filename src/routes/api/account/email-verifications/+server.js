@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
 import {
 	AccountSecurityConfigurationError,
+	AccountSecurityPolicyError,
 	createPasskeyEmailVerification
 } from '$lib/server/auth/account-security.js';
 import {
@@ -62,6 +63,10 @@ export async function POST(event) {
 		}
 
 		if (error instanceof AccountSecurityConfigurationError) {
+			return json({ message: error.message }, { status: error.status });
+		}
+
+		if (error instanceof AccountSecurityPolicyError) {
 			return json({ message: error.message }, { status: error.status });
 		}
 

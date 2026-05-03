@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-Use this checklist before moving the SvelteKit app from the PR branch to production.
+Use this checklist before moving the SvelteKit app from the PR branch to Vercel production.
 
 ## Required Commands
 
@@ -24,15 +24,31 @@ npm run build
 - `BETTER_AUTH_TRUSTED_ORIGINS`
 - `PASSKEY_ORIGIN`
 - `PASSKEY_RP_ID`
+- `AUTH_ALLOWED_EMAILS`
 - `ACCOUNT_RECOVERY_SECRET`
-- `EMAIL_DELIVERY_WEBHOOK_URL`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
 - `CALENDAR_TOKEN_SECRET`
 
-Calendar provider sync additionally needs:
+Production values for the personal deployment:
+
+- `BETTER_AUTH_URL=https://todokanban.com`
+- `BETTER_AUTH_TRUSTED_ORIGINS=https://todokanban.com`
+- `PASSKEY_ORIGIN=https://todokanban.com`
+- `PASSKEY_RP_ID=todokanban.com`
+- `AUTH_ALLOWED_EMAILS=scyea@naver.com,scyea1995@gmail.com`
+- `EMAIL_FROM=Todokanban <no-reply@todokanban.com>`
+
+Webhook email delivery remains available with `EMAIL_DELIVERY_WEBHOOK_URL` and `EMAIL_DELIVERY_WEBHOOK_SECRET` if Resend is not used.
+
+Google Calendar provider sync additionally needs:
 
 - `CALENDAR_OAUTH_ENCRYPTION_KEY`
 - `GOOGLE_CALENDAR_CLIENT_ID`
 - `GOOGLE_CALENDAR_CLIENT_SECRET`
+
+Microsoft Calendar is optional for later:
+
 - `MICROSOFT_CALENDAR_CLIENT_ID`
 - `MICROSOFT_CALENDAR_CLIENT_SECRET`
 
@@ -50,4 +66,7 @@ Calendar provider sync additionally needs:
 - Create and revoke an iCalendar subscription token.
 - Connect a Google or Microsoft calendar account in a staging OAuth app.
 - Run manual calendar sync and confirm event links are created.
+- Confirm a logged-out browser cannot see the board.
+- Confirm an unauthorized email cannot request a verification code.
 - Go offline, edit an existing server task, come back online, and confirm the queued write flushes.
+- On an already logged-in device, go offline, reload, and confirm the local board still opens.
