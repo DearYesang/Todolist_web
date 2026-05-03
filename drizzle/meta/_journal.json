@@ -15,6 +15,13 @@
       "when": 1777795533257,
       "tag": "0001_open_mauler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777796700541,
+      "tag": "0002_yellow_paladin",
+      "breakpoints": true
     }
   ]
 }
