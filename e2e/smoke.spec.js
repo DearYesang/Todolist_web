@@ -102,6 +102,11 @@ test('opens the Eisenhower matrix view with all quadrants', async ({ page }) => 
 	await expect(page.getByText('Planned important')).toBeVisible();
 	await expect(page.getByText('Interrupting task')).toBeVisible();
 	await expect(page.getByText('E2E cached task')).toBeVisible();
+	await expect(page.getByText('Completed matrix task')).toBeHidden();
+
+	await page.getByRole('button', { name: /완료 보기/ }).click();
+	await expect(page.getByText('Completed matrix task')).toBeVisible();
+	await expect(page.getByRole('button', { name: /완료 숨기기/ })).toBeVisible();
 });
 
 /**
@@ -180,6 +185,20 @@ async function seedOfflineBoard(page) {
 				endDate: formatDate(past),
 				priority: 'medium',
 				urgency: 'normal',
+				category: '',
+				parentId: null,
+				subtasks: [],
+				collapsed: false,
+				createdAt: Date.now()
+			},
+			{
+				id: 'local-completed-matrix-task',
+				text: 'Completed matrix task',
+				status: 'done',
+				startDate: formatDate(past),
+				endDate: formatDate(past),
+				priority: 'high',
+				urgency: 'urgent',
 				category: '',
 				parentId: null,
 				subtasks: [],
