@@ -174,6 +174,7 @@ tasks(board_id, category)
 tasks(board_id, deleted_at)
 checklist_items(task_id, position)
 calendar_connections(workspace_id, provider)
+calendar_connections(user_id, provider, provider_account_id) unique
 calendar_subscription_tokens(user_id)
 calendar_subscription_tokens(board_id)
 calendar_subscription_tokens(token_hash) unique
@@ -189,7 +190,7 @@ sync_cursors(connection_id, resource)
 4. Generate new UUIDs for tasks and checklist items.
 5. Keep an old-id to new-id map.
 6. Reconnect valid parent links through the map.
-7. Insert tasks first, then checklist items.
+7. Insert tasks first, then checklist items through a Neon HTTP `batch()` transaction.
 8. Return an import summary with skipped or repaired counts.
 
 ## Export Strategy
@@ -203,6 +204,10 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Authenticated checklist create/update/delete.
 - Authenticated read-only `/api/calendar.ics` download backed by server tasks.
 - Revocable token-based `/api/calendar/subscriptions/[token].ics` feed backed by token hashes.
+- OAuth-backed Google/Microsoft calendar connections with encrypted provider tokens.
+- Manual calendar provider sync that upserts/deletes linked all-day events.
+- Email-code passkey onboarding and hashed recovery codes.
+- Offline client write queue for retryable server mutations.
 - Parent ownership and cycle validation in the service layer.
 
-Server append import/export is implemented. Replace import and two-way provider sync are still planned.
+Server append/replace import and provider sync foundations are implemented. Background calendar workers, provider webhooks, and richer conflict resolution are still planned.

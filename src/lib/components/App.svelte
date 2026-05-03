@@ -13,6 +13,7 @@
     import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
+    import CalendarSyncPanel from './CalendarSyncPanel.svelte';
     import FilterBar from './FilterBar.svelte';
     import GanttTimeline from './GanttTimeline.svelte';
     import KanbanBoard from './KanbanBoard.svelte';
@@ -143,6 +144,7 @@
     <div class="header-actions">
         <AuthPanel />
         <CalendarFeedPanel />
+        <CalendarSyncPanel />
         <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
         <button class="btn" onclick={() => document.getElementById('import-file')?.click()}>📂 불러오기</button>
         <button class="btn" onclick={exportData}>💾 내보내기</button>

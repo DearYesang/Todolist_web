@@ -149,7 +149,9 @@ export const workspaceMembers = pgTable(
 		workspaceId: uuid('workspace_id')
 			.notNull()
 			.references(() => workspaces.id, { onDelete: 'cascade' }),
-		userId: text('user_id').notNull(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
 		role: text('role').notNull(),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
@@ -241,7 +243,9 @@ export const calendarConnections = pgTable(
 		workspaceId: uuid('workspace_id')
 			.notNull()
 			.references(() => workspaces.id, { onDelete: 'cascade' }),
-		userId: text('user_id').notNull(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
 		provider: text('provider').notNull(),
 		providerAccountId: text('provider_account_id'),
 		encryptedAccessToken: text('encrypted_access_token'),
@@ -251,6 +255,11 @@ export const calendarConnections = pgTable(
 	},
 	(table) => [
 		index('calendar_connections_workspace_provider_idx').on(table.workspaceId, table.provider),
+		uniqueIndex('calendar_connections_user_provider_account_uidx').on(
+			table.userId,
+			table.provider,
+			table.providerAccountId
+		),
 		check('calendar_connections_provider_check', sql`${table.provider} in ('google', 'microsoft', 'caldav')`)
 	]
 );

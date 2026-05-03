@@ -199,6 +199,50 @@ select {
     font-size: 12px;
 }
 
+.calendar-sync-panel {
+    position: relative;
+}
+
+.calendar-sync-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 200;
+    width: min(360px, 88vw);
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+}
+
+.calendar-sync-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.calendar-connection-list {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.calendar-connection-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.calendar-sync-message {
+    margin: 10px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
 .view-toggle {
     display: flex;
     overflow: hidden;
@@ -267,6 +311,11 @@ select {
 .btn-primary:hover {
     border-color: #3fb950;
     filter: brightness(1.06);
+}
+
+.btn-small {
+    padding: 5px 8px;
+    font-size: 12px;
 }
 
 .btn-primary:disabled,
