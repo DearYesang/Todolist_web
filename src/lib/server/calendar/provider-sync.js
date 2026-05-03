@@ -209,7 +209,7 @@ async function syncCalendarProvidersForUserUnlocked(userId) {
 		.select()
 		.from(schema.calendarConnections)
 		.where(eq(schema.calendarConnections.userId, userId));
-	const tasks = await listTasksForUser(userId);
+	const tasks = (await listTasksForUser(userId)).filter(shouldSyncTaskToProvider);
 	const taskLimit = getSyncTaskLimit();
 	if (tasks.length > taskLimit) {
 		throw new CalendarSyncError(`Calendar sync is limited to ${taskLimit} tasks per run.`, 413);
@@ -540,6 +540,13 @@ function toSyncRunResponse(row) {
 		failed: row.failed,
 		message: row.message
 	};
+}
+
+/**
+ * @param {import('$lib/shared/task-domain.js').Task} task
+ */
+export function shouldSyncTaskToProvider(task) {
+	return task.status !== 'done';
 }
 
 function getSyncTaskLimit() {

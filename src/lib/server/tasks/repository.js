@@ -150,26 +150,31 @@ export async function replaceTasksForUser(userId, payload) {
 	const db = getDb();
 	const board = await getOrCreatePersonalBoardForUser(db, userId);
 	const now = new Date();
-	const deleteExistingTasks = db
-		.delete(schema.tasks)
-		.where(eq(schema.tasks.boardId, board.id))
+	const retireExistingTasks = db
+		.update(schema.tasks)
+		.set({
+			deletedAt: now,
+			updatedAt: now,
+			version: sql`${schema.tasks.version} + 1`
+		})
+		.where(and(eq(schema.tasks.boardId, board.id), isNull(schema.tasks.deletedAt)))
 		.returning({ id: schema.tasks.id });
 
 	if (plans.length === 0) {
-		const [deletedRows] = await db.batch([deleteExistingTasks]);
+		const [retiredRows] = await db.batch([retireExistingTasks]);
 		return {
 			tasks: [],
 			summary: {
 				...summary,
-				replacedTasks: deletedRows.length
+				replacedTasks: retiredRows.length
 			}
 		};
 	}
 
 	const taskValues = createImportTaskValues(plans, board.id, userId, now);
 	const checklistValues = createImportChecklistValues(plans, now);
-	const [deletedRows, createdTaskRows, createdChecklistRows = []] = await db.batch([
-		deleteExistingTasks,
+	const [retiredRows, createdTaskRows, createdChecklistRows = []] = await db.batch([
+		retireExistingTasks,
 		db
 			.insert(schema.tasks)
 			.values(taskValues)
@@ -183,7 +188,7 @@ export async function replaceTasksForUser(userId, payload) {
 		tasks: mapTaskRowsToClientTasks(createdTaskRows, createdChecklistRows),
 		summary: {
 			...summary,
-			replacedTasks: deletedRows.length
+			replacedTasks: retiredRows.length
 		}
 	};
 }

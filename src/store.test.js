@@ -45,6 +45,8 @@ import {
     encryptCalendarToken,
     CalendarTokenEncryptionError
 } from './lib/server/calendar/oauth-encryption.js';
+import { shouldSyncTaskToProvider } from './lib/server/calendar/provider-sync.js';
+import { upsertProviderCalendarEvent } from './lib/server/calendar/providers.js';
 import {
     listCalendarProviders as listCalendarProvidersRequest,
     syncCalendarProviders as syncCalendarProvidersRequest
@@ -1020,6 +1022,7 @@ describe('calendar provider sync helpers', () => {
         } else {
             process.env.CALENDAR_OAUTH_ENCRYPTION_KEY = originalKey;
         }
+        Reflect.deleteProperty(globalThis, 'fetch');
     });
 
     it('encrypts OAuth tokens with associated data', () => {
@@ -1077,6 +1080,45 @@ describe('calendar provider sync helpers', () => {
         expect(syncFetcher).toHaveBeenCalledWith('/api/calendar/sync', expect.objectContaining({
             method: 'POST'
         }));
+    });
+
+    it('keeps provider events as full inclusive all-day task ranges', async () => {
+        const task = normalizeTask({
+            text: 'Range task',
+            startDate: '2026-05-03',
+            endDate: '2026-05-05'
+        });
+        let requestBody = '';
+        const fetcher = vi.fn(async (_url, init) => {
+            requestBody = typeof init?.body === 'string' ? init.body : '';
+            return new Response(JSON.stringify({
+                id: 'provider-event-id',
+                etag: 'provider-etag'
+            }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' }
+            });
+        });
+        Object.defineProperty(globalThis, 'fetch', {
+            configurable: true,
+            value: fetcher
+        });
+
+        await expect(upsertProviderCalendarEvent('google', 'access-token', null, task)).resolves.toEqual({
+            id: 'provider-event-id',
+            etag: 'provider-etag'
+        });
+        const body = JSON.parse(requestBody);
+        expect(body).toMatchObject({
+            start: { date: '2026-05-03' },
+            end: { date: '2026-05-06' }
+        });
+    });
+
+    it('excludes completed tasks from provider calendar sync', () => {
+        expect(shouldSyncTaskToProvider(normalizeTask({ status: 'todo' }))).toBe(true);
+        expect(shouldSyncTaskToProvider(normalizeTask({ status: 'doing' }))).toBe(true);
+        expect(shouldSyncTaskToProvider(normalizeTask({ status: 'done' }))).toBe(false);
     });
 });
 

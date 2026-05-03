@@ -6,7 +6,8 @@
 - Passkey RP ID: `todokanban-alpha.vercel.app`
 - Allowed registration emails: `scyea@naver.com`, `scyea1995@gmail.com`
 - Email delivery: Resend sandbox sender for the first free deployment
-- Primary calendar provider: Google Calendar
+- Primary calendar feed: iCal subscription links
+- First external calendar provider: Google Calendar
 - Runtime region: Vercel Tokyo (`hnd1`) close to a Neon Asia region
 - DB migrations: manual
 
@@ -93,9 +94,11 @@ npm run db:migrate
 5. Confirm an unlisted email is rejected.
 6. Register a passkey and generate recovery codes.
 7. Add a task, reload, edit, and delete it.
-8. Create an iCalendar feed token and subscribe from Apple Calendar.
-9. Connect Google Calendar and run manual sync.
-10. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.
+8. Create an iCal link and subscribe from Apple Calendar.
+9. Download a single task `.ics` file from a task card or task detail panel.
+10. Connect Google Calendar and run manual external calendar sync.
+11. Mark a previously synced task done, run external calendar sync again, and confirm the provider event is deleted.
+12. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.
 
 ## Vercel Dashboard Quick Guide
 

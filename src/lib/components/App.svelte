@@ -7,6 +7,10 @@
         clearCachedAuthScope,
         readCachedAuthScope
     } from '$lib/client/auth-session-scope.js';
+    import {
+        createOfflineConflictReport,
+        summarizeOfflineConflict
+    } from '$lib/client/offline-conflicts.js';
     import { enqueueOfflineMutation, setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { exportServerTasks, importServerTasks } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
@@ -40,6 +44,8 @@
     let syncedSessionUserId = null;
     /** @type {string | null} */
     let syncNotice = $state(null);
+    let conflictDetailsOpen = $state(false);
+    let syncConflicts = $state(/** @type {import('$lib/client/offline-conflicts.js').OfflineConflictSummary[]} */ ([]));
     const appUnlocked = $derived(Boolean($session.data?.user?.id || (!isOnline && cachedAuthScope?.id)));
 
     $effect(() => {
@@ -116,12 +122,33 @@
 
     async function runServerSync() {
         const result = await syncServerTasks();
-        const conflicts = Array.isArray(result.offlineConflicts) ? result.offlineConflicts.length : 0;
-        if (conflicts > 0) {
-            syncNotice = `다른 기기에서 먼저 변경된 작업 ${conflicts}건은 서버 상태를 우선해 다시 불러왔습니다.`;
+        const conflicts = Array.isArray(result.offlineConflicts) ? result.offlineConflicts : [];
+        if (conflicts.length > 0) {
+            syncConflicts = conflicts.map((conflict) => summarizeOfflineConflict(conflict, get(tasks)));
+            conflictDetailsOpen = false;
+            syncNotice = null;
         } else if (result.ok) {
+            syncConflicts = [];
             syncNotice = null;
         }
+    }
+
+    function dismissSyncConflicts() {
+        syncConflicts = [];
+        conflictDetailsOpen = false;
+    }
+
+    function downloadConflictReport() {
+        if (syncConflicts.length === 0) return;
+
+        const data = JSON.stringify(createOfflineConflictReport(syncConflicts), null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `offline_conflicts_${new Date().toISOString().split('T')[0]}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
     }
 
     /**
@@ -241,10 +268,37 @@
 </div>
 
 {#if appUnlocked}
-    {#if syncNotice}
+    {#if syncConflicts.length > 0}
+        <div class="sync-notice conflict-notice" role="status">
+            <div class="sync-notice-main">
+                <span>오프라인 변경 {syncConflicts.length}건이 서버의 최신 상태와 충돌했습니다.</span>
+                <div class="sync-notice-actions">
+                    <button class="btn btn-small" onclick={() => conflictDetailsOpen = !conflictDetailsOpen}>
+                        {conflictDetailsOpen ? '내역 닫기' : '내역 보기'}
+                    </button>
+                    <button class="btn btn-small" onclick={downloadConflictReport}>내역 저장</button>
+                    <button class="btn btn-small" onclick={dismissSyncConflicts}>확인</button>
+                </div>
+            </div>
+
+            {#if conflictDetailsOpen}
+                <div class="sync-conflict-list">
+                    {#each syncConflicts as conflict (conflict.id)}
+                        <div class="sync-conflict-row">
+                            <strong>{conflict.title}</strong>
+                            <span>{conflict.target}</span>
+                            <small>{conflict.detail}</small>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+        </div>
+    {:else if syncNotice}
         <div class="sync-notice" role="status">
-            <span>{syncNotice}</span>
-            <button class="btn btn-small" onclick={() => syncNotice = null}>확인</button>
+            <div class="sync-notice-main">
+                <span>{syncNotice}</span>
+                <button class="btn btn-small" onclick={() => syncNotice = null}>확인</button>
+            </div>
         </div>
     {/if}
 

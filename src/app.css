@@ -596,9 +596,10 @@ select {
 
 .sync-notice {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
     max-width: 1320px;
     margin: 0 auto 14px;
     padding: 10px 24px;
@@ -607,6 +608,49 @@ select {
     background: rgba(210, 153, 34, 0.12);
     color: var(--text-secondary);
     font-size: 13px;
+}
+
+.sync-notice-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sync-notice-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.sync-conflict-list {
+    display: grid;
+    gap: 6px;
+}
+
+.sync-conflict-row {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.7fr) minmax(140px, 1fr) minmax(160px, 1.2fr);
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(210, 153, 34, 0.24);
+    border-radius: var(--radius-sm);
+    background: rgba(13, 17, 23, 0.35);
+}
+
+.sync-conflict-row strong {
+    color: var(--text);
+}
+
+.sync-conflict-row span,
+.sync-conflict-row small {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.sync-conflict-row small {
+    color: var(--text-muted);
 }
 
 .filter-label {
@@ -1492,15 +1536,19 @@ select {
     }
 
     .calendar-feed-panel,
-    .calendar-feed-panel > .btn {
+    .calendar-feed-panel > .btn,
+    .calendar-sync-panel,
+    .calendar-sync-panel > .btn {
         flex: 1 1 120px;
     }
 
-    .calendar-feed-panel > .btn {
+    .calendar-feed-panel > .btn,
+    .calendar-sync-panel > .btn {
         width: 100%;
     }
 
-    .calendar-feed-popover {
+    .calendar-feed-popover,
+    .calendar-sync-popover {
         left: 0;
         right: auto;
         width: 100%;
@@ -1522,6 +1570,24 @@ select {
 
     .panel-footer {
         flex-direction: column;
+    }
+
+    .sync-notice-main,
+    .sync-conflict-row {
+        grid-template-columns: 1fr;
+    }
+
+    .sync-notice-main {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .sync-notice-actions {
+        justify-content: stretch;
+    }
+
+    .sync-notice-actions .btn {
+        flex: 1;
     }
 
     .panel-footer-actions {
