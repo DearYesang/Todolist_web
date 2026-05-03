@@ -2,6 +2,7 @@ import { passkey } from '@better-auth/passkey';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { betterAuth } from 'better-auth';
 import { drizzle } from 'drizzle-orm/neon-http';
+import { randomUUID } from 'node:crypto';
 import { getDb, schema } from '$lib/server/db';
 
 export const authDatabaseConfigured = Boolean(process.env.DATABASE_URL);
@@ -29,7 +30,37 @@ export const auth = betterAuth({
 		passkey({
 			rpName: 'Todolist',
 			rpID: process.env.PASSKEY_RP_ID ?? getHostname(passkeyOrigin),
-			origin: passkeyOrigin
+			origin: passkeyOrigin,
+			registration: {
+				requireSession: false,
+				resolveUser: async ({ ctx, context }) => {
+					const registration = parseRegistrationContext(context);
+					const existing = await ctx.context.internalAdapter.findUserByEmail(registration.email);
+					const userId = existing?.user.id ?? randomUUID();
+
+					return {
+						id: userId,
+						name: registration.email,
+						displayName: registration.name
+					};
+				},
+				afterVerification: async ({ ctx, user, context }) => {
+					const registration = parseRegistrationContext(context);
+					const existing = await ctx.context.internalAdapter.findUserByEmail(registration.email);
+					if (existing) {
+						return { userId: existing.user.id };
+					}
+
+					const created = await ctx.context.internalAdapter.createUser({
+						id: user.id,
+						email: registration.email,
+						name: registration.name,
+						emailVerified: true
+					});
+
+					return { userId: created.id };
+				}
+			}
 		})
 	]
 });
@@ -69,4 +100,27 @@ function getAuthConfigurationError() {
 	}
 
 	return null;
+}
+
+/** @param {string | null | undefined} context */
+function parseRegistrationContext(context) {
+	let parsed;
+	try {
+		parsed = context ? JSON.parse(context) : null;
+	} catch {
+		throw new Error('Invalid passkey registration context.');
+	}
+
+	const email = typeof parsed?.email === 'string' ? parsed.email.trim().toLowerCase() : '';
+	const name = typeof parsed?.name === 'string' && parsed.name.trim() ? parsed.name.trim() : email;
+	if (!isEmail(email)) {
+		throw new Error('A valid email is required for passkey registration.');
+	}
+
+	return { email, name };
+}
+
+/** @param {string} value */
+function isEmail(value) {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
