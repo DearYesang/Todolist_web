@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
+    "secrets": "node scripts/generate-secrets.mjs",
     "doctor": "node scripts/doctor.mjs",
     "predeploy": "npm run doctor && npm test && npm run check && npm run build",
     "db:generate": "drizzle-kit generate",

@@ -54,8 +54,11 @@ npm test
 Run the production readiness check:
 
 ```bash
+npm run secrets
 npm run doctor
 ```
+
+`npm run secrets` prints Vercel-ready secret values. Keep the output out of git.
 
 Database setup:
 

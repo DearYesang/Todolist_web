@@ -6,6 +6,7 @@ Use this checklist before moving the SvelteKit app from the PR branch to Vercel 
 
 ```bash
 npm ci
+npm run secrets
 npm run doctor
 npm run db:migrate
 npm audit --audit-level=low
@@ -15,6 +16,7 @@ npm run build
 ```
 
 `npm run doctor` validates required production secrets and OAuth/email configuration from the current environment.
+`npm run secrets` prints fresh secret values for Vercel; do not commit its output.
 
 ## Required Environment
 
