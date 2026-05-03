@@ -5,6 +5,7 @@ test('keeps the private app locked before login', async ({ page }) => {
 
 	await expect(page.getByRole('heading', { name: /나의 칸반 보드/ })).toBeVisible();
 	await expect(page.getByRole('button', { name: /칸반 뷰/ })).toBeHidden();
+	await expect(page.getByRole('button', { name: /매트릭스/ })).toBeHidden();
 	await expect(page.getByRole('button', { name: /불러오기/ })).toBeHidden();
 });
 
@@ -87,6 +88,22 @@ test('stacks Kanban columns on iPhone-width screens', async ({ page }) => {
 	expect(boxes[1].y).toBeLessThan(boxes[2].y);
 });
 
+test('opens the Eisenhower matrix view with all quadrants', async ({ page }) => {
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	await page.getByRole('button', { name: /매트릭스/ }).click();
+
+	await expect(page.getByRole('heading', { name: '즉시 실행' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: '계획하기' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: '줄이기' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: '보류/제거' })).toBeVisible();
+	await expect(page.getByText('Urgent important')).toBeVisible();
+	await expect(page.getByText('Planned important')).toBeVisible();
+	await expect(page.getByText('Interrupting task')).toBeVisible();
+	await expect(page.getByText('E2E cached task')).toBeVisible();
+});
+
 /**
  * @param {import('@playwright/test').Page} page
  */
@@ -113,6 +130,48 @@ async function seedOfflineBoard(page) {
 			cachedAt: Date.now()
 		}));
 		localStorage.setItem('kanbanTasks:e2e-user', JSON.stringify([
+			{
+				id: 'local-urgent-important',
+				text: 'Urgent important',
+				status: 'todo',
+				startDate: formatDate(past),
+				endDate: formatDate(past),
+				priority: 'high',
+				urgency: 'urgent',
+				category: '',
+				parentId: null,
+				subtasks: [],
+				collapsed: false,
+				createdAt: Date.now()
+			},
+			{
+				id: 'local-planned-important',
+				text: 'Planned important',
+				status: 'doing',
+				startDate: formatDate(past),
+				endDate: formatDate(past),
+				priority: 'high',
+				urgency: 'normal',
+				category: '',
+				parentId: null,
+				subtasks: [],
+				collapsed: false,
+				createdAt: Date.now()
+			},
+			{
+				id: 'local-interrupting-task',
+				text: 'Interrupting task',
+				status: 'todo',
+				startDate: formatDate(past),
+				endDate: formatDate(past),
+				priority: 'medium',
+				urgency: 'urgent',
+				category: '',
+				parentId: null,
+				subtasks: [],
+				collapsed: false,
+				createdAt: Date.now()
+			},
 			{
 				id: 'local-e2e-task',
 				text: 'E2E cached task',
