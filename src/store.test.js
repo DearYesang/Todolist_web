@@ -62,12 +62,14 @@ import {
     mergeTasks,
     replaceTasks,
     resetFilters,
+    setTaskStorageOwner,
     tasks
 } from './lib/client/task-store.js';
 import {
     enqueueOfflineMutation,
     flushOfflineWriteQueue,
-    loadOfflineQueue
+    loadOfflineQueue,
+    setOfflineQueueOwner
 } from './lib/client/offline-write-queue.js';
 
 describe('task data normalization', () => {
@@ -536,6 +538,7 @@ describe('offline write queue', () => {
     });
 
     afterEach(() => {
+        setOfflineQueueOwner(null);
         Reflect.deleteProperty(globalThis, 'localStorage');
     });
 
@@ -596,6 +599,58 @@ describe('offline write queue', () => {
             taskId,
             attempts: 1
         });
+    });
+});
+
+describe('task storage owner scope', () => {
+    /** @type {Map<string, string>} */
+    let storage;
+
+    beforeEach(() => {
+        storage = new Map();
+        Object.defineProperty(globalThis, 'localStorage', {
+            configurable: true,
+            value: {
+                getItem: vi.fn((key) => storage.get(key) ?? null),
+                setItem: vi.fn((key, value) => {
+                    storage.set(key, String(value));
+                }),
+                removeItem: vi.fn((key) => {
+                    storage.delete(key);
+                })
+            }
+        });
+        setTaskStorageOwner(null);
+        replaceTasks([]);
+    });
+
+    afterEach(() => {
+        setTaskStorageOwner(null);
+        replaceTasks([]);
+        Reflect.deleteProperty(globalThis, 'localStorage');
+    });
+
+    it('keeps cached task lists scoped by user', () => {
+        const taskA = normalizeTask({
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            text: 'User A task'
+        });
+        const taskB = normalizeTask({
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            text: 'User B task'
+        });
+
+        setTaskStorageOwner('user-a');
+        replaceTasks([taskA]);
+        expect(JSON.parse(storage.get('kanbanTasks:user-a') ?? '[]')).toHaveLength(1);
+
+        setTaskStorageOwner('user-b');
+        expect(get(tasks)).toEqual([]);
+        replaceTasks([taskB]);
+        expect(JSON.parse(storage.get('kanbanTasks:user-b') ?? '[]')).toHaveLength(1);
+
+        setTaskStorageOwner('user-a');
+        expect(get(tasks)).toEqual([taskA]);
     });
 });
 

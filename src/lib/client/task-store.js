@@ -25,6 +25,9 @@ import {
 export * from '../shared/task-domain.js';
 
 const STORAGE_KEY = 'kanbanTasks';
+const DEFAULT_STORAGE_OWNER = 'anonymous';
+
+let taskStorageOwner = DEFAULT_STORAGE_OWNER;
 
 /**
  * @returns {Storage | null}
@@ -48,7 +51,7 @@ function loadInitialTasks() {
         const storage = getStorage();
         if (!storage) return [];
 
-        const raw = storage.getItem(STORAGE_KEY);
+        const raw = storage.getItem(getTaskStorageKey()) ?? readLegacyTasks(storage);
         if (!raw) return [];
 
         const parsed = JSON.parse(raw);
@@ -73,11 +76,46 @@ tasks.subscribe((value) => {
         const storage = getStorage();
         if (!storage) return;
 
-        storage.setItem(STORAGE_KEY, JSON.stringify(value));
+        storage.setItem(getTaskStorageKey(), JSON.stringify(value));
+        if (taskStorageOwner === DEFAULT_STORAGE_OWNER) {
+            storage.removeItem(STORAGE_KEY);
+        }
     } catch (error) {
         console.error('Failed to persist kanban tasks', error);
     }
 });
+
+/**
+ * @param {string | null | undefined} ownerId
+ */
+export function setTaskStorageOwner(ownerId) {
+    const nextOwner = normalizeStorageOwner(ownerId);
+    if (nextOwner === taskStorageOwner) {
+        return;
+    }
+
+    taskStorageOwner = nextOwner;
+    tasks.set(loadInitialTasks());
+}
+
+function getTaskStorageKey() {
+    return `${STORAGE_KEY}:${taskStorageOwner}`;
+}
+
+/**
+ * @param {Storage} storage
+ */
+function readLegacyTasks(storage) {
+    return taskStorageOwner === DEFAULT_STORAGE_OWNER ? storage.getItem(STORAGE_KEY) : null;
+}
+
+/**
+ * @param {string | null | undefined} ownerId
+ */
+function normalizeStorageOwner(ownerId) {
+    const trimmed = ownerId?.trim();
+    return trimmed || DEFAULT_STORAGE_OWNER;
+}
 
 /** @type {import('svelte/store').Writable<'kanban' | 'gantt'>} */
 export const currentView = writable('kanban');

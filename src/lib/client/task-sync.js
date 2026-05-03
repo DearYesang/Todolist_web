@@ -15,11 +15,14 @@ export async function syncServerTasks(fetcher = globalThis.fetch) {
 	if (flushed.syncedTasks.length > 0) {
 		mergeTasks(flushed.syncedTasks);
 	}
+	if (flushed.conflicts.length > 0) {
+		console.warn(`Dropped ${flushed.conflicts.length} offline mutations that conflicted with server state.`);
+	}
 
 	const result = await listServerTasks(fetcher);
 	if (result.ok && result.tasks.length > 0) {
 		mergeTasks(result.tasks);
 	}
 
-	return result;
+	return { ...result, offlineConflicts: flushed.conflicts };
 }
