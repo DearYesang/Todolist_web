@@ -1,4 +1,5 @@
 import { normalizeTask, normalizeTaskList } from '../shared/task-domain.js';
+import { extractBackupTasks } from '../shared/task-backup.js';
 
 const FALLBACK_STATUSES = new Set([401, 409, 503]);
 
@@ -128,16 +129,26 @@ export async function exportServerTasks(fetcher = globalThis.fetch) {
 }
 
 /**
- * @param {unknown[]} tasks
+ * @param {unknown} payload
  * @param {{ mode?: 'append' | 'replace' } | typeof fetch} [options]
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<ImportServerTasksResult>}
  */
-export async function importServerTasks(tasks, options = {}, fetcher = globalThis.fetch) {
+export async function importServerTasks(payload, options = {}, fetcher = globalThis.fetch) {
 	const requestOptions = typeof options === 'function' ? {} : options;
 	const requestFetcher = typeof options === 'function' ? options : fetcher;
 	if (typeof requestFetcher !== 'function') {
 		return createFallbackResult('Task API is not available.');
+	}
+
+	const tasks = extractBackupTasks(payload);
+	if (!tasks) {
+		return {
+			ok: false,
+			fallback: false,
+			status: 400,
+			message: 'Import payload must be an array of tasks or a backup object with a tasks array.'
+		};
 	}
 
 	try {
