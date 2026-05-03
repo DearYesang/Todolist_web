@@ -41,6 +41,10 @@ function isTrustedUnsafeApiRequest(event) {
 
 	const origin = event.request.headers.get('origin');
 	if (!origin) {
+		if (process.env.NODE_ENV === 'production') {
+			return false;
+		}
+
 		return !secFetchSite || secFetchSite === 'same-origin' || secFetchSite === 'same-site' || secFetchSite === 'none';
 	}
 
