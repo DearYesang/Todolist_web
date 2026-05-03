@@ -2,6 +2,7 @@
     import { get } from 'svelte/store';
     import { createServerTask } from '$lib/client/task-api.js';
     import { buildTaskCreateDraft, createLocalTaskFromDraft } from '$lib/client/task-create.js';
+    import { enqueueOfflineMutation } from '$lib/client/offline-write-queue.js';
     import { categories, tasks } from '$lib/client/task-store.js';
     import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
 
@@ -76,7 +77,15 @@
                 }
             }
 
-            appendTask(createLocalTaskFromDraft(draft.payload, draft.parent));
+            const localTask = createLocalTaskFromDraft(draft.payload, draft.parent);
+            appendTask(localTask);
+            if (!draft.hasLocalParent) {
+                enqueueOfflineMutation({
+                    type: 'task.create',
+                    localTaskId: localTask.id,
+                    payload: draft.payload
+                });
+            }
             resetForm();
         } finally {
             isSubmitting = false;
