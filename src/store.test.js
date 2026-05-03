@@ -1157,8 +1157,9 @@ describe('server task mapping', () => {
                 category: 'Sync',
                 startDate: '2026-05-03',
                 endDate: '2026-05-04',
-                position: '0',
-                createdBy: 'user-id',
+	                position: '0',
+	                version: 1,
+	                createdBy: 'user-id',
                 createdAt: new Date('2026-05-03T00:00:00.000Z'),
                 updatedAt: new Date('2026-05-03T00:00:00.000Z'),
                 completedAt: null,
@@ -1188,10 +1189,11 @@ describe('server task mapping', () => {
                 category: 'Sync',
                 parentId: null,
                 subtasks: [{ id: 'check-1', text: 'Mapped checklist', done: false }],
-                collapsed: false,
-                createdAt: new Date('2026-05-03T00:00:00.000Z').getTime()
-            }
-        ]);
+	                collapsed: false,
+	                createdAt: new Date('2026-05-03T00:00:00.000Z').getTime(),
+	                version: 1
+	            }
+	        ]);
     });
 });
 
@@ -1252,26 +1254,34 @@ describe('server task validation', () => {
             category: '  Sync  ',
             startDate: '2026-05-03',
             endDate: '2026-05-04',
-            parentId: null
-        })).toEqual({
-            title: 'Updated task',
-            status: 'doing',
+	            parentId: null
+	        })).toEqual({
+	            title: 'Updated task',
+	            status: 'doing',
             priority: 'high',
             urgency: 'urgent',
             category: 'Sync',
             startDate: '2026-05-03',
             endDate: '2026-05-04',
-            parentId: null
-        });
-    });
+	            parentId: null
+	        });
+	        expect(parseUpdateTaskInput({
+	            text: 'Versioned update',
+	            expectedVersion: 3
+	        })).toEqual({
+	            title: 'Versioned update',
+	            expectedVersion: 3
+	        });
+	    });
 
     it('rejects invalid update payloads and date ranges', () => {
         expect(() => parseTaskIdParam('local-id')).toThrow('taskId must be a UUID.');
-        expect(() => parseUpdateTaskInput({})).toThrow('At least one task field is required.');
-        expect(() => parseUpdateTaskInput({ status: 'blocked' })).toThrow('Invalid status.');
-        expect(() => parseUpdateTaskInput({ parentId: 'local-parent' })).toThrow('parentId must be a UUID.');
-        expect(() => assertValidTaskDateRange('2026-05-04', '2026-05-03')).toThrow('Invalid task date range.');
-    });
+	        expect(() => parseUpdateTaskInput({})).toThrow('At least one task field is required.');
+	        expect(() => parseUpdateTaskInput({ status: 'blocked' })).toThrow('Invalid status.');
+	        expect(() => parseUpdateTaskInput({ parentId: 'local-parent' })).toThrow('parentId must be a UUID.');
+	        expect(() => parseUpdateTaskInput({ text: 'Bad version', expectedVersion: 0 })).toThrow('expectedVersion must be a positive integer.');
+	        expect(() => assertValidTaskDateRange('2026-05-04', '2026-05-03')).toThrow('Invalid task date range.');
+	    });
 
     it('validates checklist create and update payloads', () => {
         expect(parseCreateChecklistItemInput({ text: '  Read docs  ' })).toEqual({ text: 'Read docs' });

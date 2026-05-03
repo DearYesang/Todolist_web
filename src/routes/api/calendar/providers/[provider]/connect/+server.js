@@ -15,7 +15,10 @@ export async function GET({ params, request, url }) {
 	}
 
 	try {
-		const authorizationUrl = await createCalendarProviderAuthorizationUrl(authResult.user.id, params.provider, url);
+		const authorizationUrl = await createCalendarProviderAuthorizationUrl(authResult.user.id, params.provider, url, {
+			userId: authResult.user.id,
+			sessionId: authResult.session.id
+		});
 		throw redirect(302, authorizationUrl);
 	} catch (error) {
 		if (error instanceof CalendarSyncError || error instanceof CalendarProviderError || error instanceof CalendarTokenEncryptionError) {

@@ -2,6 +2,11 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { APIError } from 'better-auth/api';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
+import {
+	assertRateLimit,
+	createRateLimitHeaders,
+	RateLimitError
+} from '$lib/server/security/rate-limit.js';
 
 const EMAIL_VERIFICATION_PREFIX = 'passkey-email-verification:';
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
@@ -131,6 +136,12 @@ export async function createPasskeyEmailVerification(input) {
 export async function assertValidPasskeyEmailCode(email, code) {
 	const record = await findValidEmailVerification(email, code);
 	if (!record) {
+		await recordFailedPasskeyAttempt(
+			'passkey-email-code',
+			normalizeAccountEmail(email),
+			'Too many invalid email verification attempts.',
+			'PASSKEY_EMAIL_CODE_RATE_LIMITED'
+		);
 		throwPasskeyInputError(
 			'확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.',
 			'INVALID_PASSKEY_EMAIL_CODE'
@@ -145,6 +156,12 @@ export async function assertValidPasskeyEmailCode(email, code) {
 export async function consumePasskeyEmailCode(email, code) {
 	const record = await findValidEmailVerification(email, code);
 	if (!record) {
+		await recordFailedPasskeyAttempt(
+			'passkey-email-code',
+			normalizeAccountEmail(email),
+			'Too many invalid email verification attempts.',
+			'PASSKEY_EMAIL_CODE_RATE_LIMITED'
+		);
 		throwPasskeyInputError(
 			'확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.',
 			'INVALID_PASSKEY_EMAIL_CODE'
@@ -215,6 +232,12 @@ export async function revokeRecoveryCodesForUser(userId) {
 export async function assertValidRecoveryCodeForEmail(email, code) {
 	const record = await findValidRecoveryCode(email, code);
 	if (!record) {
+		await recordFailedPasskeyAttempt(
+			'passkey-recovery-code',
+			normalizeAccountEmail(email),
+			'Too many invalid recovery code attempts.',
+			'PASSKEY_RECOVERY_CODE_RATE_LIMITED'
+		);
 		throwPasskeyInputError(
 			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
 			'INVALID_PASSKEY_RECOVERY_CODE'
@@ -229,6 +252,12 @@ export async function assertValidRecoveryCodeForEmail(email, code) {
 export async function consumeRecoveryCodeForEmail(email, code) {
 	const record = await findValidRecoveryCode(email, code);
 	if (!record) {
+		await recordFailedPasskeyAttempt(
+			'passkey-recovery-code',
+			normalizeAccountEmail(email),
+			'Too many invalid recovery code attempts.',
+			'PASSKEY_RECOVERY_CODE_RATE_LIMITED'
+		);
 		throwPasskeyInputError(
 			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
 			'INVALID_PASSKEY_RECOVERY_CODE'
@@ -256,6 +285,31 @@ export async function consumeRecoveryCodeForEmail(email, code) {
  */
 function throwPasskeyInputError(message, code, status = 'BAD_REQUEST') {
 	throw new APIError(status, { message, code });
+}
+
+/**
+ * @param {string} scope
+ * @param {string} subject
+ * @param {string} message
+ * @param {string} code
+ */
+async function recordFailedPasskeyAttempt(scope, subject, message, code) {
+	try {
+		await assertRateLimit(`${scope}:subject:${subject || 'unknown'}`, {
+			limit: 5,
+			windowMs: 15 * 60 * 1000,
+			message
+		});
+	} catch (error) {
+		if (error instanceof RateLimitError) {
+			throw new APIError('TOO_MANY_REQUESTS', {
+				message: error.message,
+				code
+			}, createRateLimitHeaders(error));
+		}
+
+		throw error;
+	}
 }
 
 /**

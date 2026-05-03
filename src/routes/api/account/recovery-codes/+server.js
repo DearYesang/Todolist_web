@@ -35,7 +35,7 @@ export async function POST(event) {
 	}
 
 	try {
-		assertRateLimit(createRateLimitKey(event, 'recovery-code-create', authResult.user.id), {
+		await assertRateLimit(createRateLimitKey(event, 'recovery-code-create', authResult.user.id), {
 			limit: 3,
 			windowMs: 60 * 60 * 1000,
 			message: 'Too many recovery code regeneration requests.'
@@ -67,7 +67,7 @@ export async function DELETE(event) {
 	}
 
 	try {
-		assertRateLimit(createRateLimitKey(event, 'recovery-code-revoke', authResult.user.id), {
+		await assertRateLimit(createRateLimitKey(event, 'recovery-code-revoke', authResult.user.id), {
 			limit: 6,
 			windowMs: 60 * 60 * 1000,
 			message: 'Too many recovery code revoke requests.'

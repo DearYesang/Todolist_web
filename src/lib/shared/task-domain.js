@@ -24,6 +24,7 @@
  *   subtasks: Subtask[];
  *   collapsed: boolean;
  *   createdAt: number;
+ *   version?: number;
  * }} Task
  *
  * @typedef {{
@@ -238,6 +239,7 @@ export function normalizeTask(raw) {
     const source = /** @type {Record<string, unknown> | null | undefined} */ (raw);
     const subtasksRaw = Array.isArray(source?.subtasks) ? source.subtasks : [];
     const { startDate, endDate } = normalizeDateRange(source?.startDate, source?.endDate);
+    const version = parseTaskVersion(source?.version);
     const priority = isTaskPriority(source?.priority)
         ? source.priority
         : 'medium';
@@ -260,8 +262,16 @@ export function normalizeTask(raw) {
         parentId: typeof source?.parentId === 'string' && source.parentId ? source.parentId : null,
         subtasks: normalizeSubtasks(subtasksRaw),
         collapsed: Boolean(source?.collapsed),
-        createdAt: typeof source?.createdAt === 'number' && Number.isFinite(source.createdAt) ? source.createdAt : Date.now()
+        createdAt: typeof source?.createdAt === 'number' && Number.isFinite(source.createdAt) ? source.createdAt : Date.now(),
+        ...(version === null ? {} : { version })
     };
+}
+
+/**
+ * @param {unknown} value
+ */
+function parseTaskVersion(value) {
+	return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 /**

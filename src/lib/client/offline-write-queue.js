@@ -24,6 +24,7 @@ let queueOwnerId = DEFAULT_QUEUE_OWNER;
  *   id?: string;
  *   type: 'task.patch';
  *   taskId: string;
+ *   localParentId?: string | null;
  *   patch: Record<string, unknown>;
  * } | {
  *   id?: string;
@@ -33,7 +34,9 @@ let queueOwnerId = DEFAULT_QUEUE_OWNER;
  *   id?: string;
  *   type: 'checklist.create';
  *   taskId: string;
+ *   localItemId?: string | null;
  *   text: string;
+ *   done?: boolean;
  * } | {
  *   id?: string;
  *   type: 'checklist.patch';
@@ -136,6 +139,7 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 				if (mutation.type === 'task.create') {
 					localTaskIds.set(mutation.localTaskId, result.task.id);
 					updateQueuedLocalParentReferences(queue, index + 1, mutation.localTaskId, result.task.id);
+					updateQueuedLocalTaskReferences(queue, index + 1, mutation.localTaskId, result.task.id);
 					createdTasks.push({ localTaskId: mutation.localTaskId, task: result.task });
 				} else {
 					syncedTasks.push(result.task);
@@ -174,6 +178,20 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
  */
 function coalesceQueue(queue, mutation) {
 	if (mutation.type === 'task.patch') {
+		const pendingCreate = queue.find((item) => item.type === 'task.create' && item.localTaskId === mutation.taskId);
+		if (pendingCreate && pendingCreate.type === 'task.create') {
+			const payload = getPayloadObject(pendingCreate.payload) ?? {};
+			pendingCreate.payload = { ...payload, ...mutation.patch };
+			if ('localParentId' in mutation) {
+				pendingCreate.localParentId = mutation.localParentId;
+			}
+			return queue;
+		}
+
+		if (!isServerTaskId(mutation.taskId)) {
+			return queue;
+		}
+
 		const existing = queue.find((item) => item.type === 'task.patch' && item.taskId === mutation.taskId);
 		if (existing && existing.type === 'task.patch') {
 			existing.patch = { ...existing.patch, ...mutation.patch };
@@ -182,13 +200,38 @@ function coalesceQueue(queue, mutation) {
 	}
 
 	if (mutation.type === 'task.delete') {
-		return [
-			...queue.filter((item) => !isTaskScopedMutation(item, mutation.taskId)),
-			mutation
-		];
+		const filtered = queue.filter((item) => !isTaskScopedMutation(item, mutation.taskId));
+		return isServerTaskId(mutation.taskId) ? [...filtered, mutation] : filtered;
+	}
+
+	if (mutation.type === 'checklist.create' && !isServerTaskId(mutation.taskId)) {
+		const pendingTaskCreate = queue.find((item) => item.type === 'task.create' && item.localTaskId === mutation.taskId);
+		if (!pendingTaskCreate) {
+			return queue;
+		}
 	}
 
 	if (mutation.type === 'checklist.patch') {
+		const pendingCreate = queue.find((item) =>
+			item.type === 'checklist.create'
+			&& item.taskId === mutation.taskId
+			&& Boolean(item.localItemId)
+			&& item.localItemId === mutation.itemId
+		);
+		if (pendingCreate && pendingCreate.type === 'checklist.create') {
+			if (typeof mutation.patch.text === 'string') {
+				pendingCreate.text = mutation.patch.text;
+			}
+			if (typeof mutation.patch.done === 'boolean') {
+				pendingCreate.done = mutation.patch.done;
+			}
+			return queue;
+		}
+
+		if (!isServerTaskId(mutation.itemId)) {
+			return queue;
+		}
+
 		const existing = queue.find((item) =>
 			item.type === 'checklist.patch'
 			&& item.taskId === mutation.taskId
@@ -201,6 +244,18 @@ function coalesceQueue(queue, mutation) {
 	}
 
 	if (mutation.type === 'checklist.delete') {
+		const withoutPendingCreate = queue.filter((item) =>
+			!(
+				item.type === 'checklist.create'
+				&& item.taskId === mutation.taskId
+				&& Boolean(item.localItemId)
+				&& item.localItemId === mutation.itemId
+			)
+		);
+		if (withoutPendingCreate.length !== queue.length || !isServerTaskId(mutation.itemId)) {
+			return withoutPendingCreate;
+		}
+
 		return [
 			...queue.filter((item) =>
 				!('taskId' in item && item.taskId === mutation.taskId && 'itemId' in item && item.itemId === mutation.itemId)
@@ -217,7 +272,8 @@ function coalesceQueue(queue, mutation) {
  * @param {string} taskId
  */
 function isTaskScopedMutation(mutation, taskId) {
-	return 'taskId' in mutation && mutation.taskId === taskId;
+	return ('taskId' in mutation && mutation.taskId === taskId)
+		|| (mutation.type === 'task.create' && mutation.localTaskId === taskId);
 }
 
 /**
@@ -226,26 +282,38 @@ function isTaskScopedMutation(mutation, taskId) {
  * @returns {OfflineMutation | null}
  */
 function resolveOfflineMutationReferences(mutation, localTaskIds) {
-	if (mutation.type !== 'task.create' || !mutation.localParentId) {
-		return mutation;
+	/** @type {OfflineMutation} */
+	let resolved = mutation;
+
+	if ('taskId' in resolved && !isServerTaskId(resolved.taskId)) {
+		const serverTaskId = localTaskIds.get(resolved.taskId);
+		if (!serverTaskId) {
+			return null;
+		}
+
+		resolved = { ...resolved, taskId: serverTaskId };
 	}
 
-	const payload = getPayloadObject(mutation.payload);
+	if (resolved.type !== 'task.create' || !resolved.localParentId) {
+		return resolved;
+	}
+
+	const payload = getPayloadObject(resolved.payload);
 	if (!payload) {
 		return null;
 	}
 
 	if (isServerTaskId(payload?.parentId)) {
-		return mutation;
+		return resolved;
 	}
 
-	const serverParentId = localTaskIds.get(mutation.localParentId);
+	const serverParentId = localTaskIds.get(resolved.localParentId);
 	if (!serverParentId) {
 		return null;
 	}
 
 	return {
-		...mutation,
+		...resolved,
 		payload: {
 			...payload,
 			parentId: serverParentId
@@ -279,6 +347,23 @@ function updateQueuedLocalParentReferences(queue, startIndex, localTaskId, serve
 }
 
 /**
+ * @param {OfflineMutation[]} queue
+ * @param {number} startIndex
+ * @param {string} localTaskId
+ * @param {string} serverTaskId
+ */
+function updateQueuedLocalTaskReferences(queue, startIndex, localTaskId, serverTaskId) {
+	for (let index = startIndex; index < queue.length; index += 1) {
+		const mutation = queue[index];
+		if (!('taskId' in mutation) || mutation.taskId !== localTaskId) {
+			continue;
+		}
+
+		mutation.taskId = serverTaskId;
+	}
+}
+
+/**
  * @param {unknown} payload
  * @returns {Record<string, unknown> | null}
  */
@@ -301,7 +386,7 @@ async function executeOfflineMutation(mutation, fetcher) {
 		case 'task.delete':
 			return deleteServerTask(mutation.taskId, fetcher);
 		case 'checklist.create':
-			return createServerChecklistItem(mutation.taskId, mutation.text, fetcher);
+			return executeChecklistCreateMutation(mutation, fetcher);
 		case 'checklist.patch':
 			return updateServerChecklistItem(mutation.taskId, mutation.itemId, mutation.patch, fetcher);
 		case 'checklist.delete':
@@ -314,6 +399,33 @@ async function executeOfflineMutation(mutation, fetcher) {
 				message: 'Unknown offline mutation.'
 			});
 	}
+}
+
+/**
+ * @param {Extract<OfflineMutation, { type: 'checklist.create' }>} mutation
+ * @param {typeof fetch} fetcher
+ */
+async function executeChecklistCreateMutation(mutation, fetcher) {
+	const createResult = await createServerChecklistItem(mutation.taskId, mutation.text, fetcher);
+	if (!createResult.ok || mutation.done !== true) {
+		return createResult;
+	}
+
+	const createdItem = findCreatedChecklistItem(createResult.task, mutation.text);
+	if (!createdItem) {
+		return createResult;
+	}
+
+	const updateResult = await updateServerChecklistItem(mutation.taskId, createdItem.id, { done: true }, fetcher);
+	return updateResult.ok ? updateResult : createResult;
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task} task
+ * @param {string} text
+ */
+function findCreatedChecklistItem(task, text) {
+	return [...task.subtasks].reverse().find((item) => item.text === text && isServerTaskId(item.id)) ?? null;
 }
 
 /**
