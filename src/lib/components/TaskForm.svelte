@@ -79,13 +79,12 @@
 
             const localTask = createLocalTaskFromDraft(draft.payload, draft.parent);
             appendTask(localTask);
-            if (!draft.hasLocalParent) {
-                enqueueOfflineMutation({
-                    type: 'task.create',
-                    localTaskId: localTask.id,
-                    payload: draft.payload
-                });
-            }
+            enqueueOfflineMutation({
+                type: 'task.create',
+                localTaskId: localTask.id,
+                localParentId: draft.hasLocalParent ? draft.parent?.id ?? null : null,
+                payload: draft.payload
+            });
             resetForm();
         } finally {
             isSubmitting = false;

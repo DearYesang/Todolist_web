@@ -127,6 +127,58 @@ describe('offline write queue conflict behavior', () => {
 		});
 	});
 
+	it('resolves child creates queued under local parents', async () => {
+		const localParentId = 'local-parent';
+		const localChildId = 'local-child';
+		const serverParent = normalizeTask({
+			id: '11111111-1111-4111-8111-111111111111',
+			text: 'Parent'
+		});
+		const serverChild = normalizeTask({
+			id: '22222222-2222-4222-8222-222222222222',
+			text: 'Child',
+			parentId: serverParent.id
+		});
+
+		enqueueOfflineMutation({
+			type: 'task.create',
+			localTaskId: localParentId,
+			payload: { text: 'Parent', parentId: null }
+		});
+		enqueueOfflineMutation({
+			type: 'task.create',
+			localTaskId: localChildId,
+			localParentId,
+			payload: { text: 'Child', parentId: null }
+		});
+
+		const fetcher = vi.fn()
+			.mockResolvedValueOnce(new Response(JSON.stringify({ task: serverParent }), {
+				status: 201,
+				headers: { 'content-type': 'application/json' }
+			}))
+			.mockResolvedValueOnce(new Response(JSON.stringify({ task: serverChild }), {
+				status: 201,
+				headers: { 'content-type': 'application/json' }
+			}));
+
+		const result = await flushOfflineWriteQueue(fetcher);
+
+		expect(result).toMatchObject({
+			flushed: 2,
+			remaining: 0,
+			blocked: false
+		});
+		expect(fetcher).toHaveBeenNthCalledWith(2, '/api/tasks', expect.objectContaining({
+			method: 'POST',
+			body: JSON.stringify({ text: 'Child', parentId: serverParent.id })
+		}));
+		expect(result.createdTasks).toEqual([
+			{ localTaskId: localParentId, task: serverParent },
+			{ localTaskId: localChildId, task: serverChild }
+		]);
+	});
+
 	it('ignores corrupted queue records from another owner', () => {
 		setOfflineQueueOwner('user-a');
 		storage.set('kanbanOfflineWriteQueue:user-a', JSON.stringify([{

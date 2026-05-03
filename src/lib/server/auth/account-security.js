@@ -215,10 +215,14 @@ export async function consumeRecoveryCodeForEmail(email, code) {
 		throw new Error('A valid recovery code is required to add a passkey for this account.');
 	}
 
-	await getDb()
+	const [updated] = await getDb()
 		.update(schema.accountRecoveryCodes)
 		.set({ usedAt: new Date() })
-		.where(and(eq(schema.accountRecoveryCodes.id, record.id), isNull(schema.accountRecoveryCodes.usedAt)));
+		.where(and(eq(schema.accountRecoveryCodes.id, record.id), isNull(schema.accountRecoveryCodes.usedAt)))
+		.returning({ id: schema.accountRecoveryCodes.id });
+	if (!updated) {
+		throw new Error('A valid recovery code is required to add a passkey for this account.');
+	}
 }
 
 /**
