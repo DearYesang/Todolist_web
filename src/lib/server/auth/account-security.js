@@ -1,4 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
+import { APIError } from 'better-auth/api';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 
@@ -62,7 +63,7 @@ export function parsePasskeyRegistrationContext(context) {
 	try {
 		parsed = context ? JSON.parse(context) : null;
 	} catch {
-		throw new Error('Invalid passkey registration context.');
+		throwPasskeyInputError('패스키 등록 요청이 올바르지 않습니다.', 'INVALID_PASSKEY_REGISTRATION_CONTEXT');
 	}
 
 	const email = normalizeAccountEmail(parsed?.email);
@@ -73,9 +74,16 @@ export function parsePasskeyRegistrationContext(context) {
 	const recoveryCode = typeof parsed?.recoveryCode === 'string' ? parsed.recoveryCode.trim() : '';
 
 	if (!isAccountEmail(email)) {
-		throw new Error('A valid email is required for passkey registration.');
+		throwPasskeyInputError('패스키 등록에 사용할 이메일을 다시 확인해 주세요.', 'INVALID_PASSKEY_REGISTRATION_EMAIL');
 	}
-	assertAllowedAccountEmail(email);
+	try {
+		assertAllowedAccountEmail(email);
+	} catch (error) {
+		if (error instanceof AccountSecurityPolicyError) {
+			throwPasskeyInputError('가입이 허용된 이메일만 사용할 수 있습니다.', 'EMAIL_NOT_ALLOWED', 'FORBIDDEN');
+		}
+		throw error;
+	}
 
 	return { email, name, emailVerificationCode, recoveryCode };
 }
@@ -123,7 +131,10 @@ export async function createPasskeyEmailVerification(input) {
 export async function assertValidPasskeyEmailCode(email, code) {
 	const record = await findValidEmailVerification(email, code);
 	if (!record) {
-		throw new Error('A valid email verification code is required for passkey registration.');
+		throwPasskeyInputError(
+			'확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.',
+			'INVALID_PASSKEY_EMAIL_CODE'
+		);
 	}
 }
 
@@ -134,7 +145,10 @@ export async function assertValidPasskeyEmailCode(email, code) {
 export async function consumePasskeyEmailCode(email, code) {
 	const record = await findValidEmailVerification(email, code);
 	if (!record) {
-		throw new Error('A valid email verification code is required for passkey registration.');
+		throwPasskeyInputError(
+			'확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.',
+			'INVALID_PASSKEY_EMAIL_CODE'
+		);
 	}
 
 	await getDb().delete(schema.verification).where(eq(schema.verification.id, record.id));
@@ -201,7 +215,10 @@ export async function revokeRecoveryCodesForUser(userId) {
 export async function assertValidRecoveryCodeForEmail(email, code) {
 	const record = await findValidRecoveryCode(email, code);
 	if (!record) {
-		throw new Error('A valid recovery code is required to add a passkey for this account.');
+		throwPasskeyInputError(
+			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
+			'INVALID_PASSKEY_RECOVERY_CODE'
+		);
 	}
 }
 
@@ -212,7 +229,10 @@ export async function assertValidRecoveryCodeForEmail(email, code) {
 export async function consumeRecoveryCodeForEmail(email, code) {
 	const record = await findValidRecoveryCode(email, code);
 	if (!record) {
-		throw new Error('A valid recovery code is required to add a passkey for this account.');
+		throwPasskeyInputError(
+			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
+			'INVALID_PASSKEY_RECOVERY_CODE'
+		);
 	}
 
 	const [updated] = await getDb()
@@ -221,8 +241,21 @@ export async function consumeRecoveryCodeForEmail(email, code) {
 		.where(and(eq(schema.accountRecoveryCodes.id, record.id), isNull(schema.accountRecoveryCodes.usedAt)))
 		.returning({ id: schema.accountRecoveryCodes.id });
 	if (!updated) {
-		throw new Error('A valid recovery code is required to add a passkey for this account.');
+		throwPasskeyInputError(
+			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
+			'INVALID_PASSKEY_RECOVERY_CODE'
+		);
 	}
+}
+
+/**
+ * @param {string} message
+ * @param {string} code
+ * @param {'BAD_REQUEST' | 'FORBIDDEN'} [status]
+ * @returns {never}
+ */
+function throwPasskeyInputError(message, code, status = 'BAD_REQUEST') {
+	throw new APIError(status, { message, code });
 }
 
 /**

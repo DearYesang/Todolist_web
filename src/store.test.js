@@ -996,7 +996,7 @@ describe('account security helpers', () => {
         expect(() => parsePasskeyRegistrationContext(JSON.stringify({
             email: 'not-email',
             emailVerificationCode: '123456'
-        }))).toThrow('A valid email is required');
+        }))).toThrow('패스키 등록에 사용할 이메일을 다시 확인해 주세요.');
     });
 
     it('limits registration to configured personal emails', () => {
