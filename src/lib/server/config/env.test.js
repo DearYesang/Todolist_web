@@ -105,6 +105,26 @@ describe('runtime config report', () => {
 		expect(report.blocking).toHaveLength(0);
 	});
 
+	it('normalizes a URL-shaped PASSKEY_RP_ID to the deployed host', () => {
+		process.env.NODE_ENV = 'production';
+		process.env.DATABASE_URL = 'postgresql://user:pass@host/db';
+		process.env.BETTER_AUTH_SECRET = 'auth-secret-with-more-than-32-characters';
+		process.env.BETTER_AUTH_URL = 'https://todokanban-alpha.vercel.app';
+		process.env.BETTER_AUTH_TRUSTED_ORIGINS = 'https://todokanban-alpha.vercel.app';
+		process.env.PASSKEY_ORIGIN = 'https://todokanban-alpha.vercel.app';
+		process.env.PASSKEY_RP_ID = 'https://todokanban-alpha.vercel.app/';
+		process.env.AUTH_ALLOWED_EMAILS = 'scyea@naver.com,scyea1995@gmail.com';
+		process.env.ACCOUNT_RECOVERY_SECRET = 'recovery-secret-with-more-than-32-characters';
+		process.env.RESEND_API_KEY = 'resend-api-key-with-more-than-32-characters';
+		process.env.EMAIL_FROM = 'Todokanban <onboarding@resend.dev>';
+		process.env.CALENDAR_TOKEN_SECRET = 'calendar-token-secret-with-more-than-32-characters';
+
+		const report = getRuntimeConfigReport({ currentOrigin: 'https://todokanban-alpha.vercel.app' });
+
+		expect(report.ok).toBe(true);
+		expect(report.blocking).toHaveLength(0);
+	});
+
 	it('recognizes placeholder values', () => {
 		expect(isPlaceholderValue('replace-with-secret')).toBe(true);
 		expect(isPlaceholderValue('please-change-me')).toBe(true);
