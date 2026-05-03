@@ -8,6 +8,7 @@ import {
 } from './lib/shared/task-domain.js';
 import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
 import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
+import { parseCreateTaskInput, TaskWriteError } from './lib/server/tasks/validation.js';
 import {
     moveTask,
     replaceTasks,
@@ -234,5 +235,53 @@ describe('server task mapping', () => {
                 createdAt: new Date('2026-05-03T00:00:00.000Z').getTime()
             }
         ]);
+    });
+});
+
+describe('server task validation', () => {
+    it('accepts a strict create payload with safe defaults', () => {
+        expect(parseCreateTaskInput({
+            text: '  Server task  ',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04',
+            category: '  Sync  '
+        })).toEqual({
+            title: 'Server task',
+            status: 'todo',
+            priority: 'medium',
+            urgency: 'normal',
+            category: 'Sync',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04',
+            parentId: null
+        });
+    });
+
+    it('rejects invalid create payloads instead of silently repairing them', () => {
+        expect(() => parseCreateTaskInput({
+            text: '',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04'
+        })).toThrow(TaskWriteError);
+
+        expect(() => parseCreateTaskInput({
+            text: 'Bad status',
+            status: 'blocked',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04'
+        })).toThrow('Invalid status.');
+
+        expect(() => parseCreateTaskInput({
+            text: 'Bad date',
+            startDate: '2026-05-04',
+            endDate: '2026-05-03'
+        })).toThrow('Invalid task date range.');
+
+        expect(() => parseCreateTaskInput({
+            text: 'Bad parent',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04',
+            parentId: 'local-timestamp-id'
+        })).toThrow('parentId must be a UUID.');
     });
 });
