@@ -1,5 +1,5 @@
 <script>
-    import { categories, createId, getDefaultDateRange, PRIORITY_LABELS, tasks, URGENCY_LABELS } from './store.js';
+    import { categories, createId, getDefaultDateRange, normalizeTask, PRIORITY_LABELS, tasks, URGENCY_LABELS } from './store.js';
 
     let isFormOpen = $state(false);
     let newTaskText = $state('');
@@ -33,7 +33,7 @@
 
             return [
                 ...current,
-                {
+                normalizeTask({
                     id: createId(),
                     text,
                     status: parent?.status || 'todo',
@@ -46,13 +46,16 @@
                     subtasks: [],
                     collapsed: false,
                     createdAt: Date.now()
-                }
+                })
             ];
         });
 
         resetForm();
     }
 
+    /**
+     * @param {KeyboardEvent} event
+     */
     function handleTaskInputKeydown(event) {
         if (event.key === 'Enter') {
             event.preventDefault();

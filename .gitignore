@@ -11,13 +11,32 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+build
+.svelte-kit
 *.local
 .vercel
 .netlify
+dev-dist
+sw.js.map
+workbox-*.js.map
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+AuthKey_*.p8
+*.mobileprovision
 
 # Backups & Data
 kanban_backup_*.json
 build_log.txt
+*.sqlite
+*.sqlite3
+*.db
+local.db*
 
 # Editor directories and files
 .vscode/*
