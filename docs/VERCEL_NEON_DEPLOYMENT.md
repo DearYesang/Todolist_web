@@ -81,11 +81,12 @@ npm run db:migrate
 ## Smoke Test
 
 1. Open `https://todokanban-alpha.vercel.app/api/health?strict=true`.
-2. Confirm the board is hidden before login.
-3. Request a verification code for `scyea@naver.com`.
-4. Confirm an unlisted email is rejected.
-5. Register a passkey and generate recovery codes.
-6. Add a task, reload, edit, and delete it.
-7. Create an iCalendar feed token and subscribe from Apple Calendar.
-8. Connect Google Calendar and run manual sync.
-9. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.
+2. Open `https://todokanban-alpha.vercel.app/api/auth/passkey/generate-authenticate-options` and confirm it is handled by the auth route rather than a SvelteKit `404` page.
+3. Confirm the board is hidden before login.
+4. Request a verification code for `scyea@naver.com`.
+5. Confirm an unlisted email is rejected.
+6. Register a passkey and generate recovery codes.
+7. Add a task, reload, edit, and delete it.
+8. Create an iCalendar feed token and subscribe from Apple Calendar.
+9. Connect Google Calendar and run manual sync.
+10. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.

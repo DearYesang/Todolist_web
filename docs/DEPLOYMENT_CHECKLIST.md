@@ -60,9 +60,11 @@ Microsoft Calendar is optional for later:
 
 - `/api/health` returns non-secret readiness details.
 - `/api/health?strict=true` returns `503` if required production configuration is missing or unsafe.
+- `/api/auth/passkey/generate-authenticate-options` should not return a SvelteKit `404` page. A handled auth/config JSON response is fine; a page 404 means the Better Auth route is not mounted for the deployed host.
 
 ## Manual Smoke
 
+- Confirm `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, `PASSKEY_ORIGIN`, and `PASSKEY_RP_ID` exactly match the deployed host before registering passkeys.
 - Create a passkey account with an email verification code.
 - Generate and store recovery codes.
 - Create, edit, delete, and reload a task.
