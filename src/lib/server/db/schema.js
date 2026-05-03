@@ -196,6 +196,7 @@ export const tasks = pgTable(
 		startDate: date('start_date').notNull(),
 		endDate: date('end_date').notNull(),
 		position: numeric('position', { precision: 20, scale: 10 }).notNull().default('0'),
+		version: integer('version').notNull().default(1),
 		createdBy: text('created_by').notNull(),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -234,6 +235,17 @@ export const checklistItems = pgTable(
 		...timestamps()
 	},
 	(table) => [index('checklist_items_task_position_idx').on(table.taskId, table.position)]
+);
+
+export const rateLimitBuckets = pgTable(
+	'rate_limit_buckets',
+	{
+		key: text('key').primaryKey(),
+		count: integer('count').notNull().default(0),
+		resetAt: timestamp('reset_at', { withTimezone: true }).notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(table) => [index('rate_limit_buckets_reset_at_idx').on(table.resetAt)]
 );
 
 export const calendarConnections = pgTable(

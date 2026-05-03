@@ -3,7 +3,7 @@ import { auth, authConfigurationError, authDatabaseConfigured } from './index.js
 /**
  * @param {Request} request
  * @returns {Promise<
- *   | { ok: true; user: { id: string; email?: string; name?: string } }
+ *   | { ok: true; user: { id: string; email?: string; name?: string }; session: { id: string; token?: string } }
  *   | { ok: false; response: Response }
  * >}
  */
@@ -30,5 +30,5 @@ export async function requireAuthUser(request) {
 		};
 	}
 
-	return { ok: true, user: session.user };
+	return { ok: true, user: session.user, session: session.session };
 }

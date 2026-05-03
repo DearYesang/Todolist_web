@@ -149,7 +149,7 @@
                 if (result.fallback) {
                     replaceTasks(importMode === 'replace' ? parsedTasks : [...get(tasks), ...parsedTasks]);
                     resetFilters();
-                    alert('데이터를 성공적으로 불러왔습니다.');
+                    alert('오프라인 상태라 이 기기의 로컬 캐시에만 불러왔습니다. 서버와 다른 기기에 반영하려면 온라인 상태에서 다시 불러와 주세요.');
                     return;
                 }
 

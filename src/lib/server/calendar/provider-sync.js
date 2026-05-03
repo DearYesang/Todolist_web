@@ -55,8 +55,9 @@ export async function listCalendarProviderConnections(userId) {
  * @param {string} userId
  * @param {string} provider
  * @param {URL} baseUrl
+ * @param {{ userId: string; sessionId: string }} sessionBinding
  */
-export async function createCalendarProviderAuthorizationUrl(userId, provider, baseUrl) {
+export async function createCalendarProviderAuthorizationUrl(userId, provider, baseUrl, sessionBinding) {
 	assertCalendarOauthEncryptionConfigured();
 	const state = createOauthState();
 	const redirectUri = createRedirectUri(baseUrl, provider);
@@ -64,7 +65,7 @@ export async function createCalendarProviderAuthorizationUrl(userId, provider, b
 	await getDb().insert(schema.verification).values({
 		id: createStateId(),
 		identifier: `${OAUTH_STATE_PREFIX}${state}`,
-		value: JSON.stringify({ userId, provider }),
+		value: JSON.stringify({ userId, provider, sessionId: sessionBinding.sessionId }),
 		expiresAt
 	});
 
@@ -76,11 +77,17 @@ export async function createCalendarProviderAuthorizationUrl(userId, provider, b
  * @param {string} code
  * @param {string} state
  * @param {URL} baseUrl
+ * @param {{ userId: string; sessionId: string }} sessionBinding
  */
-export async function completeCalendarProviderAuthorization(provider, code, state, baseUrl) {
+export async function completeCalendarProviderAuthorization(provider, code, state, baseUrl, sessionBinding) {
 	assertCalendarOauthEncryptionConfigured();
 	const stateRecord = await consumeOauthState(state);
-	if (!stateRecord || stateRecord.provider !== provider) {
+	if (
+		!stateRecord
+		|| stateRecord.provider !== provider
+		|| stateRecord.userId !== sessionBinding.userId
+		|| stateRecord.sessionId !== sessionBinding.sessionId
+	) {
 		throw new CalendarSyncError('Calendar OAuth state is invalid or expired.', 400);
 	}
 
@@ -457,15 +464,13 @@ async function markTaskLinkErrored(connectionId, taskId) {
 async function consumeOauthState(state) {
 	const identifier = `${OAUTH_STATE_PREFIX}${state}`;
 	const [record] = await getDb()
-		.select()
-		.from(schema.verification)
+		.delete(schema.verification)
 		.where(and(eq(schema.verification.identifier, identifier), gt(schema.verification.expiresAt, new Date())))
-		.limit(1);
+		.returning();
 	if (!record) {
 		return null;
 	}
 
-	await getDb().delete(schema.verification).where(eq(schema.verification.id, record.id));
 	try {
 		const parsed = JSON.parse(record.value);
 		if (!parsed || typeof parsed !== 'object') {
@@ -474,7 +479,8 @@ async function consumeOauthState(state) {
 
 		const userId = typeof parsed.userId === 'string' ? parsed.userId : '';
 		const provider = typeof parsed.provider === 'string' ? parsed.provider : '';
-		return userId && provider ? { userId, provider } : null;
+		const sessionId = typeof parsed.sessionId === 'string' ? parsed.sessionId : '';
+		return userId && provider && sessionId ? { userId, provider, sessionId } : null;
 	} catch {
 		return null;
 	}

@@ -39,7 +39,7 @@ export async function POST(event) {
 
 	try {
 		const email = typeof payload?.email === 'string' ? payload.email : '';
-		assertRateLimit(createRateLimitKey(event, 'email-verification-send', email), {
+		await assertRateLimit(createRateLimitKey(event, 'email-verification-send', email), {
 			limit: 5,
 			windowMs: 15 * 60 * 1000,
 			message: 'Too many email verification requests.'

@@ -179,6 +179,149 @@ describe('offline write queue conflict behavior', () => {
 		]);
 	});
 
+	it('coalesces local task edits into pending creates before flushing', async () => {
+		const localTaskId = 'local-task';
+		const serverTask = normalizeTask({
+			id: '44444444-4444-4444-8444-444444444444',
+			text: 'Edited task',
+			status: 'doing'
+		});
+
+		enqueueOfflineMutation({
+			type: 'task.create',
+			localTaskId,
+			payload: {
+				text: 'Draft task',
+				status: 'todo',
+				parentId: null
+			}
+		});
+		enqueueOfflineMutation({
+			type: 'task.patch',
+			taskId: localTaskId,
+			patch: {
+				text: 'Edited task',
+				status: 'doing'
+			}
+		});
+
+		expect(loadOfflineQueue()).toHaveLength(1);
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			type: 'task.create',
+			payload: {
+				text: 'Edited task',
+				status: 'doing',
+				parentId: null
+			}
+		});
+
+		const fetcher = vi.fn(async () => new Response(JSON.stringify({ task: serverTask }), {
+			status: 201,
+			headers: { 'content-type': 'application/json' }
+		}));
+
+		await expect(flushOfflineWriteQueue(fetcher)).resolves.toMatchObject({
+			flushed: 1,
+			remaining: 0,
+			blocked: false,
+			createdTasks: [{ localTaskId, task: serverTask }]
+		});
+		expect(fetcher).toHaveBeenCalledWith('/api/tasks', expect.objectContaining({
+			method: 'POST',
+			body: JSON.stringify({
+				text: 'Edited task',
+				status: 'doing',
+				parentId: null
+			})
+		}));
+	});
+
+	it('coalesces checklist create edits and replays a final done state', async () => {
+		const taskId = '55555555-5555-4555-8555-555555555555';
+		const localItemId = 'local-checklist';
+		const serverItemId = '66666666-6666-4666-8666-666666666666';
+		const createdTask = normalizeTask({
+			id: taskId,
+			text: 'Task',
+			subtasks: [{ id: serverItemId, text: 'Renamed checklist', done: false }]
+		});
+		const updatedTask = normalizeTask({
+			id: taskId,
+			text: 'Task',
+			subtasks: [{ id: serverItemId, text: 'Renamed checklist', done: true }]
+		});
+
+		enqueueOfflineMutation({
+			type: 'checklist.create',
+			taskId,
+			localItemId,
+			text: 'First checklist'
+		});
+		enqueueOfflineMutation({
+			type: 'checklist.patch',
+			taskId,
+			itemId: localItemId,
+			patch: { text: 'Renamed checklist' }
+		});
+		enqueueOfflineMutation({
+			type: 'checklist.patch',
+			taskId,
+			itemId: localItemId,
+			patch: { done: true }
+		});
+
+		expect(loadOfflineQueue()).toHaveLength(1);
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			type: 'checklist.create',
+			text: 'Renamed checklist',
+			done: true
+		});
+
+		const fetcher = vi.fn()
+			.mockResolvedValueOnce(new Response(JSON.stringify({ task: createdTask }), {
+				status: 201,
+				headers: { 'content-type': 'application/json' }
+			}))
+			.mockResolvedValueOnce(new Response(JSON.stringify({ task: updatedTask }), {
+				status: 200,
+				headers: { 'content-type': 'application/json' }
+			}));
+
+		await expect(flushOfflineWriteQueue(fetcher)).resolves.toMatchObject({
+			flushed: 1,
+			remaining: 0,
+			blocked: false,
+			syncedTasks: [updatedTask]
+		});
+		expect(fetcher).toHaveBeenNthCalledWith(1, `/api/tasks/${taskId}/checklist`, expect.objectContaining({
+			method: 'POST',
+			body: JSON.stringify({ text: 'Renamed checklist' })
+		}));
+		expect(fetcher).toHaveBeenNthCalledWith(2, `/api/tasks/${taskId}/checklist/${serverItemId}`, expect.objectContaining({
+			method: 'PATCH',
+			body: JSON.stringify({ done: true })
+		}));
+	});
+
+	it('drops a pending checklist create when the local item is deleted before sync', () => {
+		const taskId = '77777777-7777-4777-8777-777777777777';
+		const localItemId = 'local-checklist';
+
+		enqueueOfflineMutation({
+			type: 'checklist.create',
+			taskId,
+			localItemId,
+			text: 'Temporary checklist'
+		});
+		enqueueOfflineMutation({
+			type: 'checklist.delete',
+			taskId,
+			itemId: localItemId
+		});
+
+		expect(loadOfflineQueue()).toEqual([]);
+	});
+
 	it('ignores corrupted queue records from another owner', () => {
 		setOfflineQueueOwner('user-a');
 		storage.set('kanbanOfflineWriteQueue:user-a', JSON.stringify([{

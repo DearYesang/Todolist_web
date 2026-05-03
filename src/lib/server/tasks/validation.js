@@ -72,42 +72,55 @@ export function parseUpdateTaskInput(payload) {
 		throw new TaskWriteError('Task payload must be an object.');
 	}
 
-	/** @type {Record<string, string | null>} */
+	/** @type {Record<string, string | null | number>} */
 	const patch = {};
+	let hasTaskField = false;
 
 	if (hasField(source, 'text') || hasField(source, 'title')) {
 		patch.title = parseRequiredString(source.text ?? source.title, 'Task title', MAX_TITLE_LENGTH);
+		hasTaskField = true;
 	}
 
 	if (hasField(source, 'status')) {
 		patch.status = parseRequiredEnum(source.status, TASK_STATUSES, 'status');
+		hasTaskField = true;
 	}
 
 	if (hasField(source, 'priority')) {
 		patch.priority = parseRequiredEnum(source.priority, TASK_PRIORITIES, 'priority');
+		hasTaskField = true;
 	}
 
 	if (hasField(source, 'urgency')) {
 		patch.urgency = parseRequiredEnum(source.urgency, TASK_URGENCIES, 'urgency');
+		hasTaskField = true;
 	}
 
 	if (hasField(source, 'category')) {
 		patch.category = parseOptionalString(source.category, MAX_CATEGORY_LENGTH);
+		hasTaskField = true;
 	}
 
 	if (hasField(source, 'startDate')) {
 		patch.startDate = parseDateValue(source.startDate, 'startDate');
+		hasTaskField = true;
 	}
 
 	if (hasField(source, 'endDate')) {
 		patch.endDate = parseDateValue(source.endDate, 'endDate');
+		hasTaskField = true;
 	}
 
 	if (hasField(source, 'parentId')) {
 		patch.parentId = parseOptionalUuid(source.parentId, 'parentId');
+		hasTaskField = true;
 	}
 
-	if (Object.keys(patch).length === 0) {
+	if (hasField(source, 'expectedVersion') || hasField(source, 'version')) {
+		patch.expectedVersion = parseExpectedVersion(source.expectedVersion ?? source.version);
+	}
+
+	if (!hasTaskField) {
 		throw new TaskWriteError('At least one task field is required.');
 	}
 
@@ -218,6 +231,21 @@ function parseOptionalString(value, maxLength) {
 	}
 
 	return trimmed;
+}
+
+/**
+ * @param {unknown} value
+ */
+function parseExpectedVersion(value) {
+	if (value === undefined || value === null || value === '') {
+		return null;
+	}
+
+	if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+		throw new TaskWriteError('expectedVersion must be a positive integer.');
+	}
+
+	return value;
 }
 
 /**

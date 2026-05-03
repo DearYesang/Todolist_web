@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 import { planTaskImport } from './import-planner.js';
 import { mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
@@ -93,6 +93,7 @@ export async function createTaskForUser(userId, payload) {
 			startDate: input.startDate,
 			endDate: input.endDate,
 			position: createPositionValue(now),
+			version: 1,
 			createdBy: userId,
 			createdAt: now,
 			updatedAt: now,
@@ -205,6 +206,7 @@ function createImportTaskValues(plans, boardId, userId, now) {
 		startDate: plan.task.startDate,
 		endDate: plan.task.endDate,
 		position: createPositionValue(now, index),
+		version: 1,
 		createdBy: userId,
 		createdAt: new Date(plan.task.createdAt),
 		updatedAt: now,
@@ -244,6 +246,7 @@ export async function updateTaskForUser(userId, taskId, payload) {
 	if (!existing) {
 		throw new TaskWriteError('Task was not found.', 404);
 	}
+	const expectedVersion = typeof input.expectedVersion === 'number' ? input.expectedVersion : null;
 
 	const hasParentPatch = hasField(input, 'parentId');
 	const nextStartDate = typeof input.startDate === 'string' ? input.startDate : existing.startDate;
@@ -251,7 +254,9 @@ export async function updateTaskForUser(userId, taskId, payload) {
 	assertValidTaskDateRange(nextStartDate, nextEndDate);
 
 	let nextStatus = typeof input.status === 'string' ? input.status : existing.status;
-	let nextParentTaskId = hasParentPatch ? input.parentId : existing.parentTaskId;
+	let nextParentTaskId = hasParentPatch
+		? typeof input.parentId === 'string' ? input.parentId : null
+		: existing.parentTaskId;
 	if (nextParentTaskId) {
 		const parent = await getWritableParentTask(db, existing.boardId, nextParentTaskId);
 		if (!parent || !(await canAssignParentTask(db, existing.boardId, existing.id, nextParentTaskId))) {
@@ -279,12 +284,21 @@ export async function updateTaskForUser(userId, taskId, payload) {
 			endDate: nextEndDate,
 			parentTaskId: nextParentTaskId,
 			updatedAt: now,
+			version: sql`${schema.tasks.version} + 1`,
 			completedAt: nextStatus === 'done' ? existing.completedAt ?? now : null
 		})
-		.where(and(eq(schema.tasks.id, existing.id), eq(schema.tasks.boardId, existing.boardId), isNull(schema.tasks.deletedAt)))
+		.where(and(
+			eq(schema.tasks.id, existing.id),
+			eq(schema.tasks.boardId, existing.boardId),
+			isNull(schema.tasks.deletedAt),
+			...(expectedVersion === null ? [] : [eq(schema.tasks.version, expectedVersion)])
+		))
 		.returning();
 
 	if (!updated) {
+		if (expectedVersion !== null) {
+			throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
+		}
 		throw new TaskWriteError('Task could not be updated.', 500);
 	}
 
@@ -357,7 +371,8 @@ export async function createChecklistItemForUser(userId, taskId, payload) {
 		throw new TaskWriteError('Checklist item could not be created.', 500);
 	}
 
-	return mapTaskRowToClientTask(task, await getChecklistRowsForTask(db, task.id));
+	const updatedTask = await bumpTaskVersion(db, task.id, now);
+	return mapTaskRowToClientTask(updatedTask ?? task, await getChecklistRowsForTask(db, task.id));
 }
 
 /**
@@ -402,7 +417,8 @@ export async function updateChecklistItemForUser(userId, taskId, itemId, payload
 		throw new TaskWriteError('Checklist item was not found.', 404);
 	}
 
-	return mapTaskRowToClientTask(task, await getChecklistRowsForTask(db, task.id));
+	const updatedTask = await bumpTaskVersion(db, task.id, new Date());
+	return mapTaskRowToClientTask(updatedTask ?? task, await getChecklistRowsForTask(db, task.id));
 }
 
 /**
@@ -428,7 +444,26 @@ export async function deleteChecklistItemForUser(userId, taskId, itemId) {
 		throw new TaskWriteError('Checklist item was not found.', 404);
 	}
 
-	return mapTaskRowToClientTask(task, await getChecklistRowsForTask(db, task.id));
+	const updatedTask = await bumpTaskVersion(db, task.id, new Date());
+	return mapTaskRowToClientTask(updatedTask ?? task, await getChecklistRowsForTask(db, task.id));
+}
+
+/**
+ * @param {ReturnType<typeof getDb>} db
+ * @param {string} taskId
+ * @param {Date} now
+ */
+async function bumpTaskVersion(db, taskId, now) {
+	const [updated] = await db
+		.update(schema.tasks)
+		.set({
+			updatedAt: now,
+			version: sql`${schema.tasks.version} + 1`
+		})
+		.where(and(eq(schema.tasks.id, taskId), isNull(schema.tasks.deletedAt)))
+		.returning();
+
+	return updated ?? null;
 }
 
 /**

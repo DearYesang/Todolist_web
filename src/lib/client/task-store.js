@@ -175,6 +175,24 @@ export function mergeTasks(nextTasks) {
 }
 
 /**
+ * @param {unknown[]} serverTasks
+ */
+export function applyServerTaskSnapshot(serverTasks) {
+    const incoming = normalizeTaskList(serverTasks).filter((task) => isServerTaskId(task.id));
+    tasks.update((current) => {
+        const collapsedById = new Map(current.map((task) => [task.id, task.collapsed]));
+        const pendingLocalTasks = current.filter((task) => !isServerTaskId(task.id));
+        const authoritativeTasks = incoming.map((task) =>
+            collapsedById.has(task.id)
+                ? { ...task, collapsed: Boolean(collapsedById.get(task.id)) }
+                : task
+        );
+
+        return normalizeTaskList([...pendingLocalTasks, ...authoritativeTasks]);
+    });
+}
+
+/**
  * @param {string} localTaskId
  * @param {import('../shared/task-domain.js').Task} serverTask
  */
@@ -273,8 +291,18 @@ export function addSubtask(taskId, text) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    tasks.update((current) => addSubtaskToList(current, taskId, text));
-    syncChecklistCreate(taskId, trimmed);
+    /** @type {string | null} */
+    let subtaskId = null;
+    tasks.update((current) => {
+        const previousIds = new Set(current.find((task) => task.id === taskId)?.subtasks.map((subtask) => subtask.id) ?? []);
+        const next = addSubtaskToList(current, taskId, text);
+        subtaskId = next.find((task) => task.id === taskId)?.subtasks.find((subtask) => !previousIds.has(subtask.id))?.id ?? null;
+        return next;
+    });
+
+    if (subtaskId) {
+        syncChecklistCreate(taskId, subtaskId, trimmed);
+    }
 }
 
 /**
@@ -321,17 +349,30 @@ export function deleteSubtask(taskId, subtaskId) {
  * @param {import('../shared/task-domain.js').Task | null} task
  */
 function syncTaskSnapshot(task) {
-    if (!task || !shouldSyncServerTask(task.id)) {
+    if (!task || typeof window === 'undefined') {
         return;
     }
 
     const patch = toServerTaskPatch(task);
+    const mutation = {
+        type: 'task.patch',
+        taskId: task.id,
+        localParentId: getLocalParentId(task),
+        patch
+    };
+
+    if (!isServerTaskId(task.id)) {
+        enqueueOfflineMutation(/** @type {import('./offline-write-queue.js').OfflineMutationInput} */ (mutation));
+        return;
+    }
+
     void updateServerTask(task.id, patch).then((result) =>
-        syncReturnedTask(result, {
+        syncReturnedTask(result, /** @type {import('./offline-write-queue.js').OfflineMutationInput} */ ({
             type: 'task.patch',
             taskId: task.id,
+            localParentId: getLocalParentId(task),
             patch
-        })
+        }))
     );
 }
 
@@ -339,7 +380,15 @@ function syncTaskSnapshot(task) {
  * @param {string} taskId
  */
 function syncTaskDelete(taskId) {
-    if (!shouldSyncServerTask(taskId)) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!isServerTaskId(taskId)) {
+        enqueueOfflineMutation({
+            type: 'task.delete',
+            taskId
+        });
         return;
     }
 
@@ -365,6 +414,11 @@ async function syncClearDoneTasks(taskList) {
         && shouldSyncServerTask(task.id)
         && !hasDoneAncestor(taskList, task, doneIds)
     );
+    const topLevelLocalDoneTasks = taskList.filter((task) =>
+        task.status === 'done'
+        && !isServerTaskId(task.id)
+        && !hasDoneAncestor(taskList, task, doneIds)
+    );
 
     for (const task of topLevelDoneTasks) {
         const result = await deleteServerTask(task.id);
@@ -372,6 +426,10 @@ async function syncClearDoneTasks(taskList) {
             type: 'task.delete',
             taskId: task.id
         });
+    }
+
+    for (const task of topLevelLocalDoneTasks) {
+        syncTaskDelete(task.id);
     }
 }
 
@@ -396,10 +454,21 @@ function hasDoneAncestor(taskList, task, doneIds) {
 
 /**
  * @param {string} taskId
+ * @param {string} subtaskId
  * @param {string} text
  */
-function syncChecklistCreate(taskId, text) {
-    if (!shouldSyncServerTask(taskId)) {
+function syncChecklistCreate(taskId, subtaskId, text) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!isServerTaskId(taskId)) {
+        enqueueOfflineMutation({
+            type: 'checklist.create',
+            taskId,
+            localItemId: subtaskId,
+            text
+        });
         return;
     }
 
@@ -407,6 +476,7 @@ function syncChecklistCreate(taskId, text) {
         syncReturnedTask(result, {
             type: 'checklist.create',
             taskId,
+            localItemId: subtaskId,
             text
         })
     );
@@ -418,7 +488,17 @@ function syncChecklistCreate(taskId, text) {
  * @param {{ text?: string; done?: boolean }} patch
  */
 function syncChecklistPatch(taskId, subtaskId, patch) {
-    if (!shouldSyncServerTask(taskId) || !isServerTaskId(subtaskId)) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!isServerTaskId(taskId) || !isServerTaskId(subtaskId)) {
+        enqueueOfflineMutation({
+            type: 'checklist.patch',
+            taskId,
+            itemId: subtaskId,
+            patch
+        });
         return;
     }
 
@@ -437,7 +517,16 @@ function syncChecklistPatch(taskId, subtaskId, patch) {
  * @param {string} subtaskId
  */
 function syncChecklistDelete(taskId, subtaskId) {
-    if (!shouldSyncServerTask(taskId) || !isServerTaskId(subtaskId)) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!isServerTaskId(taskId) || !isServerTaskId(subtaskId)) {
+        enqueueOfflineMutation({
+            type: 'checklist.delete',
+            taskId,
+            itemId: subtaskId
+        });
         return;
     }
 
@@ -460,6 +549,13 @@ function shouldSyncServerTask(taskId) {
 /**
  * @param {import('../shared/task-domain.js').Task} task
  */
+function getLocalParentId(task) {
+    return task.parentId && !isServerTaskId(task.parentId) ? task.parentId : null;
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task} task
+ */
 function toServerTaskPatch(task) {
     return {
         text: task.text,
@@ -469,7 +565,8 @@ function toServerTaskPatch(task) {
         priority: task.priority,
         urgency: task.urgency,
         category: task.category,
-        parentId: isServerTaskId(task.parentId) ? task.parentId : null
+        parentId: isServerTaskId(task.parentId) ? task.parentId : null,
+        ...(typeof task.version === 'number' ? { expectedVersion: task.version } : {})
     };
 }
 

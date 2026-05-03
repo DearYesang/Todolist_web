@@ -42,7 +42,8 @@ function mapTaskRowToRawTask(task, subtasks) {
 		parentId: task.parentTaskId,
 		subtasks,
 		collapsed: false,
-		createdAt: toTimestamp(task.createdAt)
+		createdAt: toTimestamp(task.createdAt),
+		version: task.version
 	};
 }
 

@@ -1,3 +1,6 @@
+import { sql } from 'drizzle-orm';
+import { getDb, schema } from '$lib/server/db/index.js';
+
 /** @type {Map<string, { count: number; resetAt: number }>} */
 const buckets = new Map();
 
@@ -18,7 +21,20 @@ export class RateLimitError extends Error {
  * @param {string} key
  * @param {{ limit: number; windowMs: number; message?: string }} options
  */
-export function assertRateLimit(key, options) {
+export async function assertRateLimit(key, options) {
+	if (process.env.DATABASE_URL) {
+		await assertPersistentRateLimit(key, options);
+		return;
+	}
+
+	assertMemoryRateLimit(key, options);
+}
+
+/**
+ * @param {string} key
+ * @param {{ limit: number; windowMs: number; message?: string }} options
+ */
+function assertMemoryRateLimit(key, options) {
 	const now = Date.now();
 	const existing = buckets.get(key);
 	if (!existing || existing.resetAt <= now) {
@@ -32,6 +48,49 @@ export function assertRateLimit(key, options) {
 	}
 
 	existing.count += 1;
+}
+
+/**
+ * @param {string} key
+ * @param {{ limit: number; windowMs: number; message?: string }} options
+ */
+async function assertPersistentRateLimit(key, options) {
+	const now = new Date();
+	const resetAt = new Date(now.getTime() + options.windowMs);
+	const [row] = await getDb()
+		.insert(schema.rateLimitBuckets)
+		.values({
+			key,
+			count: 1,
+			resetAt,
+			updatedAt: now
+		})
+		.onConflictDoUpdate({
+			target: schema.rateLimitBuckets.key,
+			set: {
+				count: sql`case
+					when ${schema.rateLimitBuckets.resetAt} <= ${now} then 1
+					else ${schema.rateLimitBuckets.count} + 1
+				end`,
+				resetAt: sql`case
+					when ${schema.rateLimitBuckets.resetAt} <= ${now} then ${resetAt}
+					else ${schema.rateLimitBuckets.resetAt}
+				end`,
+				updatedAt: now
+			}
+		})
+		.returning({
+			count: schema.rateLimitBuckets.count,
+			resetAt: schema.rateLimitBuckets.resetAt
+		});
+	const count = Number(row?.count ?? 1);
+	if (count <= options.limit) {
+		return;
+	}
+
+	const resetAtMs = row?.resetAt?.getTime() ?? resetAt.getTime();
+	const retryAfter = Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000));
+	throw new RateLimitError(options.message ?? 'Too many requests.', retryAfter);
 }
 
 /**

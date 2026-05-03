@@ -22,7 +22,7 @@ export async function POST(event) {
 	}
 
 	try {
-		assertRateLimit(createRateLimitKey(event, 'calendar-sync', authResult.user.id), {
+		await assertRateLimit(createRateLimitKey(event, 'calendar-sync', authResult.user.id), {
 			limit: 6,
 			windowMs: 60 * 60 * 1000,
 			message: 'Calendar sync is cooling down.'

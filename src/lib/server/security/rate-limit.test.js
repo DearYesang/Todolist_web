@@ -12,13 +12,13 @@ describe('server rate limit helper', () => {
 		resetRateLimitBuckets();
 	});
 
-	it('throws a 429 with Retry-After when the bucket is exhausted', () => {
-		assertRateLimit('test-key', { limit: 2, windowMs: 60_000 });
-		assertRateLimit('test-key', { limit: 2, windowMs: 60_000 });
+	it('throws a 429 with Retry-After when the bucket is exhausted', async () => {
+		await assertRateLimit('test-key', { limit: 2, windowMs: 60_000 });
+		await assertRateLimit('test-key', { limit: 2, windowMs: 60_000 });
 
-		expect(() => assertRateLimit('test-key', { limit: 2, windowMs: 60_000 })).toThrow(RateLimitError);
+		await expect(assertRateLimit('test-key', { limit: 2, windowMs: 60_000 })).rejects.toThrow(RateLimitError);
 		try {
-			assertRateLimit('test-key', { limit: 2, windowMs: 60_000 });
+			await assertRateLimit('test-key', { limit: 2, windowMs: 60_000 });
 		} catch (error) {
 			expect(error).toBeInstanceOf(RateLimitError);
 			expect(createRateLimitHeaders(/** @type {RateLimitError} */ (error))).toEqual({

@@ -52,7 +52,7 @@ export async function POST(event) {
 	}
 
 	try {
-		assertRateLimit(createRateLimitKey(event, 'calendar-token-create', authResult.user.id), {
+		await assertRateLimit(createRateLimitKey(event, 'calendar-token-create', authResult.user.id), {
 			limit: 5,
 			windowMs: 60 * 60 * 1000,
 			message: 'Too many calendar feed token creation requests.'
