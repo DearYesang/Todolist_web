@@ -53,20 +53,21 @@
                     return;
                 }
 
-                if (get(tasks).length > 0 && !confirm('가져온 데이터를 현재 목록에 추가하시겠습니까?')) {
-                    return;
-                }
+                const importMode = get(tasks).length > 0 && confirm('현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.')
+                    ? 'replace'
+                    : 'append';
 
-                const result = await importServerTasks(parsed);
+                const result = await importServerTasks(parsed, { mode: importMode });
                 if (result.ok) {
-                    replaceTasks([...get(tasks), ...result.tasks]);
+                    replaceTasks(importMode === 'replace' ? result.tasks : [...get(tasks), ...result.tasks]);
                     resetFilters();
-                    alert(`데이터를 성공적으로 불러왔습니다. 가져온 작업: ${result.summary.importedTasks}개`);
+                    const replacedText = result.summary.replacedTasks ? ` 교체된 작업: ${result.summary.replacedTasks}개.` : '';
+                    alert(`데이터를 성공적으로 불러왔습니다. 가져온 작업: ${result.summary.importedTasks}개.${replacedText}`);
                     return;
                 }
 
                 if (result.fallback) {
-                    replaceTasks([...get(tasks), ...parsed]);
+                    replaceTasks(importMode === 'replace' ? parsed : [...get(tasks), ...parsed]);
                     resetFilters();
                     alert('데이터를 성공적으로 불러왔습니다.');
                     return;
