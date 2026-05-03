@@ -59,15 +59,21 @@ export async function listCalendarTokens(fetcher = globalThis.fetch) {
 
 /**
  * @param {string} name
+ * @param {{ expiresInDays?: number } | typeof fetch} [options]
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<CalendarTokenCreateResult>}
  */
-export async function createCalendarToken(name, fetcher = globalThis.fetch) {
+export async function createCalendarToken(name, options = {}, fetcher = globalThis.fetch) {
+	const requestOptions = typeof options === 'function' ? {} : options;
+	const requestFetcher = typeof options === 'function' ? options : fetcher;
 	try {
-		const response = await fetcher('/api/calendar/tokens', {
+		const response = await requestFetcher('/api/calendar/tokens', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ name })
+			body: JSON.stringify({
+				name,
+				...(requestOptions.expiresInDays ? { expiresInDays: requestOptions.expiresInDays } : {})
+			})
 		});
 		const body = await readJsonBody(response);
 

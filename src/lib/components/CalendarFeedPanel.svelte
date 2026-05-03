@@ -13,6 +13,7 @@
     let isOpen = $state(false);
     let isWorking = $state(false);
     let message = $state('');
+    let expiresInDays = $state(90);
 
     $effect(() => {
         if ($session.data?.user && isOpen) {
@@ -33,7 +34,7 @@
         message = '';
         isWorking = true;
         try {
-            const result = await createCalendarToken('Calendar feed');
+            const result = await createCalendarToken('Calendar feed', { expiresInDays });
             if (!result.ok) {
                 message = result.message;
                 return;
@@ -79,6 +80,28 @@
             message = '복사하지 못했습니다.';
         }
     }
+
+    /**
+     * @param {string | Date | null} value
+     */
+    function formatDate(value) {
+        if (!value) return '만료 없음';
+        return new Date(value).toLocaleDateString('ko-KR');
+    }
+
+    /**
+     * @param {import('$lib/client/calendar-token-api.js').CalendarTokenRecord} token
+     */
+    function getTokenState(token) {
+        if (token.revokedAt) return '해지됨';
+        if (!token.expiresAt) return '만료 없음';
+
+        const expiresAt = new Date(token.expiresAt).getTime();
+        const days = Math.ceil((expiresAt - Date.now()) / 86_400_000);
+        if (days < 0) return '만료됨';
+        if (days <= 14) return `${days}일 남음`;
+        return `${formatDate(token.expiresAt)} 만료`;
+    }
 </script>
 
 {#if $session.data?.user}
@@ -93,6 +116,12 @@
         {#if isOpen}
             <div class="calendar-feed-popover">
                 <div class="calendar-feed-actions">
+                    <select class="calendar-feed-select" bind:value={expiresInDays} aria-label="구독 링크 만료">
+                        <option value={30}>30일</option>
+                        <option value={90}>90일</option>
+                        <option value={180}>180일</option>
+                        <option value={365}>1년</option>
+                    </select>
                     <button class="btn btn-primary" onclick={handleCreate} disabled={isWorking}>링크 만들기</button>
                     {#if latestUrl}
                         <button class="btn" onclick={copyLatestUrl}>복사</button>
@@ -107,7 +136,12 @@
                     <div class="calendar-token-list">
                         {#each tokens as token (token.id)}
                             <div class="calendar-token-row">
-                                <span class:revoked={Boolean(token.revokedAt)}>{token.name} · {token.tokenPrefix}</span>
+                                <span class:revoked={Boolean(token.revokedAt)}>
+                                    {token.name} · {token.tokenPrefix} · {getTokenState(token)}
+                                    {#if token.lastUsedAt}
+                                        · 사용 {formatDate(token.lastUsedAt)}
+                                    {/if}
+                                </span>
                                 <button
                                     class="btn btn-ghost"
                                     disabled={Boolean(token.revokedAt) || isWorking}

@@ -4,11 +4,18 @@ import {
 	AccountSecurityConfigurationError,
 	createPasskeyEmailVerification
 } from '$lib/server/auth/account-security.js';
+import {
+	assertRateLimit,
+	createRateLimitHeaders,
+	createRateLimitKey,
+	RateLimitError
+} from '$lib/server/security/rate-limit.js';
 
 const MAX_BODY_BYTES = 10_000;
 
 /** @type {import('./$types').RequestHandler} */
-export async function POST({ request }) {
+export async function POST(event) {
+	const { request } = event;
 	if (!authDatabaseConfigured) {
 		return json({ message: 'Auth database is not configured.' }, { status: 503 });
 	}
@@ -30,8 +37,14 @@ export async function POST({ request }) {
 	}
 
 	try {
+		const email = typeof payload?.email === 'string' ? payload.email : '';
+		assertRateLimit(createRateLimitKey(event, 'email-verification-send', email), {
+			limit: 5,
+			windowMs: 15 * 60 * 1000,
+			message: 'Too many email verification requests.'
+		});
 		const result = await createPasskeyEmailVerification({
-			email: payload?.email,
+			email,
 			name: payload?.name
 		});
 		return json(result, {
@@ -41,6 +54,13 @@ export async function POST({ request }) {
 			}
 		});
 	} catch (error) {
+		if (error instanceof RateLimitError) {
+			return json({ message: error.message }, {
+				status: error.status,
+				headers: createRateLimitHeaders(error)
+			});
+		}
+
 		if (error instanceof AccountSecurityConfigurationError) {
 			return json({ message: error.message }, { status: error.status });
 		}

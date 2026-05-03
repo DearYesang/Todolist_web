@@ -1,12 +1,15 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
+import { isPlaceholderValue } from '$lib/server/config/env.js';
 import { ensurePersonalBoardForUser, listTasksForBoard } from '$lib/server/tasks/repository.js';
 
 const TOKEN_PREFIX = 'cal_';
 const TOKEN_BYTES = 32;
 const TOKEN_PREVIEW_LENGTH = 12;
 const MAX_TOKEN_NAME_LENGTH = 80;
+const DEFAULT_TOKEN_TTL_DAYS = 90;
+const MAX_ACTIVE_TOKENS_PER_USER = 5;
 
 export class CalendarTokenConfigurationError extends Error {
 	constructor() {
@@ -46,6 +49,14 @@ export async function createCalendarTokenForUser(userId, payload) {
 	const source = /** @type {Record<string, unknown> | null} */ (payload);
 	const name = parseTokenName(source?.name);
 	const db = getDb();
+	const activeTokens = await db
+		.select({ id: schema.calendarSubscriptionTokens.id })
+		.from(schema.calendarSubscriptionTokens)
+		.where(and(eq(schema.calendarSubscriptionTokens.userId, userId), isNull(schema.calendarSubscriptionTokens.revokedAt)));
+	if (activeTokens.length >= MAX_ACTIVE_TOKENS_PER_USER) {
+		throw new CalendarTokenLimitError(`Calendar feeds are limited to ${MAX_ACTIVE_TOKENS_PER_USER} active tokens per user.`);
+	}
+
 	const [created] = await db
 		.insert(schema.calendarSubscriptionTokens)
 		.values({
@@ -58,7 +69,7 @@ export async function createCalendarTokenForUser(userId, payload) {
 			createdAt: now,
 			lastUsedAt: null,
 			revokedAt: null,
-			expiresAt: null
+			expiresAt: parseTokenExpiresAt(source?.expiresInDays, now)
 		})
 		.returning();
 
@@ -124,11 +135,20 @@ export function createCalendarToken() {
  */
 export function hashCalendarToken(rawToken) {
 	const secret = process.env.CALENDAR_TOKEN_SECRET;
-	if (!secret) {
+	if (!secret || isPlaceholderValue(secret) || secret.length < 32) {
 		throw new CalendarTokenConfigurationError();
 	}
 
 	return createHmac('sha256', secret).update(rawToken).digest('hex');
+}
+
+export class CalendarTokenLimitError extends Error {
+	/** @param {string} message */
+	constructor(message) {
+		super(message);
+		this.name = 'CalendarTokenLimitError';
+		this.status = 429;
+	}
 }
 
 /**
@@ -145,6 +165,19 @@ function parseTokenName(value) {
 	}
 
 	return name.slice(0, MAX_TOKEN_NAME_LENGTH);
+}
+
+/**
+ * @param {unknown} value
+ * @param {Date} now
+ */
+function parseTokenExpiresAt(value, now) {
+	const days = typeof value === 'number' && Number.isFinite(value)
+		? Math.max(1, Math.min(365, Math.floor(value)))
+		: DEFAULT_TOKEN_TTL_DAYS;
+	const expiresAt = new Date(now);
+	expiresAt.setUTCDate(expiresAt.getUTCDate() + days);
+	return expiresAt;
 }
 
 /**

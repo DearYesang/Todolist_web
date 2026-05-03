@@ -728,12 +728,12 @@ describe('calendar subscription tokens', () => {
     });
 
     it('hashes tokens with a required keyed secret', () => {
-        process.env.CALENDAR_TOKEN_SECRET = 'calendar-secret-one';
+        process.env.CALENDAR_TOKEN_SECRET = 'calendar-secret-one-with-32-bytes';
         const hash = hashCalendarToken('cal_test-token');
         expect(hash).toMatch(/^[a-f0-9]{64}$/);
         expect(hashCalendarToken('cal_test-token')).toBe(hash);
 
-        process.env.CALENDAR_TOKEN_SECRET = 'calendar-secret-two';
+        process.env.CALENDAR_TOKEN_SECRET = 'calendar-secret-two-with-32-bytes';
         expect(hashCalendarToken('cal_test-token')).not.toBe(hash);
 
         delete process.env.CALENDAR_TOKEN_SECRET;
