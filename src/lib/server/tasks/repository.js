@@ -92,7 +92,7 @@ export async function createTaskForUser(userId, payload) {
 			category: input.category,
 			startDate: input.startDate,
 			endDate: input.endDate,
-			position: String(now.getTime()),
+			position: createPositionValue(now),
 			createdBy: userId,
 			createdAt: now,
 			updatedAt: now,
@@ -204,7 +204,7 @@ function createImportTaskValues(plans, boardId, userId, now) {
 		category: plan.task.category,
 		startDate: plan.task.startDate,
 		endDate: plan.task.endDate,
-		position: String(now.getTime() + index),
+		position: createPositionValue(now, index),
 		createdBy: userId,
 		createdAt: new Date(plan.task.createdAt),
 		updatedAt: now,
@@ -224,7 +224,7 @@ function createImportChecklistValues(plans, now) {
 			taskId: plan.id,
 			text: item.text,
 			done: item.done,
-			position: String(now.getTime() + index),
+			position: createPositionValue(now, index),
 			createdAt: now,
 			updatedAt: now
 		}))
@@ -347,7 +347,7 @@ export async function createChecklistItemForUser(userId, taskId, payload) {
 			taskId: task.id,
 			text: input.text,
 			done: false,
-			position: String(now.getTime()),
+			position: createPositionValue(now),
 			createdAt: now,
 			updatedAt: now
 		})
@@ -358,6 +358,18 @@ export async function createChecklistItemForUser(userId, taskId, payload) {
 	}
 
 	return mapTaskRowToClientTask(task, await getChecklistRowsForTask(db, task.id));
+}
+
+/**
+ * PostgreSQL numeric(20,10) allows 10 integer digits. Millisecond timestamps are
+ * already 13 digits, so store second-based sortable positions instead.
+ *
+ * @param {Date} now
+ * @param {number} [offset]
+ */
+export function createPositionValue(now, offset = 0) {
+	const seconds = Math.floor(now.getTime() / 1000);
+	return (seconds + offset / 1000).toFixed(3);
 }
 
 /**

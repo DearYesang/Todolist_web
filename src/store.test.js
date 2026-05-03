@@ -50,6 +50,7 @@ import {
 } from './lib/client/calendar-provider-api.js';
 import { planTaskImport } from './lib/server/tasks/import-planner.js';
 import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
+import { createPositionValue } from './lib/server/tasks/repository.js';
 import {
     assertValidTaskDateRange,
     parseCreateTaskInput,
@@ -834,6 +835,15 @@ describe('server task import planning', () => {
             parentTaskId: '11111111-1111-4111-8111-111111111111'
         });
         expect(summary.receivedTasks).toBe(2);
+    });
+
+    it('creates sortable positions that fit numeric(20,10)', () => {
+        const position = createPositionValue(new Date('2026-05-04T00:00:00.000Z'), 12);
+        const [integerPart, decimalPart = ''] = position.split('.');
+
+        expect(integerPart.length).toBeLessThanOrEqual(10);
+        expect(decimalPart.length).toBeLessThanOrEqual(10);
+        expect(Number(position)).toBeGreaterThan(Number(createPositionValue(new Date('2026-05-04T00:00:00.000Z'), 11)));
     });
 
     it('rejects unsupported imports and skips empty task titles', () => {
