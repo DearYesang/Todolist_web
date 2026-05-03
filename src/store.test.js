@@ -480,6 +480,24 @@ describe('client task creation', () => {
             method: 'POST',
             body: JSON.stringify(payload)
         }));
+
+        const replaceFetcher = vi.fn(async () => new Response(JSON.stringify({
+            tasks: [serverTask],
+            summary: { ...summary, replacedTasks: 3 }
+        }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        await expect(importServerTasks(payload, { mode: 'replace' }, replaceFetcher)).resolves.toEqual({
+            ok: true,
+            tasks: [serverTask],
+            summary: { ...summary, replacedTasks: 3 }
+        });
+        expect(replaceFetcher).toHaveBeenCalledWith('/api/import?mode=replace', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify(payload)
+        }));
     });
 });
 

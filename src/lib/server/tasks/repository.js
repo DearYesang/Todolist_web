@@ -121,29 +121,104 @@ export async function importTasksForUser(userId, payload) {
 	const db = getDb();
 	const board = await getOrCreatePersonalBoardForUser(db, userId);
 	const now = new Date();
-	const createdTaskRows = await db
-		.insert(schema.tasks)
-		.values(plans.map((plan, index) => ({
-			id: plan.id,
-			boardId: board.id,
-			parentTaskId: plan.parentTaskId,
-			title: plan.task.text.trim(),
-			status: plan.task.status,
-			priority: plan.task.priority,
-			urgency: plan.task.urgency,
-			category: plan.task.category,
-			startDate: plan.task.startDate,
-			endDate: plan.task.endDate,
-			position: String(now.getTime() + index),
-			createdBy: userId,
-			createdAt: new Date(plan.task.createdAt),
-			updatedAt: now,
-			completedAt: plan.task.status === 'done' ? now : null,
-			deletedAt: null
-		})))
-		.returning();
+	const taskValues = createImportTaskValues(plans, board.id, userId, now);
+	const checklistValues = createImportChecklistValues(plans, now);
+	const [createdTaskRows, createdChecklistRows = []] = await db.batch([
+		db
+			.insert(schema.tasks)
+			.values(taskValues)
+			.returning(),
+		...(checklistValues.length > 0
+			? [db.insert(schema.checklistItems).values(checklistValues).returning()]
+			: [])
+	]);
 
-	const checklistValues = plans.flatMap((plan) =>
+	return {
+		tasks: mapTaskRowsToClientTasks(createdTaskRows, createdChecklistRows),
+		summary
+	};
+}
+
+/**
+ * @param {string} userId
+ * @param {unknown} payload
+ */
+export async function replaceTasksForUser(userId, payload) {
+	const { plans, summary } = planTaskImport(payload);
+	const db = getDb();
+	const board = await getOrCreatePersonalBoardForUser(db, userId);
+	const now = new Date();
+	const deleteExistingTasks = db
+		.delete(schema.tasks)
+		.where(eq(schema.tasks.boardId, board.id))
+		.returning({ id: schema.tasks.id });
+
+	if (plans.length === 0) {
+		const [deletedRows] = await db.batch([deleteExistingTasks]);
+		return {
+			tasks: [],
+			summary: {
+				...summary,
+				replacedTasks: deletedRows.length
+			}
+		};
+	}
+
+	const taskValues = createImportTaskValues(plans, board.id, userId, now);
+	const checklistValues = createImportChecklistValues(plans, now);
+	const [deletedRows, createdTaskRows, createdChecklistRows = []] = await db.batch([
+		deleteExistingTasks,
+		db
+			.insert(schema.tasks)
+			.values(taskValues)
+			.returning(),
+		...(checklistValues.length > 0
+			? [db.insert(schema.checklistItems).values(checklistValues).returning()]
+			: [])
+	]);
+
+	return {
+		tasks: mapTaskRowsToClientTasks(createdTaskRows, createdChecklistRows),
+		summary: {
+			...summary,
+			replacedTasks: deletedRows.length
+		}
+	};
+}
+
+/**
+ * @param {ReturnType<typeof planTaskImport>['plans']} plans
+ * @param {string} boardId
+ * @param {string} userId
+ * @param {Date} now
+ */
+function createImportTaskValues(plans, boardId, userId, now) {
+	return plans.map((plan, index) => ({
+		id: plan.id,
+		boardId,
+		parentTaskId: plan.parentTaskId,
+		title: plan.task.text.trim(),
+		status: plan.task.status,
+		priority: plan.task.priority,
+		urgency: plan.task.urgency,
+		category: plan.task.category,
+		startDate: plan.task.startDate,
+		endDate: plan.task.endDate,
+		position: String(now.getTime() + index),
+		createdBy: userId,
+		createdAt: new Date(plan.task.createdAt),
+		updatedAt: now,
+		completedAt: plan.task.status === 'done' ? now : null,
+		deletedAt: null
+	}));
+}
+
+/**
+ * @param {ReturnType<typeof planTaskImport>['plans']} plans
+ * @param {Date} now
+ */
+function createImportChecklistValues(plans, now) {
+	return plans.flatMap((plan) =>
 		plan.checklistItems.map((item, index) => ({
 			id: item.id,
 			taskId: plan.id,
@@ -154,14 +229,6 @@ export async function importTasksForUser(userId, payload) {
 			updatedAt: now
 		}))
 	);
-	const createdChecklistRows = checklistValues.length > 0
-		? await db.insert(schema.checklistItems).values(checklistValues).returning()
-		: [];
-
-	return {
-		tasks: mapTaskRowsToClientTasks(createdTaskRows, createdChecklistRows),
-		summary
-	};
 }
 
 /**

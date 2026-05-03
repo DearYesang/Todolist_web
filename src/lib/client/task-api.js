@@ -42,6 +42,7 @@ const FALLBACK_STATUSES = new Set([401, 409, 503]);
  *   importedChecklistItems: number;
  *   skippedChecklistItems: number;
  *   repairedParentLinks: number;
+ *   replacedTasks?: number;
  * }} TaskImportSummary
  *
  * @typedef {{
@@ -128,16 +129,21 @@ export async function exportServerTasks(fetcher = globalThis.fetch) {
 
 /**
  * @param {unknown[]} tasks
+ * @param {{ mode?: 'append' | 'replace' } | typeof fetch} [options]
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<ImportServerTasksResult>}
  */
-export async function importServerTasks(tasks, fetcher = globalThis.fetch) {
-	if (typeof fetcher !== 'function') {
+export async function importServerTasks(tasks, options = {}, fetcher = globalThis.fetch) {
+	const requestOptions = typeof options === 'function' ? {} : options;
+	const requestFetcher = typeof options === 'function' ? options : fetcher;
+	if (typeof requestFetcher !== 'function') {
 		return createFallbackResult('Task API is not available.');
 	}
 
 	try {
-		const response = await fetcher('/api/import', {
+		const mode = requestOptions.mode === 'replace' ? 'replace' : 'append';
+		const url = mode === 'replace' ? '/api/import?mode=replace' : '/api/import';
+		const response = await requestFetcher(url, {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json'
