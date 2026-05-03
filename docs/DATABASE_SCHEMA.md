@@ -178,6 +178,7 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Personal `Personal` workspace and `Inbox` board provisioning for first authenticated task creation.
 - Authenticated task list/create/update/soft-delete cascade.
 - Authenticated checklist create/update/delete.
+- Authenticated read-only `/api/calendar.ics` download backed by server tasks.
 - Parent ownership and cycle validation in the service layer.
 
-Server import/export and calendar feed routes are still planned.
+Server import/export and revocable calendar subscription tokens are still planned.
