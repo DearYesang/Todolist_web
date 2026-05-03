@@ -1,6 +1,6 @@
 # SvelteKit Migration Notes
 
-The project has moved from a Svelte 5 + Vite SPA shell to a SvelteKit shell. The current app still uses browser `localStorage` for task data, but it now renders through SvelteKit routes.
+The project has moved from a Svelte 5 + Vite SPA shell to a SvelteKit shell. The app keeps browser `localStorage` as a fallback cache, while authenticated users can sync tasks and checklist items through SvelteKit API routes backed by Neon Postgres.
 
 ## Completed
 
@@ -36,7 +36,14 @@ PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker
 
 Local iCalendar export uses `src/lib/shared/calendar-ics.js`; the same generator can back a server `.ics` feed once tasks are database-backed.
 
-`src/routes/api/tasks/+server.js` exposes authenticated server read/create paths for database-backed tasks. Client writes still use the local store until the rest of the write and conflict policy is explicit.
+Authenticated task routes now cover read/create/update/delete plus checklist create/update/delete:
+
+- `src/routes/api/tasks/+server.js`
+- `src/routes/api/tasks/[taskId]/+server.js`
+- `src/routes/api/tasks/[taskId]/checklist/+server.js`
+- `src/routes/api/tasks/[taskId]/checklist/[itemId]/+server.js`
+
+Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until a server import/conflict policy exists.
 
 ## Target Shape
 
@@ -71,13 +78,10 @@ src/routes/api/export/+server.js
 
 ## Next Steps
 
-1. Add SvelteKit route-level smoke tests or Playwright once UI flows stabilize.
-2. Build account onboarding UI around passkey registration and sign-in.
-3. Implement server task update/delete/checklist writes with an explicit transaction/conflict policy.
-4. Switch client mutations from local store writes to server calls with optimistic updates.
-5. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.
-6. Add server-backed read-only iCalendar feed after task data is server-backed.
-7. Define conflict policy for offline server-backed writes.
+1. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during server import.
+2. Add server-backed read-only iCalendar feed after token strategy is defined.
+3. Define conflict policy for offline server-backed writes.
+4. Add route/component tests around auth and sync flows once UI flows stabilize.
 
 ## Domain Boundaries
 
@@ -101,7 +105,8 @@ The client should own:
 ## Auth Plan
 
 - Use Better Auth as the initial auth system.
-- Use passkey-first login with required user verification.
+- Use passkey-first login with platform authenticators.
+- Passkey-first onboarding is enabled by resolving a registration email/name into a Better Auth user.
 - Require at least one recovery path before enforcing passkey-only production login.
 - Do not let the browser call the database directly.
 
