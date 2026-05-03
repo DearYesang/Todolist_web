@@ -1,5 +1,6 @@
 <script>
-    import { deleteTaskCascade, getCategoryColor, tasks, updateTask } from './store.js';
+    import { deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
+    import { getCategoryColor } from '$lib/shared/task-domain.js';
     import { fade, fly } from 'svelte/transition';
 
     let { taskId, onclose } = $props();

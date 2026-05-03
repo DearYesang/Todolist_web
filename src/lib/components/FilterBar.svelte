@@ -2,13 +2,13 @@
     import {
         categories,
         filters,
-        getCategoryColor,
         setCategoryFilter,
         setPriorityFilter,
         setUrgencyFilter
-    } from './store.js';
+    } from '$lib/client/task-store.js';
+    import { getCategoryColor } from '$lib/shared/task-domain.js';
 
-    /** @type {{ value: import('./store.js').PriorityFilter; label: string }[]} */
+    /** @type {{ value: import('$lib/shared/task-domain.js').PriorityFilter; label: string }[]} */
     const priorityOptions = [
         { value: 'all', label: '전체' },
         { value: 'high', label: '🔴 높음' },
@@ -16,7 +16,7 @@
         { value: 'low', label: '🟢 낮음' }
     ];
 
-    /** @type {{ value: import('./store.js').UrgencyFilter; label: string }[]} */
+    /** @type {{ value: import('$lib/shared/task-domain.js').UrgencyFilter; label: string }[]} */
     const urgencyOptions = [
         { value: 'all', label: '전체' },
         { value: 'urgent', label: '🔥 시급' },

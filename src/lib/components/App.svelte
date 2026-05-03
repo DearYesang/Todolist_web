@@ -6,7 +6,7 @@
         replaceTasks,
         resetFilters,
         tasks
-    } from './store.js';
+    } from '$lib/client/task-store.js';
     import FilterBar from './FilterBar.svelte';
     import GanttTimeline from './GanttTimeline.svelte';
     import KanbanBoard from './KanbanBoard.svelte';

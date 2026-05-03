@@ -1,6 +1,7 @@
 <script>
     import { onDestroy } from 'svelte';
-    import { buildHierarchy, filters, getCategoryColor, getFilteredTasks, tasks, updateTask } from './store.js';
+    import { filters, tasks, updateTask } from '$lib/client/task-store.js';
+    import { buildHierarchy, getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
 
     let { openTask } = $props();
 
@@ -58,11 +59,11 @@
         }
 
         const { roots, childrenByParent } = buildHierarchy(visibleTasks);
-        /** @type {{ task: import('./store.js').Task; depth: number }[]} */
+        /** @type {{ task: import('$lib/shared/task-domain.js').Task; depth: number }[]} */
         const displayList = [];
 
         /**
-         * @param {import('./store.js').Task[]} list
+         * @param {import('$lib/shared/task-domain.js').Task[]} list
          * @param {number} depth
          */
         function addToDisplay(list, depth) {
@@ -87,7 +88,7 @@
     });
 
     /**
-     * @param {import('./store.js').Task} task
+     * @param {import('$lib/shared/task-domain.js').Task} task
      */
     function getCoords(task) {
         const { startDate, endDate } = getRenderedDates(task);
@@ -130,7 +131,7 @@
     }
 
     /**
-     * @param {import('./store.js').Task} task
+     * @param {import('$lib/shared/task-domain.js').Task} task
      */
     function getRenderedDates(task) {
         if (resizeState?.taskId === task.id) {
@@ -147,7 +148,7 @@
     }
 
     /**
-     * @param {import('./store.js').Task} task
+     * @param {import('$lib/shared/task-domain.js').Task} task
      */
     function getBarTitle(task) {
         const { startDate, endDate } = getRenderedDates(task);
@@ -162,7 +163,7 @@
 
     /**
      * @param {PointerEvent} event
-     * @param {import('./store.js').Task} task
+     * @param {import('$lib/shared/task-domain.js').Task} task
      * @param {'start' | 'end'} edge
      */
     function startResize(event, task, edge) {
