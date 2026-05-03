@@ -1,5 +1,6 @@
 <script>
     import { deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
+    import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import { getCategoryColor } from '$lib/shared/task-domain.js';
     import { fade, fly } from 'svelte/transition';
 
@@ -27,6 +28,11 @@
             deleteTaskCascade(taskId);
             onclose();
         }
+    }
+
+    function downloadCalendar() {
+        if (!task) return;
+        downloadTaskCalendar(task);
     }
 
     /**
@@ -184,7 +190,10 @@
 
             <div class="panel-footer">
                 <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
-                <button class="btn btn-primary" onclick={onclose}>완료</button>
+                <div class="panel-footer-actions">
+                    <button class="btn btn-calendar" onclick={downloadCalendar}>📅 캘린더 추가</button>
+                    <button class="btn btn-primary" onclick={onclose}>완료</button>
+                </div>
             </div>
         </div>
     </div>

@@ -394,6 +394,18 @@ select {
     font-size: 12px;
 }
 
+.btn-calendar {
+    border-color: rgba(88, 166, 255, 0.35);
+    color: var(--accent);
+    background: rgba(88, 166, 255, 0.08);
+}
+
+.btn-calendar:hover {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.16);
+    color: var(--text);
+}
+
 .add-panel,
 .filter-bar,
 .board,
@@ -1006,6 +1018,13 @@ select {
     flex-wrap: wrap;
 }
 
+.card-secondary-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 .empty-state {
     padding: 30px 14px;
     text-align: center;
@@ -1375,6 +1394,13 @@ select {
     border-top: 1px solid var(--border);
 }
 
+.panel-footer-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .locked-app-state {
     display: flex;
     justify-content: center;
@@ -1496,6 +1522,15 @@ select {
 
     .panel-footer {
         flex-direction: column;
+    }
+
+    .panel-footer-actions {
+        justify-content: stretch;
+    }
+
+    .panel-footer .btn,
+    .panel-footer-actions .btn {
+        width: 100%;
     }
 
     .side-panel {
