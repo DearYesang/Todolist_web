@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { extractBackupTasks } from '$lib/shared/task-backup.js';
 import { normalizeTaskList } from '$lib/shared/task-domain.js';
 import { TaskWriteError } from './validation.js';
 
@@ -35,16 +36,17 @@ const MAX_IMPORT_CHECKLIST_ITEMS = 2500;
  * @returns {{ plans: PlannedTaskImport[]; summary: TaskImportSummary }}
  */
 export function planTaskImport(payload, options = {}) {
-	if (!Array.isArray(payload)) {
-		throw new TaskWriteError('Import payload must be an array of tasks.');
+	const rawTasks = extractBackupTasks(payload);
+	if (!rawTasks) {
+		throw new TaskWriteError('Import payload must be an array of tasks or a backup object with a tasks array.');
 	}
 
-	if (payload.length > MAX_IMPORT_TASKS) {
+	if (rawTasks.length > MAX_IMPORT_TASKS) {
 		throw new TaskWriteError(`Import payload must contain ${MAX_IMPORT_TASKS} tasks or less.`);
 	}
 
 	const idFactory = options.idFactory ?? randomUUID;
-	const normalized = normalizeTaskList(payload);
+	const normalized = normalizeTaskList(rawTasks);
 	const importableTasks = normalized.filter((task) => task.text.trim());
 	const importedTaskIds = new Set(importableTasks.map((task) => task.id));
 	const idMap = new Map(importableTasks.map((task) => [task.id, idFactory()]));
@@ -94,7 +96,7 @@ export function planTaskImport(payload, options = {}) {
 	return {
 		plans,
 		summary: {
-			receivedTasks: payload.length,
+			receivedTasks: rawTasks.length,
 			importedTasks: plans.length,
 			skippedTasks: normalized.length - plans.length,
 			importedChecklistItems,

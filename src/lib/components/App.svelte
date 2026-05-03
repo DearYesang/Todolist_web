@@ -18,6 +18,7 @@
         setTaskStorageOwner,
         tasks
     } from '$lib/client/task-store.js';
+    import { extractBackupTasks } from '$lib/shared/task-backup.js';
     import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
@@ -126,7 +127,8 @@
 
             try {
                 const parsed = JSON.parse(fileText);
-                if (!Array.isArray(parsed)) {
+                const parsedTasks = extractBackupTasks(parsed);
+                if (!parsedTasks) {
                     alert('올바른 칸반 데이터 형식이 아닙니다.');
                     return;
                 }
@@ -135,7 +137,7 @@
                     ? 'replace'
                     : 'append';
 
-                const result = await importServerTasks(parsed, { mode: importMode });
+                const result = await importServerTasks(parsedTasks, { mode: importMode });
                 if (result.ok) {
                     replaceTasks(importMode === 'replace' ? result.tasks : [...get(tasks), ...result.tasks]);
                     resetFilters();
@@ -145,7 +147,7 @@
                 }
 
                 if (result.fallback) {
-                    replaceTasks(importMode === 'replace' ? parsed : [...get(tasks), ...parsed]);
+                    replaceTasks(importMode === 'replace' ? parsedTasks : [...get(tasks), ...parsedTasks]);
                     resetFilters();
                     alert('데이터를 성공적으로 불러왔습니다.');
                     return;

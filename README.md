@@ -80,7 +80,7 @@ Calendar provider sync additionally requires `CALENDAR_OAUTH_ENCRYPTION_KEY` plu
 
 ## Data Model
 
-The current local backup format is an array of tasks:
+The current local backup format is an array of tasks. Import also accepts wrapper objects shaped like `{ "tasks": [...] }`, `{ "kanbanTasks": [...] }`, or `{ "data": { "tasks": [...] } }` so older/manual backups remain portable:
 
 ```js
 {

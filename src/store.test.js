@@ -6,6 +6,7 @@ import {
     normalizeTask,
     normalizeTaskList
 } from './lib/shared/task-domain.js';
+import { extractBackupTasks } from './lib/shared/task-backup.js';
 import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
 import {
     createServerChecklistItem,
@@ -499,6 +500,22 @@ describe('client task creation', () => {
             body: JSON.stringify(payload)
         }));
 
+        const wrappedPayload = { version: 1, tasks: payload };
+        const wrappedFetcher = vi.fn(async () => new Response(JSON.stringify({
+            tasks: [serverTask],
+            summary
+        }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+        }));
+        await expect(importServerTasks(wrappedPayload, wrappedFetcher)).resolves.toMatchObject({
+            ok: true,
+            tasks: [serverTask]
+        });
+        expect(wrappedFetcher).toHaveBeenCalledWith('/api/import', expect.objectContaining({
+            body: JSON.stringify(payload)
+        }));
+
         const replaceFetcher = vi.fn(async () => new Response(JSON.stringify({
             tasks: [serverTask],
             summary: { ...summary, replacedTasks: 3 }
@@ -703,6 +720,16 @@ describe('task storage owner scope', () => {
 });
 
 describe('server task import planning', () => {
+    it('extracts supported backup payload shapes', () => {
+        const payload = [{ id: 'legacy-task', text: 'Imported task' }];
+
+        expect(extractBackupTasks(payload)).toBe(payload);
+        expect(extractBackupTasks({ tasks: payload })).toBe(payload);
+        expect(extractBackupTasks({ kanbanTasks: payload })).toBe(payload);
+        expect(extractBackupTasks({ data: { tasks: payload } })).toBe(payload);
+        expect(extractBackupTasks({ text: 'Not a backup' })).toBeNull();
+    });
+
     it('remaps legacy ids and preserves valid parent/checklist relationships', () => {
         const ids = [
             '00000000-0000-4000-8000-000000000001',
@@ -764,8 +791,53 @@ describe('server task import planning', () => {
         });
     });
 
-    it('rejects non-array imports and skips empty task titles', () => {
-        expect(() => planTaskImport({ text: 'Not an array' })).toThrow('Import payload must be an array of tasks.');
+    it('accepts wrapped legacy backups, remaps numeric ids, and fills missing dates', () => {
+        const ids = [
+            '11111111-1111-4111-8111-111111111111',
+            '22222222-2222-4222-8222-222222222222'
+        ];
+        const { plans, summary } = planTaskImport({
+            tasks: [
+                {
+                    id: '1776348148045',
+                    text: '시험공부',
+                    status: 'doing',
+                    priority: 'high',
+                    urgency: 'urgent',
+                    category: '공부',
+                    parentId: null,
+                    subtasks: [],
+                    collapsed: false,
+                    createdAt: 1776348148046
+                },
+                {
+                    id: '1776348212462',
+                    text: '정리',
+                    status: 'todo',
+                    parentId: '1776348148045'
+                }
+            ]
+        }, {
+            idFactory: () => ids.shift() ?? '33333333-3333-4333-8333-333333333333'
+        });
+
+        expect(plans).toHaveLength(2);
+        expect(plans[0]).toMatchObject({
+            oldId: '1776348148045',
+            id: '11111111-1111-4111-8111-111111111111',
+            parentTaskId: null
+        });
+        expect(plans[0].task.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(plans[1]).toMatchObject({
+            oldId: '1776348212462',
+            id: '22222222-2222-4222-8222-222222222222',
+            parentTaskId: '11111111-1111-4111-8111-111111111111'
+        });
+        expect(summary.receivedTasks).toBe(2);
+    });
+
+    it('rejects unsupported imports and skips empty task titles', () => {
+        expect(() => planTaskImport({ text: 'Not an array' })).toThrow('Import payload must be an array of tasks or a backup object with a tasks array.');
 
         const { plans, summary } = planTaskImport([
             { id: 'empty', text: '' },
