@@ -24,9 +24,9 @@ Browser
 
 ## Important Boundary
 
-The current `tasks` store is still a client-oriented singleton. It is safe to import during SSR because localStorage access is guarded, but it should not become the long-term server data boundary.
+Pure task validation now lives in `src/lib/shared/task-domain.js`. The writable stores, localStorage persistence, and client actions live in `src/lib/client/task-store.js`.
 
-Before adding database writes, move the pure validation logic into shared modules and keep browser stores as client caches only.
+`src/store.js` remains as a compatibility re-export for existing component imports. New code should import from the shared/client modules directly.
 
 ## Target Shape
 
@@ -46,8 +46,8 @@ Browser / PWA
 ```txt
 src/lib/components/
 src/lib/client/task-store.js
-src/lib/shared/task-schema.ts
-src/lib/shared/task-domain.ts
+src/lib/shared/task-schema.js
+src/lib/shared/task-domain.js
 src/lib/server/auth/
 src/lib/server/db/
 src/lib/server/tasks/
@@ -61,7 +61,7 @@ src/routes/api/export/+server.ts
 ## Next Steps
 
 1. Move reusable components into `src/lib/components`.
-2. Split `src/store.js` into shared domain validation and client cache store.
+2. Replace compatibility imports from `src/store.js` with direct shared/client imports.
 3. Add SvelteKit route-level smoke tests or Playwright once UI flows stabilize.
 4. Add Better Auth and wire session data through `hooks.server.ts`.
 5. Add Drizzle and Neon connection under `$lib/server/db`.

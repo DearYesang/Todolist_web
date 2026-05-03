@@ -2,14 +2,16 @@ import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     canAssignParent,
-    moveTask,
     normalizeDateRange,
     normalizeTask,
-    normalizeTaskList,
+    normalizeTaskList
+} from './lib/shared/task-domain.js';
+import {
+    moveTask,
     replaceTasks,
     resetFilters,
     tasks
-} from './store.js';
+} from './lib/client/task-store.js';
 
 describe('task data normalization', () => {
     beforeEach(() => {
