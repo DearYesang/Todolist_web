@@ -25,6 +25,14 @@ import {
     hashCalendarToken
 } from './lib/server/calendar/tokens.js';
 import {
+    parsePasskeyRegistrationContext,
+    normalizeAccountEmail
+} from './lib/server/auth/account-security.js';
+import {
+    createRecoveryCodes as createRecoveryCodesRequest,
+    requestEmailVerificationCode
+} from './lib/client/account-security-api.js';
+import {
     createCalendarToken as createCalendarTokenRequest,
     listCalendarTokens,
     revokeCalendarToken
@@ -669,6 +677,77 @@ describe('calendar subscription tokens', () => {
         });
         expect(revokeFetcher).toHaveBeenCalledWith('/api/calendar/tokens/token-id', expect.objectContaining({
             method: 'DELETE'
+        }));
+    });
+});
+
+describe('account security helpers', () => {
+    it('normalizes registration context and requires an email', () => {
+        expect(normalizeAccountEmail('  USER@Example.COM ')).toBe('user@example.com');
+        expect(parsePasskeyRegistrationContext(JSON.stringify({
+            email: ' USER@Example.COM ',
+            name: ' User ',
+            emailVerificationCode: '123456'
+        }))).toEqual({
+            email: 'user@example.com',
+            name: 'User',
+            emailVerificationCode: '123456',
+            recoveryCode: ''
+        });
+
+        expect(() => parsePasskeyRegistrationContext(JSON.stringify({
+            email: 'not-email',
+            emailVerificationCode: '123456'
+        }))).toThrow('A valid email is required');
+    });
+
+    it('calls account verification and recovery endpoints', async () => {
+        const verificationFetcher = vi.fn(async () => new Response(JSON.stringify({
+            email: 'user@example.com',
+            expiresAt: '2026-05-03T00:15:00.000Z',
+            previewCode: '123456'
+        }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        await expect(requestEmailVerificationCode({
+            email: 'user@example.com',
+            name: 'User'
+        }, verificationFetcher)).resolves.toEqual({
+            ok: true,
+            email: 'user@example.com',
+            expiresAt: '2026-05-03T00:15:00.000Z',
+            previewCode: '123456'
+        });
+        expect(verificationFetcher).toHaveBeenCalledWith('/api/account/email-verifications', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ email: 'user@example.com', name: 'User' })
+        }));
+
+        const recoveryFetcher = vi.fn(async () => new Response(JSON.stringify({
+            codes: ['td-AAAA-BBBB-CCCC'],
+            summary: {
+                total: 10,
+                available: 10,
+                lastCreatedAt: '2026-05-03T00:00:00.000Z'
+            }
+        }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        await expect(createRecoveryCodesRequest(recoveryFetcher)).resolves.toEqual({
+            ok: true,
+            codes: ['td-AAAA-BBBB-CCCC'],
+            summary: {
+                total: 10,
+                available: 10,
+                lastCreatedAt: '2026-05-03T00:00:00.000Z'
+            }
+        });
+        expect(recoveryFetcher).toHaveBeenCalledWith('/api/account/recovery-codes', expect.objectContaining({
+            method: 'POST'
         }));
     });
 });

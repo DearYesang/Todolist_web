@@ -123,6 +123,22 @@ select {
     color: var(--priority-high);
 }
 
+.recovery-code-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(118px, 1fr));
+    gap: 4px;
+    width: min(320px, 100%);
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+}
+
+.recovery-code-list code {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
 .calendar-feed-panel {
     position: relative;
 }
