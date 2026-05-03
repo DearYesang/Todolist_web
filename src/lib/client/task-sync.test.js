@@ -4,6 +4,7 @@ import { normalizeTask } from '../shared/task-domain.js';
 import {
 	addSubtask,
 	deleteSubtask,
+	mergeTasks,
 	replaceTasks,
 	renameSubtask,
 	tasks,
@@ -142,6 +143,36 @@ describe('client task sync', () => {
 				category: 'Client',
 				parentId: null
 			}
+		});
+	});
+
+	it('preserves a child task parent link when merging a partial server response', () => {
+		const parent = normalizeTask({
+			id: '11111111-1111-4111-8111-111111111111',
+			text: 'Parent task',
+			status: 'todo'
+		});
+		const child = normalizeTask({
+			id: '22222222-2222-4222-8222-222222222222',
+			text: 'Child task',
+			status: 'todo',
+			parentId: parent.id
+		});
+		const checklistSyncedChild = normalizeTask({
+			...child,
+			subtasks: [{ id: '33333333-3333-4333-8333-333333333333', text: 'Checklist item', done: false }],
+			version: 2
+		});
+
+		replaceTasks([parent, child]);
+		mergeTasks([checklistSyncedChild]);
+
+		const mergedChild = get(tasks).find((task) => task.id === child.id);
+		expect(mergedChild).toMatchObject({
+			id: child.id,
+			parentId: parent.id,
+			subtasks: [{ id: '33333333-3333-4333-8333-333333333333', text: 'Checklist item', done: false }],
+			version: 2
 		});
 	});
 
