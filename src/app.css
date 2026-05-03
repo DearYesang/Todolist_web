@@ -231,6 +231,23 @@ select {
     flex-wrap: wrap;
 }
 
+.calendar-provider-action {
+    display: flex;
+    flex: 1 1 150px;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.calendar-provider-action .btn {
+    width: 100%;
+}
+
+.calendar-provider-action span {
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
 .calendar-connection-list {
     display: grid;
     gap: 6px;
@@ -563,6 +580,21 @@ select {
     padding-top: 4px;
     padding-bottom: 16px;
     flex-wrap: wrap;
+}
+
+.sync-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    max-width: 1320px;
+    margin: 0 auto 14px;
+    padding: 10px 24px;
+    border-top: 1px solid rgba(210, 153, 34, 0.35);
+    border-bottom: 1px solid rgba(210, 153, 34, 0.28);
+    background: rgba(210, 153, 34, 0.12);
+    color: var(--text-secondary);
+    font-size: 13px;
 }
 
 .filter-label {
@@ -1450,6 +1482,7 @@ select {
 
     .add-panel,
     .filter-bar,
+    .sync-notice,
     .board,
     .gantt-board {
         padding-left: 12px;

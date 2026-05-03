@@ -261,20 +261,27 @@ export async function updateServerTask(taskId, patch, fetcher = globalThis.fetch
 
 /**
  * @param {string} taskId
+ * @param {{ expectedVersion?: number } | typeof fetch} [options]
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<DeleteServerTaskResult>}
  */
-export async function deleteServerTask(taskId, fetcher = globalThis.fetch) {
-	if (typeof fetcher !== 'function') {
+export async function deleteServerTask(taskId, options = {}, fetcher = globalThis.fetch) {
+	const requestOptions = typeof options === 'function' ? {} : options;
+	const requestFetcher = typeof options === 'function' ? options : fetcher;
+	if (typeof requestFetcher !== 'function') {
 		return createFallbackResult('Task API is not available.');
 	}
 
 	try {
-		const response = await fetcher(`/api/tasks/${encodeURIComponent(taskId)}`, {
+		const expectedVersion = typeof requestOptions.expectedVersion === 'number'
+			? requestOptions.expectedVersion
+			: null;
+		const response = await requestFetcher(`/api/tasks/${encodeURIComponent(taskId)}`, {
 			method: 'DELETE',
-			headers: {
-				accept: 'application/json'
-			}
+			headers: expectedVersion === null
+				? { accept: 'application/json' }
+				: { 'content-type': 'application/json' },
+			...(expectedVersion === null ? {} : { body: JSON.stringify({ expectedVersion }) })
 		});
 		const body = await readJsonBody(response);
 

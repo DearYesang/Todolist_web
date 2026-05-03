@@ -51,6 +51,12 @@ Google Calendar provider sync additionally needs:
 - `GOOGLE_CALENDAR_CLIENT_ID`
 - `GOOGLE_CALENDAR_CLIENT_SECRET`
 
+Create the Google OAuth client as a Web application and add this authorized redirect URI:
+
+```text
+https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
+```
+
 Microsoft Calendar is optional for later:
 
 - `MICROSOFT_CALENDAR_CLIENT_ID`

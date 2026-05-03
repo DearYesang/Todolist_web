@@ -128,6 +128,26 @@ export function parseUpdateTaskInput(payload) {
 }
 
 /**
+ * @param {unknown} payload
+ */
+export function parseDeleteTaskInput(payload) {
+	if (payload === undefined || payload === null || payload === '') {
+		return { expectedVersion: null };
+	}
+
+	const source = /** @type {Record<string, unknown> | null} */ (payload);
+	if (!source || typeof source !== 'object' || Array.isArray(source)) {
+		throw new TaskWriteError('Task delete payload must be an object.');
+	}
+
+	return {
+		expectedVersion: hasField(source, 'expectedVersion') || hasField(source, 'version')
+			? parseExpectedVersion(source.expectedVersion ?? source.version)
+			: null
+	};
+}
+
+/**
  * @param {string} startDate
  * @param {string} endDate
  */

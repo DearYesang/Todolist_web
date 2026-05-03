@@ -36,8 +36,16 @@ export async function DELETE({ params, request }) {
 		return authResult.response;
 	}
 
+	let payload;
 	try {
-		const deleted = await deleteTaskCascadeForUser(authResult.user.id, params.taskId);
+		const body = await request.text();
+		payload = body.trim() ? JSON.parse(body) : undefined;
+	} catch {
+		return json({ message: 'Request body must be valid JSON.' }, { status: 400 });
+	}
+
+	try {
+		const deleted = await deleteTaskCascadeForUser(authResult.user.id, params.taskId, payload);
 		return json({ deleted });
 	} catch (error) {
 		if (error instanceof TaskWriteError) {

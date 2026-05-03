@@ -175,6 +175,16 @@ export function mergeTasks(nextTasks) {
 }
 
 /**
+ * @param {string[]} taskIds
+ */
+export function removeTasksByIds(taskIds) {
+    const ids = new Set(taskIds);
+    if (ids.size === 0) return;
+
+    tasks.update((current) => normalizeTaskList(current.filter((task) => !ids.has(task.id))));
+}
+
+/**
  * @param {unknown[]} serverTasks
  */
 export function applyServerTaskSnapshot(serverTasks) {
@@ -269,8 +279,13 @@ export function toggleCollapse(taskId) {
  * @param {string} taskId
  */
 export function deleteTaskCascade(taskId) {
-    tasks.update((current) => deleteTaskCascadeFromList(current, taskId));
-    syncTaskDelete(taskId);
+    /** @type {import('../shared/task-domain.js').Task | null} */
+    let deletedTask = null;
+    tasks.update((current) => {
+        deletedTask = current.find((task) => task.id === taskId) ?? null;
+        return deleteTaskCascadeFromList(current, taskId);
+    });
+    syncTaskDelete(taskId, deletedTask);
 }
 
 export function clearDoneTasks() {
@@ -378,24 +393,28 @@ function syncTaskSnapshot(task) {
 
 /**
  * @param {string} taskId
+ * @param {import('../shared/task-domain.js').Task | null} [task]
  */
-function syncTaskDelete(taskId) {
+function syncTaskDelete(taskId, task = null) {
     if (typeof window === 'undefined') {
         return;
     }
 
+    const expectedVersion = typeof task?.version === 'number' ? task.version : undefined;
     if (!isServerTaskId(taskId)) {
         enqueueOfflineMutation({
             type: 'task.delete',
-            taskId
+            taskId,
+            ...(expectedVersion === undefined ? {} : { expectedVersion })
         });
         return;
     }
 
-    void deleteServerTask(taskId).then((result) =>
+    void deleteServerTask(taskId, expectedVersion === undefined ? {} : { expectedVersion }).then((result) =>
         reportSyncFailure(result, {
             type: 'task.delete',
-            taskId
+            taskId,
+            ...(expectedVersion === undefined ? {} : { expectedVersion })
         })
     );
 }
@@ -421,15 +440,17 @@ async function syncClearDoneTasks(taskList) {
     );
 
     for (const task of topLevelDoneTasks) {
-        const result = await deleteServerTask(task.id);
+        const expectedVersion = typeof task.version === 'number' ? task.version : undefined;
+        const result = await deleteServerTask(task.id, expectedVersion === undefined ? {} : { expectedVersion });
         reportSyncFailure(result, {
             type: 'task.delete',
-            taskId: task.id
+            taskId: task.id,
+            ...(expectedVersion === undefined ? {} : { expectedVersion })
         });
     }
 
     for (const task of topLevelLocalDoneTasks) {
-        syncTaskDelete(task.id);
+        syncTaskDelete(task.id, task);
     }
 }
 

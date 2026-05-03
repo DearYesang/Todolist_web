@@ -19,6 +19,8 @@ build
 dev-dist
 sw.js.map
 workbox-*.js.map
+test-results
+playwright-report
 
 # Environment & Secrets
 .env
