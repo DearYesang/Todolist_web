@@ -114,9 +114,12 @@ The client should own:
 Installability and an offline shell cache are in place:
 
 - `manifest.webmanifest`
+- PNG maskable icons and `apple-touch-icon`
 - SVG application icon
 - SvelteKit service worker
 - cached shell and static assets
+- iOS safe-area viewport handling
+- touch-specific responsive CSS for iPhone-sized screens and iPad-sized coarse-pointer screens
 
 Retryable offline writes are persisted in a local queue and flushed before server list sync. Multi-device merge policy remains intentionally conservative.
 
