@@ -75,10 +75,13 @@ Microsoft Calendar is optional for later:
 - Generate and store recovery codes.
 - Create, edit, delete, and reload a task.
 - Export and replace-import a JSON backup.
-- Create and revoke an iCalendar subscription token.
+- Create and revoke an iCal link.
+- Download a single task `.ics` file from a card or task detail panel.
 - Connect a Google or Microsoft calendar account in a staging OAuth app.
-- Run manual calendar sync and confirm event links are created.
+- Run manual external calendar sync and confirm event links are created.
+- Mark a synced task done, run manual external calendar sync again, and confirm the provider event is deleted.
 - Confirm a logged-out browser cannot see the board.
 - Confirm an unauthorized email cannot request a verification code.
 - Go offline, edit an existing server task, come back online, and confirm the queued write flushes.
+- If a version conflict is forced, confirm the conflict panel shows the dropped offline mutation and can export a JSON report.
 - On an already logged-in device, go offline, reload, and confirm the local board still opens.

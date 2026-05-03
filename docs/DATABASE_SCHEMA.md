@@ -224,9 +224,9 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Authenticated read-only `/api/calendar.ics` download backed by server tasks.
 - Revocable token-based `/api/calendar/subscriptions/[token].ics` feed backed by token hashes.
 - OAuth-backed Google/Microsoft calendar connections with encrypted provider tokens.
-- Manual calendar provider sync that upserts/deletes linked all-day events and records durable sync runs.
+- Manual calendar provider sync that upserts linked all-day events, deletes provider events for completed or removed tasks, and records durable sync runs.
 - Email-code passkey onboarding and hashed recovery codes.
 - Offline client write queue for retryable server mutations.
 - Parent ownership and cycle validation in the service layer.
 
-Server append/replace import and provider sync foundations are implemented. Background calendar workers, provider webhooks, and richer conflict resolution are still planned.
+Server append/replace import, provider sync foundations, and conflict review details are implemented. Background calendar workers, provider webhooks, and apply/keep-server conflict actions are still planned.

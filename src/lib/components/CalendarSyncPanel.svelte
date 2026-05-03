@@ -55,7 +55,9 @@
             }
 
             const failed = result.summaries.reduce((total, summary) => total + summary.failed, 0);
-            message = `동기화 완료: 연결 ${result.connections}개, 작업 ${result.tasks}개${failed ? `, 실패 ${failed}개` : ''}`;
+            const upserted = result.summaries.reduce((total, summary) => total + summary.upserted, 0);
+            const deleted = result.summaries.reduce((total, summary) => total + summary.deleted, 0);
+            message = `외부 캘린더 동기화 완료: 연결 ${result.connections}개, 반영 ${upserted}개, 삭제 ${deleted}개${failed ? `, 실패 ${failed}개` : ''}`;
             await refresh();
         } finally {
             isWorking = false;
@@ -97,10 +99,10 @@
     function getProviderSetupHint(provider) {
         if (provider.configured) return '';
         if (provider.id === 'google') {
-            return 'Google OAuth 환경 변수가 필요합니다.';
+            return 'Google Calendar 연결 설정이 필요합니다.';
         }
         if (provider.id === 'microsoft') {
-            return 'Microsoft OAuth 환경 변수가 필요합니다.';
+            return 'Microsoft Calendar 연결 설정이 필요합니다.';
         }
         return 'OAuth 환경 변수가 필요합니다.';
     }
@@ -115,7 +117,7 @@
 
 {#if $session.data?.user}
     <div class="calendar-sync-panel">
-        <button class="btn" onclick={toggleOpen}>🔄 Sync</button>
+        <button class="btn" onclick={toggleOpen}>🌐 외부 캘린더</button>
 
         {#if isOpen}
             <div class="calendar-sync-popover">
@@ -134,7 +136,7 @@
                             {/if}
                         </div>
                     {/each}
-                    <button class="btn btn-primary" onclick={syncNow} disabled={isWorking || connections.length === 0}>동기화</button>
+                    <button class="btn btn-primary" onclick={syncNow} disabled={isWorking || connections.length === 0}>지금 동기화</button>
                 </div>
 
                 {#if connections.length > 0}
@@ -147,7 +149,7 @@
                                         · {connection.latestSync.status} · {formatDateTime(connection.latestSync.startedAt)}
                                     {/if}
                                 </span>
-                                <button class="btn btn-small" onclick={() => disconnect(connection.id)} disabled={isWorking}>해제</button>
+                                <button class="btn btn-small" onclick={() => disconnect(connection.id)} disabled={isWorking}>연결 해제</button>
                             </div>
                         {/each}
                     </div>
@@ -158,7 +160,7 @@
                         {#each syncRuns.slice(0, 3) as run}
                             <div class="calendar-sync-run-row">
                                 <span>{getProviderName(run.provider)} · {run.status}</span>
-                                <span>{run.upserted}/{run.taskCount} · 실패 {run.failed}</span>
+                                <span>{run.upserted}/{run.taskCount} · 삭제 {run.deleted} · 실패 {run.failed}</span>
                             </div>
                         {/each}
                     </div>

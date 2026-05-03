@@ -5,7 +5,7 @@ The project has moved from a Svelte 5 + Vite SPA shell to a SvelteKit shell. The
 ## Completed
 
 - `vite.config.js` uses the SvelteKit plugin.
-- `svelte.config.js` uses `@sveltejs/adapter-auto`.
+- `svelte.config.js` uses `@sveltejs/adapter-vercel`.
 - `src/app.html` is the document shell.
 - `src/routes/+layout.svelte` imports the global stylesheet and owns document metadata.
 - `src/routes/+page.svelte` renders the existing app component.
@@ -34,7 +34,7 @@ Better Auth server configuration lives under `src/lib/server/auth`; the SvelteKi
 
 PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker.js` caches the app shell and static assets for repeat visits.
 
-Local iCalendar export uses `src/lib/shared/calendar-ics.js`; `/api/calendar.ics` uses the same generator for authenticated server-backed calendar downloads. Revocable subscription URLs are available through `/api/calendar/tokens` and `/api/calendar/subscriptions/[token].ics`.
+Task-level iCalendar downloads use `src/lib/shared/calendar-ics.js`; `/api/calendar.ics` uses the same generator for authenticated server-backed calendar downloads. Revocable iCal URLs are available through `/api/calendar/tokens` and `/api/calendar/subscriptions/[token].ics`.
 
 Authenticated task routes now cover read/create/update/delete plus checklist create/update/delete:
 
@@ -43,7 +43,7 @@ Authenticated task routes now cover read/create/update/delete plus checklist cre
 - `src/routes/api/tasks/[taskId]/checklist/+server.js`
 - `src/routes/api/tasks/[taskId]/checklist/[itemId]/+server.js`
 
-Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until a conflict policy exists. Server JSON import currently appends remapped tasks instead of replacing existing data.
+Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until they can be created server-side. Server JSON import supports append and replace modes. Stale offline writes are surfaced in a conflict panel with exportable details.
 
 ## Target Shape
 
@@ -78,10 +78,9 @@ src/routes/api/export/+server.js
 
 ## Next Steps
 
-1. Run production migrations and configure email/OAuth delivery secrets.
-2. Add route/component tests around auth and sync flows once UI flows stabilize.
-3. Add richer conflict policy for multi-device offline writes.
-4. Add background calendar workers and provider webhooks.
+1. Add route/component tests around auth and sync flows once UI flows stabilize.
+2. Add apply/keep-server actions for multi-device conflict resolution.
+3. Add background calendar workers and provider webhooks.
 
 ## Domain Boundaries
 
