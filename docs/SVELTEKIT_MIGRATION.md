@@ -28,6 +28,8 @@ Pure task validation now lives in `src/lib/shared/task-domain.js`. The writable 
 
 Components now import directly from `src/lib/client/task-store.js` and `src/lib/shared/task-domain.js`. The temporary `src/store.js` compatibility re-export has been removed.
 
+Neon/Drizzle schema and lazy DB initialization live under `src/lib/server/db`.
+
 ## Target Shape
 
 ```txt
@@ -62,12 +64,11 @@ src/routes/api/export/+server.ts
 
 1. Add SvelteKit route-level smoke tests or Playwright once UI flows stabilize.
 2. Add Better Auth and wire session data through `hooks.server.ts`.
-3. Add Drizzle and Neon connection under `$lib/server/db`.
-4. Implement server routes/actions for task CRUD.
-5. Switch client mutations from local store writes to server calls with optimistic updates.
-6. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.
-7. Add PWA manifest and offline read cache.
-8. Add read-only iCalendar feed after task data is server-backed.
+3. Implement server routes/actions for task CRUD.
+4. Switch client mutations from local store writes to server calls with optimistic updates.
+5. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.
+6. Add PWA manifest and offline read cache.
+7. Add read-only iCalendar feed after task data is server-backed.
 
 ## Domain Boundaries
 

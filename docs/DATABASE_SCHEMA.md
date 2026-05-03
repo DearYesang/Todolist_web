@@ -1,6 +1,6 @@
 # Database Schema Draft
 
-Target stack: Neon Postgres + Drizzle + Better Auth. This is a planning draft, not an implemented migration.
+Target stack: Neon Postgres + Drizzle + Better Auth. The app schema is scaffolded in `src/lib/server/db/schema.js`; generated migrations should be committed from `drizzle/`.
 
 ## Principles
 
@@ -8,7 +8,7 @@ Target stack: Neon Postgres + Drizzle + Better Auth. This is a planning draft, n
 - Browser clients should never write directly to Postgres.
 - Every write must validate user membership, date integrity, and parent graph integrity.
 - Keep the current JSON backup shape importable during the migration.
-- Add calendar sync tables only when sync is implemented.
+- Calendar sync tables may exist ahead of the feature, but routes should not expose write sync until token encryption and provider flows are implemented.
 
 ## Auth Tables
 
@@ -20,7 +20,7 @@ Better Auth should own its generated auth tables. Expected categories:
 - `verification`
 - passkey/WebAuthn credential tables, depending on the Better Auth plugin output
 
-Do not hand-edit generated auth tables unless the adapter requires explicit schema ownership.
+Do not hand-edit generated auth tables unless the adapter requires explicit schema ownership. App tables keep user IDs as text until Better Auth owns its generated schema, then foreign-key behavior can be revisited.
 
 ## App Tables
 
@@ -29,7 +29,7 @@ Do not hand-edit generated auth tables unless the adapter requires explicit sche
 ```txt
 id uuid primary key
 name text not null
-owner_user_id text not null references user(id)
+owner_user_id text not null
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
 ```
@@ -40,7 +40,7 @@ Even for a personal app, `workspaces` keeps the future collaboration boundary cl
 
 ```txt
 workspace_id uuid not null references workspaces(id) on delete cascade
-user_id text not null references user(id) on delete cascade
+user_id text not null
 role text not null check (role in ('owner', 'admin', 'member'))
 created_at timestamptz not null default now()
 primary key (workspace_id, user_id)
@@ -71,7 +71,7 @@ category text not null default ''
 start_date date not null
 end_date date not null
 position numeric(20, 10) not null default 0
-created_by text not null references user(id)
+created_by text not null
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
 completed_at timestamptz
@@ -103,7 +103,7 @@ Add these after read-only calendar export is stable.
 ```txt
 id uuid primary key
 workspace_id uuid not null references workspaces(id) on delete cascade
-user_id text not null references user(id) on delete cascade
+user_id text not null
 provider text not null check (provider in ('google', 'microsoft', 'caldav'))
 provider_account_id text
 encrypted_access_token text
