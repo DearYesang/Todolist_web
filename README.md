@@ -71,7 +71,7 @@ Calendar subscription tokens also require `CALENDAR_TOKEN_SECRET`. Raw subscript
 
 Production passkey registration is limited by `AUTH_ALLOWED_EMAILS`. For this deployment, set it to `scyea@naver.com,scyea1995@gmail.com`.
 
-Production email verification can use Resend with `RESEND_API_KEY` and `EMAIL_FROM`. `EMAIL_DELIVERY_WEBHOOK_URL` remains available as a webhook fallback.
+Production email verification can use Resend with `RESEND_API_KEY` and `EMAIL_FROM`. For the free `todokanban.vercel.app` deployment, `Todokanban <onboarding@resend.dev>` works only for the email address associated with the Resend account. `EMAIL_DELIVERY_WEBHOOK_URL` remains available as a webhook fallback.
 
 Calendar provider sync additionally requires `CALENDAR_OAUTH_ENCRYPTION_KEY` plus the relevant Google/Microsoft OAuth client credentials. Google Calendar is the first provider to configure for the personal deployment.
 
@@ -119,7 +119,7 @@ The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persis
 
 Near-term:
 
-1. Deploy to Vercel with `todokanban.com`, Neon Asia, Resend, and manual DB migrations.
+1. Deploy to Vercel with `todokanban.vercel.app`, Neon Asia, Resend sandbox delivery, and manual DB migrations.
 2. Add broader route-level integration tests around auth, import replace, offline replay, and calendar sync.
 3. Add richer multi-device conflict resolution for queued offline writes.
 4. Add background calendar sync workers and provider webhooks.
