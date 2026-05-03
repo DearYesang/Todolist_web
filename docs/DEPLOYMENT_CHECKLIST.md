@@ -34,10 +34,10 @@ npm run build
 
 Production values for the personal deployment:
 
-- `BETTER_AUTH_URL=https://todokanban.vercel.app`
-- `BETTER_AUTH_TRUSTED_ORIGINS=https://todokanban.vercel.app`
-- `PASSKEY_ORIGIN=https://todokanban.vercel.app`
-- `PASSKEY_RP_ID=todokanban.vercel.app`
+- `BETTER_AUTH_URL=https://todokanban-alpha.vercel.app`
+- `BETTER_AUTH_TRUSTED_ORIGINS=https://todokanban-alpha.vercel.app`
+- `PASSKEY_ORIGIN=https://todokanban-alpha.vercel.app`
+- `PASSKEY_RP_ID=todokanban-alpha.vercel.app`
 - `AUTH_ALLOWED_EMAILS=scyea@naver.com,scyea1995@gmail.com`
 - `EMAIL_FROM=Todokanban <onboarding@resend.dev>`
 
