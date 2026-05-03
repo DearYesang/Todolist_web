@@ -36,6 +36,12 @@ GOOGLE_CALENDAR_CLIENT_SECRET="..."
 CALENDAR_SYNC_MAX_TASKS="250"
 ```
 
+For Google Calendar, create a Google Cloud OAuth client as a Web application and register:
+
+```text
+https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
+```
+
 `onboarding@resend.dev` is Resend's testing sender and can only deliver to the email address associated with the Resend account. For both allowed emails to receive codes independently, verify a custom email domain later and switch `EMAIL_FROM` to that domain.
 
 Generate secret values locally:

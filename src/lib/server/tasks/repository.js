@@ -7,6 +7,7 @@ import {
 	parseChecklistItemIdParam,
 	parseCreateTaskInput,
 	parseCreateChecklistItemInput,
+	parseDeleteTaskInput,
 	parseTaskIdParam,
 	parseUpdateChecklistItemInput,
 	parseUpdateTaskInput,
@@ -309,9 +310,11 @@ export async function updateTaskForUser(userId, taskId, payload) {
 /**
  * @param {string} userId
  * @param {unknown} taskId
+ * @param {unknown} [payload]
  */
-export async function deleteTaskCascadeForUser(userId, taskId) {
+export async function deleteTaskCascadeForUser(userId, taskId, payload = undefined) {
 	const id = parseTaskIdParam(taskId);
+	const input = parseDeleteTaskInput(payload);
 	const db = getDb();
 	const task = await getWritableTaskForUser(db, userId, id);
 	if (!task) {
@@ -332,10 +335,26 @@ export async function deleteTaskCascadeForUser(userId, taskId) {
 		.update(schema.tasks)
 		.set({
 			deletedAt: now,
-			updatedAt: now
+			updatedAt: now,
+			version: sql`${schema.tasks.version} + 1`
 		})
-		.where(and(eq(schema.tasks.boardId, task.boardId), inArray(schema.tasks.id, taskIds), isNull(schema.tasks.deletedAt)))
+		.where(and(
+			eq(schema.tasks.boardId, task.boardId),
+			inArray(schema.tasks.id, taskIds),
+			isNull(schema.tasks.deletedAt),
+			...(input.expectedVersion === null
+				? []
+				: [sql`exists (
+					select 1 from ${schema.tasks} as root
+					where root.id = ${task.id}
+						and root.version = ${input.expectedVersion}
+						and root.deleted_at is null
+				)`])
+		))
 		.returning({ id: schema.tasks.id });
+	if (input.expectedVersion !== null && deletedRows.length === 0) {
+		throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
+	}
 
 	return deletedRows.length;
 }

@@ -7,7 +7,7 @@
         clearCachedAuthScope,
         readCachedAuthScope
     } from '$lib/client/auth-session-scope.js';
-    import { setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
+    import { enqueueOfflineMutation, setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { exportServerTasks, importServerTasks } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
@@ -19,6 +19,7 @@
         tasks
     } from '$lib/client/task-store.js';
     import { extractBackupTasks } from '$lib/shared/task-backup.js';
+    import { normalizeTaskList } from '$lib/shared/task-domain.js';
     import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
@@ -38,6 +39,8 @@
     let scopedUserId = null;
     /** @type {string | null} */
     let syncedSessionUserId = null;
+    /** @type {string | null} */
+    let syncNotice = $state(null);
     const appUnlocked = $derived(Boolean($session.data?.user?.id || (!isOnline && cachedAuthScope?.id)));
 
     $effect(() => {
@@ -48,7 +51,7 @@
             applyStorageScope(nextScope?.id ?? null);
             if (nextScope?.id && syncedSessionUserId !== nextScope.id) {
                 syncedSessionUserId = nextScope.id;
-                void syncServerTasks();
+                void runServerSync();
             }
             return;
         }
@@ -78,7 +81,7 @@
             isOnline = true;
             void $session.refetch();
             if ($session.data?.user) {
-                void syncServerTasks();
+                void runServerSync();
             }
         };
         const handleOffline = () => {
@@ -110,6 +113,16 @@
      */
     function openTask(id) {
         selectedTaskId = id;
+    }
+
+    async function runServerSync() {
+        const result = await syncServerTasks();
+        const conflicts = Array.isArray(result.offlineConflicts) ? result.offlineConflicts.length : 0;
+        if (conflicts > 0) {
+            syncNotice = `다른 기기에서 먼저 변경된 작업 ${conflicts}건은 서버 상태를 우선해 다시 불러왔습니다.`;
+        } else if (result.ok) {
+            syncNotice = null;
+        }
     }
 
     /**
@@ -147,9 +160,16 @@
                 }
 
                 if (result.fallback) {
-                    replaceTasks(importMode === 'replace' ? parsedTasks : [...get(tasks), ...parsedTasks]);
+                    const fallbackTasks = normalizeTaskList(parsedTasks);
+                    enqueueOfflineMutation({
+                        type: 'import.tasks',
+                        mode: importMode,
+                        payload: parsedTasks,
+                        localTaskIds: fallbackTasks.map((task) => task.id)
+                    });
+                    replaceTasks(importMode === 'replace' ? fallbackTasks : [...get(tasks), ...fallbackTasks]);
                     resetFilters();
-                    alert('오프라인 상태라 이 기기의 로컬 캐시에만 불러왔습니다. 서버와 다른 기기에 반영하려면 온라인 상태에서 다시 불러와 주세요.');
+                    alert('오프라인 상태라 이 기기에 먼저 불러왔습니다. 온라인이 되면 서버와 다른 기기에 자동 반영을 시도합니다.');
                     return;
                 }
 
@@ -234,6 +254,13 @@
 </div>
 
 {#if appUnlocked}
+    {#if syncNotice}
+        <div class="sync-notice" role="status">
+            <span>{syncNotice}</span>
+            <button class="btn btn-small" onclick={() => syncNotice = null}>확인</button>
+        </div>
+    {/if}
+
     <TaskForm />
     <FilterBar />
 

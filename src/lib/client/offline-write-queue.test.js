@@ -236,6 +236,71 @@ describe('offline write queue conflict behavior', () => {
 		}));
 	});
 
+	it('replays queued offline imports when connectivity returns', async () => {
+		const importedTask = normalizeTask({
+			id: '77777777-7777-4777-8777-777777777777',
+			text: 'Imported offline'
+		});
+
+		enqueueOfflineMutation({
+			type: 'import.tasks',
+			mode: 'append',
+			payload: [{ text: 'Imported offline' }]
+		});
+
+		const fetcher = vi.fn(async () => new Response(JSON.stringify({
+			tasks: [importedTask],
+			summary: {
+				receivedTasks: 1,
+				importedTasks: 1,
+				skippedTasks: 0,
+				importedChecklistItems: 0,
+				skippedChecklistItems: 0,
+				repairedParentLinks: 0
+			}
+		}), {
+			status: 201,
+			headers: { 'content-type': 'application/json' }
+		}));
+
+		const result = await flushOfflineWriteQueue(fetcher);
+
+		expect(result).toMatchObject({
+			flushed: 1,
+			remaining: 0,
+			blocked: false,
+			completedImports: [{
+				mode: 'append',
+				tasks: [importedTask],
+				localTaskIds: []
+			}]
+		});
+		expect(fetcher).toHaveBeenCalledWith('/api/import', expect.objectContaining({
+			method: 'POST',
+			body: JSON.stringify([{ text: 'Imported offline' }])
+		}));
+	});
+
+	it('treats replace imports as a new offline baseline', () => {
+		enqueueOfflineMutation({
+			type: 'task.patch',
+			taskId: '88888888-8888-4888-8888-888888888888',
+			patch: { text: 'Older edit' }
+		});
+		enqueueOfflineMutation({
+			type: 'import.tasks',
+			mode: 'replace',
+			payload: [{ text: 'Replacement import' }]
+		});
+
+		expect(loadOfflineQueue()).toHaveLength(1);
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			type: 'import.tasks',
+			mode: 'replace',
+			payload: [{ text: 'Replacement import' }]
+		});
+	});
+
 	it('coalesces checklist create edits and replays a final done state', async () => {
 		const taskId = '55555555-5555-4555-8555-555555555555';
 		const localItemId = 'local-checklist';

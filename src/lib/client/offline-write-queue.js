@@ -3,6 +3,7 @@ import {
 	createServerTask,
 	deleteServerChecklistItem,
 	deleteServerTask,
+	importServerTasks,
 	updateServerChecklistItem,
 	updateServerTask
 } from './task-api.js';
@@ -30,6 +31,13 @@ let queueOwnerId = DEFAULT_QUEUE_OWNER;
  *   id?: string;
  *   type: 'task.delete';
  *   taskId: string;
+ *   expectedVersion?: number;
+ * } | {
+ *   id?: string;
+ *   type: 'import.tasks';
+ *   mode: 'append' | 'replace';
+ *   payload: unknown;
+ *   localTaskIds?: string[];
  * } | {
  *   id?: string;
  *   type: 'checklist.create';
@@ -63,6 +71,7 @@ let queueOwnerId = DEFAULT_QUEUE_OWNER;
  *   blocked: boolean;
  *   syncedTasks: import('../shared/task-domain.js').Task[];
  *   createdTasks: { localTaskId: string; task: import('../shared/task-domain.js').Task }[];
+ *   completedImports: { mode: 'append' | 'replace'; tasks: import('../shared/task-domain.js').Task[]; localTaskIds: string[] }[];
  *   conflicts: OfflineMutation[];
  * }} OfflineFlushResult
  */
@@ -115,6 +124,8 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 	const syncedTasks = [];
 	/** @type {{ localTaskId: string; task: import('../shared/task-domain.js').Task }[]} */
 	const createdTasks = [];
+	/** @type {{ mode: 'append' | 'replace'; tasks: import('../shared/task-domain.js').Task[]; localTaskIds: string[] }[]} */
+	const completedImports = [];
 	/** @type {OfflineMutation[]} */
 	const conflicts = [];
 	/** @type {Map<string, string>} */
@@ -144,6 +155,12 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 				} else {
 					syncedTasks.push(result.task);
 				}
+			} else if ('tasks' in result && mutation.type === 'import.tasks') {
+				completedImports.push({
+					mode: mutation.mode,
+					tasks: result.tasks,
+					localTaskIds: mutation.localTaskIds ?? []
+				});
 			}
 			continue;
 		}
@@ -168,6 +185,7 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 		blocked,
 		syncedTasks,
 		createdTasks,
+		completedImports,
 		conflicts
 	};
 }
@@ -202,6 +220,14 @@ function coalesceQueue(queue, mutation) {
 	if (mutation.type === 'task.delete') {
 		const filtered = queue.filter((item) => !isTaskScopedMutation(item, mutation.taskId));
 		return isServerTaskId(mutation.taskId) ? [...filtered, mutation] : filtered;
+	}
+
+	if (mutation.type === 'import.tasks') {
+		if (mutation.mode === 'replace') {
+			return [mutation];
+		}
+
+		return [...queue, mutation];
 	}
 
 	if (mutation.type === 'checklist.create' && !isServerTaskId(mutation.taskId)) {
@@ -384,7 +410,11 @@ async function executeOfflineMutation(mutation, fetcher) {
 		case 'task.patch':
 			return updateServerTask(mutation.taskId, mutation.patch, fetcher);
 		case 'task.delete':
-			return deleteServerTask(mutation.taskId, fetcher);
+			return deleteServerTask(mutation.taskId, {
+				...(typeof mutation.expectedVersion === 'number' ? { expectedVersion: mutation.expectedVersion } : {})
+			}, fetcher);
+		case 'import.tasks':
+			return importServerTasks(mutation.payload, { mode: mutation.mode }, fetcher);
 		case 'checklist.create':
 			return executeChecklistCreateMutation(mutation, fetcher);
 		case 'checklist.patch':
@@ -548,6 +578,7 @@ function createFlushResult(queue, blocked) {
 		blocked,
 		syncedTasks: [],
 		createdTasks: [],
+		completedImports: [],
 		conflicts: []
 	};
 }

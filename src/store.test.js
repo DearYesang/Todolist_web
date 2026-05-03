@@ -55,6 +55,7 @@ import {
     assertValidTaskDateRange,
     parseCreateTaskInput,
     parseCreateChecklistItemInput,
+    parseDeleteTaskInput,
     parseUpdateChecklistItemInput,
     parseTaskIdParam,
     parseUpdateTaskInput,
@@ -406,6 +407,24 @@ describe('client task creation', () => {
         expect(deleteFetcher).toHaveBeenCalledWith(
             '/api/tasks/44444444-4444-4444-8444-444444444444',
             expect.objectContaining({ method: 'DELETE' })
+        );
+
+        const versionedDeleteFetcher = vi.fn(async () => new Response(JSON.stringify({ deleted: 1 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        }));
+        await expect(deleteServerTask('55555555-5555-4555-8555-555555555555', {
+            expectedVersion: 7
+        }, versionedDeleteFetcher)).resolves.toEqual({
+            ok: true,
+            deleted: 1
+        });
+        expect(versionedDeleteFetcher).toHaveBeenCalledWith(
+            '/api/tasks/55555555-5555-4555-8555-555555555555',
+            expect.objectContaining({
+                method: 'DELETE',
+                body: JSON.stringify({ expectedVersion: 7 })
+            })
         );
     });
 
@@ -1272,6 +1291,8 @@ describe('server task validation', () => {
 	            title: 'Versioned update',
 	            expectedVersion: 3
 	        });
+	        expect(parseDeleteTaskInput({ expectedVersion: 4 })).toEqual({ expectedVersion: 4 });
+	        expect(parseDeleteTaskInput(undefined)).toEqual({ expectedVersion: null });
 	    });
 
     it('rejects invalid update payloads and date ranges', () => {
@@ -1280,6 +1301,7 @@ describe('server task validation', () => {
 	        expect(() => parseUpdateTaskInput({ status: 'blocked' })).toThrow('Invalid status.');
 	        expect(() => parseUpdateTaskInput({ parentId: 'local-parent' })).toThrow('parentId must be a UUID.');
 	        expect(() => parseUpdateTaskInput({ text: 'Bad version', expectedVersion: 0 })).toThrow('expectedVersion must be a positive integer.');
+	        expect(() => parseDeleteTaskInput({ expectedVersion: 0 })).toThrow('expectedVersion must be a positive integer.');
 	        expect(() => assertValidTaskDateRange('2026-05-04', '2026-05-03')).toThrow('Invalid task date range.');
 	    });
 

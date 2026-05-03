@@ -92,6 +92,20 @@
     }
 
     /**
+     * @param {import('$lib/client/calendar-provider-api.js').CalendarProviderRecord} provider
+     */
+    function getProviderSetupHint(provider) {
+        if (provider.configured) return '';
+        if (provider.id === 'google') {
+            return 'Google OAuth 환경 변수가 필요합니다.';
+        }
+        if (provider.id === 'microsoft') {
+            return 'Microsoft OAuth 환경 변수가 필요합니다.';
+        }
+        return 'OAuth 환경 변수가 필요합니다.';
+    }
+
+    /**
      * @param {string} value
      */
     function formatDateTime(value) {
@@ -107,9 +121,18 @@
             <div class="calendar-sync-popover">
                 <div class="calendar-sync-actions">
                     {#each providers as provider}
-                        <button class="btn" onclick={() => connect(provider.id)} disabled={isWorking || !provider.configured}>
-                            {provider.name}
-                        </button>
+                        <div class="calendar-provider-action">
+                            <button
+                                class="btn"
+                                title={getProviderSetupHint(provider)}
+                                onclick={() => connect(provider.id)}
+                                disabled={isWorking || !provider.configured}>
+                                {provider.name}
+                            </button>
+                            {#if !provider.configured}
+                                <span>{getProviderSetupHint(provider)}</span>
+                            {/if}
+                        </div>
                     {/each}
                     <button class="btn btn-primary" onclick={syncNow} disabled={isWorking || connections.length === 0}>동기화</button>
                 </div>
