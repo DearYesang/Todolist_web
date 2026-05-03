@@ -16,6 +16,7 @@ import {
     deleteSubtaskFromList,
     deleteTaskCascadeFromList,
     moveTaskInList,
+    normalizeTask,
     normalizeTaskList,
     renameSubtaskInList,
     toggleSubtaskInList,
@@ -163,7 +164,7 @@ export function replaceTasks(nextTasks) {
  * @param {unknown[]} nextTasks
  */
 export function mergeTasks(nextTasks) {
-    const incoming = normalizeTaskList(nextTasks);
+    const incoming = nextTasks.map((task) => normalizeTask(task));
     tasks.update((current) => {
         const merged = new Map(current.map((task) => [task.id, task]));
         incoming.forEach((task) => {
