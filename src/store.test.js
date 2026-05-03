@@ -6,6 +6,7 @@ import {
     normalizeTask,
     normalizeTaskList
 } from './lib/shared/task-domain.js';
+import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
 import {
     moveTask,
     replaceTasks,
@@ -149,5 +150,36 @@ describe('task relationship mutations', () => {
         const child = get(tasks).find((task) => task.id === 'child');
         expect(child?.status).toBe('todo');
         expect(child?.parentId).toBe('parent');
+    });
+});
+
+describe('calendar export', () => {
+    it('creates all-day iCalendar events from normalized tasks', () => {
+        const calendar = createIcsCalendar([
+            {
+                id: 'task-1',
+                text: 'Review, ship; celebrate',
+                status: 'doing',
+                startDate: '2026-05-03',
+                endDate: '2026-05-04',
+                priority: 'high',
+                urgency: 'urgent',
+                category: 'Release',
+                subtasks: [{ id: 'sub-1', text: 'QA pass', done: true }]
+            }
+        ], {
+            now: new Date('2026-05-03T00:00:00.000Z'),
+            calendarName: 'Project Calendar'
+        });
+
+        expect(calendar).toContain('BEGIN:VCALENDAR\r\n');
+        expect(calendar).toContain('X-WR-CALNAME:Project Calendar');
+        expect(calendar).toContain('UID:task-1@todolist.local');
+        expect(calendar).toContain('DTSTAMP:20260503T000000Z');
+        expect(calendar).toContain('DTSTART;VALUE=DATE:20260503');
+        expect(calendar).toContain('DTEND;VALUE=DATE:20260505');
+        expect(calendar).toContain('SUMMARY:Review\\, ship\\; celebrate');
+        expect(calendar).toContain('CATEGORIES:Release');
+        expect(calendar).toContain('Checklist:\\n- [x] QA pass');
     });
 });
