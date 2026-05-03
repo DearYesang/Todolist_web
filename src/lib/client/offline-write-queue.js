@@ -6,6 +6,7 @@ import {
 	updateServerChecklistItem,
 	updateServerTask
 } from './task-api.js';
+import { isServerTaskId } from './task-create.js';
 
 const OFFLINE_QUEUE_KEY = 'kanbanOfflineWriteQueue';
 const DEFAULT_QUEUE_OWNER = 'anonymous';
@@ -17,6 +18,7 @@ let queueOwnerId = DEFAULT_QUEUE_OWNER;
  *   id?: string;
  *   type: 'task.create';
  *   localTaskId: string;
+ *   localParentId?: string | null;
  *   payload: unknown;
  * } | {
  *   id?: string;
@@ -112,16 +114,28 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 	const createdTasks = [];
 	/** @type {OfflineMutation[]} */
 	const conflicts = [];
+	/** @type {Map<string, string>} */
+	const localTaskIds = new Map();
 	let flushed = 0;
 	let blocked = false;
 
 	for (let index = 0; index < queue.length; index += 1) {
 		const mutation = queue[index];
-		const result = await executeOfflineMutation(mutation, fetcher);
+		const executableMutation = resolveOfflineMutationReferences(mutation, localTaskIds);
+		if (!executableMutation) {
+			blocked = true;
+			remaining.push({ ...mutation, attempts: mutation.attempts + 1 });
+			remaining.push(...queue.slice(index + 1));
+			break;
+		}
+
+		const result = await executeOfflineMutation(executableMutation, fetcher);
 		if (result.ok) {
 			flushed += 1;
 			if ('task' in result) {
 				if (mutation.type === 'task.create') {
+					localTaskIds.set(mutation.localTaskId, result.task.id);
+					updateQueuedLocalParentReferences(queue, index + 1, mutation.localTaskId, result.task.id);
 					createdTasks.push({ localTaskId: mutation.localTaskId, task: result.task });
 				} else {
 					syncedTasks.push(result.task);
@@ -204,6 +218,74 @@ function coalesceQueue(queue, mutation) {
  */
 function isTaskScopedMutation(mutation, taskId) {
 	return 'taskId' in mutation && mutation.taskId === taskId;
+}
+
+/**
+ * @param {OfflineMutation} mutation
+ * @param {Map<string, string>} localTaskIds
+ * @returns {OfflineMutation | null}
+ */
+function resolveOfflineMutationReferences(mutation, localTaskIds) {
+	if (mutation.type !== 'task.create' || !mutation.localParentId) {
+		return mutation;
+	}
+
+	const payload = getPayloadObject(mutation.payload);
+	if (!payload) {
+		return null;
+	}
+
+	if (isServerTaskId(payload?.parentId)) {
+		return mutation;
+	}
+
+	const serverParentId = localTaskIds.get(mutation.localParentId);
+	if (!serverParentId) {
+		return null;
+	}
+
+	return {
+		...mutation,
+		payload: {
+			...payload,
+			parentId: serverParentId
+		}
+	};
+}
+
+/**
+ * @param {OfflineMutation[]} queue
+ * @param {number} startIndex
+ * @param {string} localTaskId
+ * @param {string} serverTaskId
+ */
+function updateQueuedLocalParentReferences(queue, startIndex, localTaskId, serverTaskId) {
+	for (let index = startIndex; index < queue.length; index += 1) {
+		const mutation = queue[index];
+		if (mutation.type !== 'task.create' || mutation.localParentId !== localTaskId) {
+			continue;
+		}
+
+		const payload = getPayloadObject(mutation.payload);
+		if (!payload || isServerTaskId(payload.parentId)) {
+			continue;
+		}
+
+		mutation.payload = {
+			...payload,
+			parentId: serverTaskId
+		};
+	}
+}
+
+/**
+ * @param {unknown} payload
+ * @returns {Record<string, unknown> | null}
+ */
+function getPayloadObject(payload) {
+	return payload && typeof payload === 'object'
+		? /** @type {Record<string, unknown>} */ (payload)
+		: null;
 }
 
 /**

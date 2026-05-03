@@ -256,7 +256,13 @@ export function deleteTaskCascade(taskId) {
 }
 
 export function clearDoneTasks() {
-    tasks.update((current) => clearDoneTasksFromList(current));
+    /** @type {import('../shared/task-domain.js').Task[]} */
+    let previousTasks = [];
+    tasks.update((current) => {
+        previousTasks = current;
+        return clearDoneTasksFromList(current);
+    });
+    void syncClearDoneTasks(previousTasks);
 }
 
 /**
@@ -343,6 +349,49 @@ function syncTaskDelete(taskId) {
             taskId
         })
     );
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task[]} taskList
+ */
+async function syncClearDoneTasks(taskList) {
+    const doneIds = new Set(taskList.filter((task) => task.status === 'done').map((task) => task.id));
+    if (doneIds.size === 0) {
+        return;
+    }
+
+    const topLevelDoneTasks = taskList.filter((task) =>
+        task.status === 'done'
+        && shouldSyncServerTask(task.id)
+        && !hasDoneAncestor(taskList, task, doneIds)
+    );
+
+    for (const task of topLevelDoneTasks) {
+        const result = await deleteServerTask(task.id);
+        reportSyncFailure(result, {
+            type: 'task.delete',
+            taskId: task.id
+        });
+    }
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task[]} taskList
+ * @param {import('../shared/task-domain.js').Task} task
+ * @param {Set<string>} doneIds
+ */
+function hasDoneAncestor(taskList, task, doneIds) {
+    const byId = new Map(taskList.map((item) => [item.id, item]));
+    let parentId = task.parentId;
+    while (parentId) {
+        if (doneIds.has(parentId)) {
+            return true;
+        }
+
+        parentId = byId.get(parentId)?.parentId ?? null;
+    }
+
+    return false;
 }
 
 /**
