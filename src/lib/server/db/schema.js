@@ -238,6 +238,34 @@ export const calendarConnections = pgTable(
 	]
 );
 
+export const calendarSubscriptionTokens = pgTable(
+	'calendar_subscription_tokens',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		workspaceId: uuid('workspace_id')
+			.notNull()
+			.references(() => workspaces.id, { onDelete: 'cascade' }),
+		boardId: uuid('board_id')
+			.notNull()
+			.references(() => boards.id, { onDelete: 'cascade' }),
+		name: text('name').notNull().default('Calendar feed'),
+		tokenHash: text('token_hash').notNull(),
+		tokenPrefix: text('token_prefix').notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+		lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+		revokedAt: timestamp('revoked_at', { withTimezone: true }),
+		expiresAt: timestamp('expires_at', { withTimezone: true })
+	},
+	(table) => [
+		index('calendar_subscription_tokens_user_id_idx').on(table.userId),
+		index('calendar_subscription_tokens_board_id_idx').on(table.boardId),
+		uniqueIndex('calendar_subscription_tokens_token_hash_uidx').on(table.tokenHash)
+	]
+);
+
 export const calendarEventLinks = pgTable(
 	'calendar_event_links',
 	{
