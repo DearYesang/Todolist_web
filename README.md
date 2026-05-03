@@ -49,6 +49,12 @@ Run tests:
 npm test
 ```
 
+Run the production readiness check:
+
+```bash
+npm run doctor
+```
+
 Database setup:
 
 ```bash
@@ -118,6 +124,7 @@ Later:
 - Rust worker only if calendar sync, recurring task expansion, or bulk import/export become heavy enough to justify a separate service
 
 See [SvelteKit migration notes](docs/SVELTEKIT_MIGRATION.md) and [database schema draft](docs/DATABASE_SCHEMA.md) for the proposed architecture.
+See [deployment checklist](docs/DEPLOYMENT_CHECKLIST.md) before promoting this branch.
 
 ## Security Notes
 
