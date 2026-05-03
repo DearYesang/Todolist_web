@@ -7,10 +7,16 @@ import {
     normalizeTaskList
 } from './lib/shared/task-domain.js';
 import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
-import { createServerTask, listServerTasks } from './lib/client/task-api.js';
+import { createServerTask, deleteServerTask, listServerTasks, updateServerTask } from './lib/client/task-api.js';
 import { buildTaskCreateDraft, createLocalTaskFromDraft } from './lib/client/task-create.js';
 import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
-import { parseCreateTaskInput, TaskWriteError } from './lib/server/tasks/validation.js';
+import {
+    assertValidTaskDateRange,
+    parseCreateTaskInput,
+    parseTaskIdParam,
+    parseUpdateTaskInput,
+    TaskWriteError
+} from './lib/server/tasks/validation.js';
 import {
     moveTask,
     mergeTasks,
@@ -313,6 +319,44 @@ describe('client task creation', () => {
             { id: 'server-only', text: 'Server only', status: 'done' }
         ]);
     });
+
+    it('calls task mutation endpoints', async () => {
+        const serverTask = normalizeTask({
+            id: '44444444-4444-4444-8444-444444444444',
+            text: 'Updated server task'
+        });
+        const updateFetcher = vi.fn(async () => new Response(JSON.stringify({ task: serverTask }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        await expect(updateServerTask('44444444-4444-4444-8444-444444444444', {
+            text: 'Updated server task'
+        }, updateFetcher)).resolves.toEqual({
+            ok: true,
+            task: serverTask
+        });
+        expect(updateFetcher).toHaveBeenCalledWith(
+            '/api/tasks/44444444-4444-4444-8444-444444444444',
+            expect.objectContaining({
+                method: 'PATCH',
+                body: JSON.stringify({ text: 'Updated server task' })
+            })
+        );
+
+        const deleteFetcher = vi.fn(async () => new Response(JSON.stringify({ deleted: 3 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        }));
+        await expect(deleteServerTask('44444444-4444-4444-8444-444444444444', deleteFetcher)).resolves.toEqual({
+            ok: true,
+            deleted: 3
+        });
+        expect(deleteFetcher).toHaveBeenCalledWith(
+            '/api/tasks/44444444-4444-4444-8444-444444444444',
+            expect.objectContaining({ method: 'DELETE' })
+        );
+    });
 });
 
 describe('calendar export', () => {
@@ -443,5 +487,36 @@ describe('server task validation', () => {
             endDate: '2026-05-04',
             parentId: 'local-timestamp-id'
         })).toThrow('parentId must be a UUID.');
+    });
+
+    it('accepts strict update payloads and task ids', () => {
+        expect(parseTaskIdParam('55555555-5555-4555-8555-555555555555')).toBe('55555555-5555-4555-8555-555555555555');
+        expect(parseUpdateTaskInput({
+            text: '  Updated task  ',
+            status: 'doing',
+            priority: 'high',
+            urgency: 'urgent',
+            category: '  Sync  ',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04',
+            parentId: null
+        })).toEqual({
+            title: 'Updated task',
+            status: 'doing',
+            priority: 'high',
+            urgency: 'urgent',
+            category: 'Sync',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04',
+            parentId: null
+        });
+    });
+
+    it('rejects invalid update payloads and date ranges', () => {
+        expect(() => parseTaskIdParam('local-id')).toThrow('taskId must be a UUID.');
+        expect(() => parseUpdateTaskInput({})).toThrow('At least one task field is required.');
+        expect(() => parseUpdateTaskInput({ status: 'blocked' })).toThrow('Invalid status.');
+        expect(() => parseUpdateTaskInput({ parentId: 'local-parent' })).toThrow('parentId must be a UUID.');
+        expect(() => assertValidTaskDateRange('2026-05-04', '2026-05-03')).toThrow('Invalid task date range.');
     });
 });

@@ -49,6 +49,83 @@ export function parseCreateTaskInput(payload) {
 }
 
 /**
+ * @param {unknown} taskId
+ */
+export function parseTaskIdParam(taskId) {
+	return parseRequiredUuid(taskId, 'taskId');
+}
+
+/**
+ * @param {unknown} payload
+ */
+export function parseUpdateTaskInput(payload) {
+	const source = /** @type {Record<string, unknown> | null} */ (payload);
+	if (!source || typeof source !== 'object' || Array.isArray(source)) {
+		throw new TaskWriteError('Task payload must be an object.');
+	}
+
+	/** @type {Record<string, string | null>} */
+	const patch = {};
+
+	if (hasField(source, 'text') || hasField(source, 'title')) {
+		patch.title = parseRequiredString(source.text ?? source.title, 'Task title', MAX_TITLE_LENGTH);
+	}
+
+	if (hasField(source, 'status')) {
+		patch.status = parseRequiredEnum(source.status, TASK_STATUSES, 'status');
+	}
+
+	if (hasField(source, 'priority')) {
+		patch.priority = parseRequiredEnum(source.priority, TASK_PRIORITIES, 'priority');
+	}
+
+	if (hasField(source, 'urgency')) {
+		patch.urgency = parseRequiredEnum(source.urgency, TASK_URGENCIES, 'urgency');
+	}
+
+	if (hasField(source, 'category')) {
+		patch.category = parseOptionalString(source.category, MAX_CATEGORY_LENGTH);
+	}
+
+	if (hasField(source, 'startDate')) {
+		patch.startDate = parseDateValue(source.startDate, 'startDate');
+	}
+
+	if (hasField(source, 'endDate')) {
+		patch.endDate = parseDateValue(source.endDate, 'endDate');
+	}
+
+	if (hasField(source, 'parentId')) {
+		patch.parentId = parseOptionalUuid(source.parentId, 'parentId');
+	}
+
+	if (Object.keys(patch).length === 0) {
+		throw new TaskWriteError('At least one task field is required.');
+	}
+
+	return patch;
+}
+
+/**
+ * @param {string} startDate
+ * @param {string} endDate
+ */
+export function assertValidTaskDateRange(startDate, endDate) {
+	const normalized = normalizeDateRange(startDate, endDate);
+	if (normalized.startDate !== startDate || normalized.endDate !== endDate) {
+		throw new TaskWriteError('Invalid task date range.');
+	}
+}
+
+/**
+ * @param {Record<string, unknown>} source
+ * @param {string} field
+ */
+function hasField(source, field) {
+	return Object.prototype.hasOwnProperty.call(source, field);
+}
+
+/**
  * @param {unknown} value
  * @param {string} label
  * @param {number} maxLength
@@ -102,6 +179,15 @@ function parseEnum(value, allowed, label, fallback) {
 		return fallback;
 	}
 
+	return parseRequiredEnum(value, allowed, label);
+}
+
+/**
+ * @param {unknown} value
+ * @param {Set<string>} allowed
+ * @param {string} label
+ */
+function parseRequiredEnum(value, allowed, label) {
 	if (typeof value !== 'string' || !allowed.has(value)) {
 		throw new TaskWriteError(`Invalid ${label}.`);
 	}
@@ -118,12 +204,22 @@ function parseDateRange(startDate, endDate) {
 		throw new TaskWriteError('startDate and endDate are required.');
 	}
 
-	const normalized = normalizeDateRange(startDate, endDate);
-	if (normalized.startDate !== startDate || normalized.endDate !== endDate) {
-		throw new TaskWriteError('Invalid task date range.');
+	assertValidTaskDateRange(startDate, endDate);
+
+	return { startDate, endDate };
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} label
+ */
+function parseDateValue(value, label) {
+	if (typeof value !== 'string') {
+		throw new TaskWriteError(`${label} must be a date string.`);
 	}
 
-	return normalized;
+	assertValidTaskDateRange(value, value);
+	return value;
 }
 
 /**
@@ -135,6 +231,14 @@ function parseOptionalUuid(value, label) {
 		return null;
 	}
 
+	return parseRequiredUuid(value, label);
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} label
+ */
+function parseRequiredUuid(value, label) {
 	if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
 		throw new TaskWriteError(`${label} must be a UUID.`);
 	}

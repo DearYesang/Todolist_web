@@ -1,3 +1,5 @@
+import { normalizeTask, normalizeTaskList } from '$lib/shared/task-domain.js';
+
 /**
  * @typedef {typeof import('$lib/server/db/schema.js').tasks.$inferSelect} TaskRow
  * @typedef {typeof import('$lib/server/db/schema.js').checklistItems.$inferSelect} ChecklistItemRow
@@ -11,7 +13,24 @@
 export function mapTaskRowsToClientTasks(taskRows, checklistRows) {
 	const checklistByTask = groupChecklistRows(checklistRows);
 
-	return normalizeTaskList(taskRows.map((task) => ({
+	return normalizeTaskList(taskRows.map((task) => mapTaskRowToRawTask(task, checklistByTask[task.id] ?? [])));
+}
+
+/**
+ * @param {TaskRow} taskRow
+ * @param {ChecklistItemRow[]} checklistRows
+ * @returns {import('$lib/shared/task-domain.js').Task}
+ */
+export function mapTaskRowToClientTask(taskRow, checklistRows = []) {
+	return normalizeTask(mapTaskRowToRawTask(taskRow, groupChecklistRows(checklistRows)[taskRow.id] ?? []));
+}
+
+/**
+ * @param {TaskRow} task
+ * @param {import('$lib/shared/task-domain.js').Subtask[]} subtasks
+ */
+function mapTaskRowToRawTask(task, subtasks) {
+	return {
 		id: task.id,
 		text: task.title,
 		status: task.status,
@@ -21,10 +40,10 @@ export function mapTaskRowsToClientTasks(taskRows, checklistRows) {
 		urgency: task.urgency,
 		category: task.category,
 		parentId: task.parentTaskId,
-		subtasks: checklistByTask[task.id] ?? [],
+		subtasks,
 		collapsed: false,
 		createdAt: toTimestamp(task.createdAt)
-	})));
+	};
 }
 
 /**
@@ -58,4 +77,3 @@ function toTimestamp(value) {
 	const timestamp = new Date(value).getTime();
 	return Number.isFinite(timestamp) ? timestamp : Date.now();
 }
-import { normalizeTaskList } from '$lib/shared/task-domain.js';
