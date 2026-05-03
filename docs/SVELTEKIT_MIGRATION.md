@@ -78,10 +78,10 @@ src/routes/api/export/+server.js
 
 ## Next Steps
 
-1. Add replace import with statement-level atomicity or transaction-capable DB access.
-2. Define conflict policy for offline server-backed writes.
-3. Add route/component tests around auth and sync flows once UI flows stabilize.
-4. Add account recovery before production passkey-only enforcement.
+1. Run production migrations and configure email/OAuth delivery secrets.
+2. Add route/component tests around auth and sync flows once UI flows stabilize.
+3. Add richer conflict policy for multi-device offline writes.
+4. Add background calendar workers and provider webhooks.
 
 ## Domain Boundaries
 
@@ -106,8 +106,8 @@ The client should own:
 
 - Use Better Auth as the initial auth system.
 - Use passkey-first login with platform authenticators.
-- Passkey-first onboarding is enabled by resolving a registration email/name into a Better Auth user.
-- Require at least one recovery path before enforcing passkey-only production login.
+- Passkey-first onboarding requires an email verification code before a new user is created.
+- Existing accounts can add a new passkey with a hashed recovery code.
 - Do not let the browser call the database directly.
 
 ## PWA Plan
@@ -119,7 +119,7 @@ Installability and an offline shell cache are in place:
 - SvelteKit service worker
 - cached shell and static assets
 
-Defer complex offline writes until the server data model and conflict policy are stable.
+Retryable offline writes are persisted in a local queue and flushed before server list sync. Multi-device merge policy remains intentionally conservative.
 
 ## Rust Revisit Point
 

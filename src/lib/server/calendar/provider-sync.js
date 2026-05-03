@@ -1,0 +1,415 @@
+import { randomBytes } from 'node:crypto';
+import { and, eq, gt } from 'drizzle-orm';
+import { getDb, schema } from '$lib/server/db/index.js';
+import { ensurePersonalBoardForUser, listTasksForUser } from '$lib/server/tasks/repository.js';
+import {
+	decryptCalendarToken,
+	encryptCalendarToken,
+	assertCalendarOauthEncryptionConfigured
+} from './oauth-encryption.js';
+import {
+	buildCalendarAuthorizationUrl,
+	deleteProviderCalendarEvent,
+	exchangeCalendarCode,
+	fetchCalendarProviderAccount,
+	listCalendarProviders,
+	refreshCalendarToken,
+	upsertProviderCalendarEvent
+} from './providers.js';
+
+const OAUTH_STATE_PREFIX = 'calendar-oauth-state:';
+
+/**
+ * @param {string} userId
+ */
+export async function listCalendarProviderConnections(userId) {
+	const rows = await getDb()
+		.select()
+		.from(schema.calendarConnections)
+		.where(eq(schema.calendarConnections.userId, userId));
+
+	return {
+		providers: listCalendarProviders(),
+		connections: rows.map(toConnectionResponse)
+	};
+}
+
+/**
+ * @param {string} userId
+ * @param {string} provider
+ * @param {URL} baseUrl
+ */
+export async function createCalendarProviderAuthorizationUrl(userId, provider, baseUrl) {
+	assertCalendarOauthEncryptionConfigured();
+	const state = createOauthState();
+	const redirectUri = createRedirectUri(baseUrl, provider);
+	const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+	await getDb().insert(schema.verification).values({
+		id: createStateId(),
+		identifier: `${OAUTH_STATE_PREFIX}${state}`,
+		value: JSON.stringify({ userId, provider }),
+		expiresAt
+	});
+
+	return buildCalendarAuthorizationUrl(provider, state, redirectUri);
+}
+
+/**
+ * @param {string} provider
+ * @param {string} code
+ * @param {string} state
+ * @param {URL} baseUrl
+ */
+export async function completeCalendarProviderAuthorization(provider, code, state, baseUrl) {
+	assertCalendarOauthEncryptionConfigured();
+	const stateRecord = await consumeOauthState(state);
+	if (!stateRecord || stateRecord.provider !== provider) {
+		throw new CalendarSyncError('Calendar OAuth state is invalid or expired.', 400);
+	}
+
+	const redirectUri = createRedirectUri(baseUrl, provider);
+	const token = await exchangeCalendarCode(provider, code, redirectUri);
+	if (!token.accessToken) {
+		throw new CalendarSyncError('Calendar provider did not return an access token.', 502);
+	}
+
+	const account = await fetchCalendarProviderAccount(provider, token.accessToken);
+	const board = await ensurePersonalBoardForUser(stateRecord.userId);
+	const associatedData = createConnectionAssociatedData({
+		userId: stateRecord.userId,
+		provider,
+		providerAccountId: account.id
+	});
+	const encryptedAccessToken = encryptCalendarToken(token.accessToken, associatedData);
+	const encryptedRefreshToken = encryptCalendarToken(token.refreshToken, associatedData);
+	const expiresAt = token.expiresIn ? new Date(Date.now() + token.expiresIn * 1000) : null;
+	const db = getDb();
+
+	const [existing] = await db
+		.select()
+		.from(schema.calendarConnections)
+		.where(and(
+			eq(schema.calendarConnections.userId, stateRecord.userId),
+			eq(schema.calendarConnections.provider, provider),
+			eq(schema.calendarConnections.providerAccountId, account.id)
+		))
+		.limit(1);
+
+	const now = new Date();
+	if (existing) {
+		const [updated] = await db
+			.update(schema.calendarConnections)
+			.set({
+				workspaceId: board.workspaceId,
+				encryptedAccessToken,
+				encryptedRefreshToken: encryptedRefreshToken ?? existing.encryptedRefreshToken,
+				expiresAt,
+				updatedAt: now
+			})
+			.where(eq(schema.calendarConnections.id, existing.id))
+			.returning();
+		return toConnectionResponse(updated);
+	}
+
+	const [created] = await db
+		.insert(schema.calendarConnections)
+		.values({
+			workspaceId: board.workspaceId,
+			userId: stateRecord.userId,
+			provider,
+			providerAccountId: account.id,
+			encryptedAccessToken,
+			encryptedRefreshToken,
+			expiresAt,
+			createdAt: now,
+			updatedAt: now
+		})
+		.returning();
+
+	return toConnectionResponse(created);
+}
+
+/**
+ * @param {string} userId
+ * @param {string} connectionId
+ */
+export async function deleteCalendarProviderConnection(userId, connectionId) {
+	const [deleted] = await getDb()
+		.delete(schema.calendarConnections)
+		.where(and(eq(schema.calendarConnections.id, connectionId), eq(schema.calendarConnections.userId, userId)))
+		.returning({ id: schema.calendarConnections.id });
+
+	if (!deleted) {
+		throw new CalendarSyncError('Calendar connection was not found.', 404);
+	}
+
+	return deleted.id;
+}
+
+/**
+ * @param {string} userId
+ */
+export async function syncCalendarProvidersForUser(userId) {
+	const db = getDb();
+	const connections = await db
+		.select()
+		.from(schema.calendarConnections)
+		.where(eq(schema.calendarConnections.userId, userId));
+	const tasks = await listTasksForUser(userId);
+	const activeTaskIds = new Set(tasks.map((task) => task.id));
+	const summaries = [];
+
+	for (const connection of connections) {
+		const accessToken = await getFreshAccessToken(connection);
+		const links = await db
+			.select()
+			.from(schema.calendarEventLinks)
+			.where(eq(schema.calendarEventLinks.connectionId, connection.id));
+		const linksByTaskId = new Map(links.map((link) => [link.taskId, link]));
+		let upserted = 0;
+		let deleted = 0;
+		let failed = 0;
+
+		for (const task of tasks) {
+			try {
+				const link = linksByTaskId.get(task.id);
+				const event = await upsertProviderCalendarEvent(
+					connection.provider,
+					accessToken,
+					link?.syncStatus === 'active' ? link.externalEventId : null,
+					task
+				);
+				if (!event.id) {
+					throw new CalendarSyncError('Calendar provider did not return an event id.', 502);
+				}
+
+				await upsertEventLink(connection.id, task.id, event.id, event.etag ?? null);
+				upserted += 1;
+			} catch {
+				await markTaskLinkErrored(connection.id, task.id);
+				failed += 1;
+			}
+		}
+
+		const staleLinks = links.filter((link) => link.syncStatus === 'active' && !activeTaskIds.has(link.taskId));
+		for (const link of staleLinks) {
+			try {
+				await deleteProviderCalendarEvent(connection.provider, accessToken, link.externalEventId);
+				await db
+					.update(schema.calendarEventLinks)
+					.set({
+						syncStatus: 'deleted',
+						lastSyncedAt: new Date()
+					})
+					.where(eq(schema.calendarEventLinks.id, link.id));
+				deleted += 1;
+			} catch {
+				failed += 1;
+			}
+		}
+
+		summaries.push({
+			connectionId: connection.id,
+			provider: connection.provider,
+			upserted,
+			deleted,
+			failed
+		});
+	}
+
+	return {
+		connections: summaries.length,
+		tasks: tasks.length,
+		summaries
+	};
+}
+
+/**
+ * @param {typeof schema.calendarConnections.$inferSelect} connection
+ */
+async function getFreshAccessToken(connection) {
+	const associatedData = createConnectionAssociatedData(connection);
+	const accessToken = decryptCalendarToken(connection.encryptedAccessToken, associatedData);
+	const refreshToken = decryptCalendarToken(connection.encryptedRefreshToken, associatedData);
+	const expiresSoon = !connection.expiresAt || connection.expiresAt.getTime() < Date.now() + 60_000;
+	if (!expiresSoon && accessToken) {
+		return accessToken;
+	}
+
+	if (!refreshToken) {
+		if (accessToken) {
+			return accessToken;
+		}
+
+		throw new CalendarSyncError('Calendar connection does not have a usable access token.', 503);
+	}
+
+	const refreshed = await refreshCalendarToken(connection.provider, refreshToken);
+	if (!refreshed.accessToken) {
+		throw new CalendarSyncError('Calendar provider did not return a refreshed access token.', 502);
+	}
+
+	const encryptedAccessToken = encryptCalendarToken(refreshed.accessToken, associatedData);
+	const encryptedRefreshToken = refreshed.refreshToken
+		? encryptCalendarToken(refreshed.refreshToken, associatedData)
+		: connection.encryptedRefreshToken;
+	const expiresAt = refreshed.expiresIn ? new Date(Date.now() + refreshed.expiresIn * 1000) : connection.expiresAt;
+
+	await getDb()
+		.update(schema.calendarConnections)
+		.set({
+			encryptedAccessToken,
+			encryptedRefreshToken,
+			expiresAt,
+			updatedAt: new Date()
+		})
+		.where(eq(schema.calendarConnections.id, connection.id));
+
+	return refreshed.accessToken;
+}
+
+/**
+ * @param {string} connectionId
+ * @param {string} taskId
+ * @param {string} externalEventId
+ * @param {string | null} etag
+ */
+async function upsertEventLink(connectionId, taskId, externalEventId, etag) {
+	const db = getDb();
+	const now = new Date();
+	const [existing] = await db
+		.select()
+		.from(schema.calendarEventLinks)
+		.where(and(
+			eq(schema.calendarEventLinks.connectionId, connectionId),
+			eq(schema.calendarEventLinks.taskId, taskId)
+		))
+		.limit(1);
+
+	if (existing) {
+		await db
+			.update(schema.calendarEventLinks)
+			.set({
+				externalCalendarId: 'primary',
+				externalEventId,
+				etag,
+				lastSyncedAt: now,
+				syncStatus: 'active'
+			})
+			.where(eq(schema.calendarEventLinks.id, existing.id));
+		return;
+	}
+
+	await db.insert(schema.calendarEventLinks).values({
+		taskId,
+		connectionId,
+		externalCalendarId: 'primary',
+		externalEventId,
+		etag,
+		lastSyncedAt: now,
+		syncStatus: 'active'
+	});
+}
+
+/**
+ * @param {string} connectionId
+ * @param {string} taskId
+ */
+async function markTaskLinkErrored(connectionId, taskId) {
+	const db = getDb();
+	const [existing] = await db
+		.select()
+		.from(schema.calendarEventLinks)
+		.where(and(
+			eq(schema.calendarEventLinks.connectionId, connectionId),
+			eq(schema.calendarEventLinks.taskId, taskId)
+		))
+		.limit(1);
+
+	if (!existing) {
+		return;
+	}
+
+	await db
+		.update(schema.calendarEventLinks)
+		.set({
+			syncStatus: 'error',
+			lastSyncedAt: new Date()
+		})
+		.where(eq(schema.calendarEventLinks.id, existing.id));
+}
+
+/**
+ * @param {string} state
+ */
+async function consumeOauthState(state) {
+	const identifier = `${OAUTH_STATE_PREFIX}${state}`;
+	const [record] = await getDb()
+		.select()
+		.from(schema.verification)
+		.where(and(eq(schema.verification.identifier, identifier), gt(schema.verification.expiresAt, new Date())))
+		.limit(1);
+	if (!record) {
+		return null;
+	}
+
+	await getDb().delete(schema.verification).where(eq(schema.verification.id, record.id));
+	try {
+		const parsed = JSON.parse(record.value);
+		if (!parsed || typeof parsed !== 'object') {
+			return null;
+		}
+
+		const userId = typeof parsed.userId === 'string' ? parsed.userId : '';
+		const provider = typeof parsed.provider === 'string' ? parsed.provider : '';
+		return userId && provider ? { userId, provider } : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * @param {URL} baseUrl
+ * @param {string} provider
+ */
+function createRedirectUri(baseUrl, provider) {
+	return new URL(`/api/calendar/providers/${provider}/callback`, baseUrl.origin).toString();
+}
+
+function createOauthState() {
+	return randomBytes(32).toString('base64url');
+}
+
+function createStateId() {
+	return randomBytes(16).toString('hex');
+}
+
+/**
+ * @param {{ userId: string; provider: string; providerAccountId: string | null }} connection
+ */
+function createConnectionAssociatedData(connection) {
+	return `calendar-oauth:${connection.userId}:${connection.provider}:${connection.providerAccountId ?? ''}`;
+}
+
+/**
+ * @param {typeof schema.calendarConnections.$inferSelect} row
+ */
+function toConnectionResponse(row) {
+	return {
+		id: row.id,
+		provider: row.provider,
+		providerAccountId: row.providerAccountId,
+		createdAt: row.createdAt.toISOString(),
+		updatedAt: row.updatedAt.toISOString(),
+		expiresAt: row.expiresAt?.toISOString() ?? null
+	};
+}
+
+export class CalendarSyncError extends Error {
+	/** @param {string} message */
+	constructor(message, status = 500) {
+		super(message);
+		this.name = 'CalendarSyncError';
+		this.status = status;
+	}
+}
