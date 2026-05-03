@@ -8,6 +8,7 @@ Use this checklist before moving the SvelteKit app from the PR branch to product
 npm ci
 npm run doctor
 npm run db:migrate
+npm audit --audit-level=low
 npm test
 npm run check
 npm run build
