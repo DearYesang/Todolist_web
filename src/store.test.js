@@ -7,12 +7,13 @@ import {
     normalizeTaskList
 } from './lib/shared/task-domain.js';
 import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
-import { createServerTask } from './lib/client/task-api.js';
+import { createServerTask, listServerTasks } from './lib/client/task-api.js';
 import { buildTaskCreateDraft, createLocalTaskFromDraft } from './lib/client/task-create.js';
 import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
 import { parseCreateTaskInput, TaskWriteError } from './lib/server/tasks/validation.js';
 import {
     moveTask,
+    mergeTasks,
     replaceTasks,
     resetFilters,
     tasks
@@ -258,6 +259,59 @@ describe('client task creation', () => {
             status: 400,
             message: 'Invalid task.'
         });
+    });
+
+    it('loads and normalizes server task lists', async () => {
+        const fetcher = vi.fn(async () => new Response(JSON.stringify({
+            tasks: [
+                {
+                    id: '33333333-3333-4333-8333-333333333333',
+                    text: '  Server list task  ',
+                    status: 'done',
+                    startDate: '2026-05-03',
+                    endDate: '2026-05-03'
+                }
+            ]
+        }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        const result = await listServerTasks(fetcher);
+        expect(result).toMatchObject({ ok: true });
+        if (!result.ok) throw new Error('Expected server task list result.');
+        expect(result.tasks).toEqual([
+            expect.objectContaining({
+                id: '33333333-3333-4333-8333-333333333333',
+                text: '  Server list task  ',
+                status: 'done'
+            })
+        ]);
+        expect(fetcher).toHaveBeenCalledWith('/api/tasks', expect.objectContaining({
+            headers: { accept: 'application/json' }
+        }));
+    });
+
+    it('merges server tasks without dropping local-only tasks', () => {
+        replaceTasks([
+            { id: 'local-only', text: 'Local only', status: 'todo' },
+            { id: 'shared-id', text: 'Old local value', status: 'todo' }
+        ]);
+
+        mergeTasks([
+            { id: 'shared-id', text: 'Server value', status: 'doing' },
+            { id: 'server-only', text: 'Server only', status: 'done' }
+        ]);
+
+        expect(get(tasks).map((task) => ({
+            id: task.id,
+            text: task.text,
+            status: task.status
+        }))).toEqual([
+            { id: 'local-only', text: 'Local only', status: 'todo' },
+            { id: 'shared-id', text: 'Server value', status: 'doing' },
+            { id: 'server-only', text: 'Server only', status: 'done' }
+        ]);
     });
 });
 

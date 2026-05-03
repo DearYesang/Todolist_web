@@ -1,4 +1,4 @@
-import { normalizeTask } from '../shared/task-domain.js';
+import { normalizeTask, normalizeTaskList } from '../shared/task-domain.js';
 
 const FALLBACK_STATUSES = new Set([401, 409, 503]);
 
@@ -12,7 +12,52 @@ const FALLBACK_STATUSES = new Set([401, 409, 503]);
  *   status: number;
  *   message: string;
  * }} CreateServerTaskResult
+ *
+ * @typedef {{
+ *   ok: true;
+ *   tasks: import('../shared/task-domain.js').Task[];
+ * } | {
+ *   ok: false;
+ *   fallback: boolean;
+ *   status: number;
+ *   message: string;
+ * }} ListServerTasksResult
  */
+
+/**
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<ListServerTasksResult>}
+ */
+export async function listServerTasks(fetcher = globalThis.fetch) {
+	if (typeof fetcher !== 'function') {
+		return createFallbackResult('Task API is not available.');
+	}
+
+	try {
+		const response = await fetcher('/api/tasks', {
+			headers: {
+				accept: 'application/json'
+			}
+		});
+		const body = await readJsonBody(response);
+
+		if (response.ok && isTasksResponse(body)) {
+			return {
+				ok: true,
+				tasks: normalizeTaskList(body.tasks)
+			};
+		}
+
+		return {
+			ok: false,
+			fallback: FALLBACK_STATUSES.has(response.status),
+			status: response.status,
+			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
+		};
+	} catch {
+		return createFallbackResult('Task API request could not be completed.');
+	}
+}
 
 /**
  * @param {unknown} payload
@@ -82,6 +127,14 @@ async function readJsonBody(response) {
  */
 function isTaskResponse(body) {
 	return Boolean(body && typeof body === 'object' && 'task' in body);
+}
+
+/**
+ * @param {unknown} body
+ * @returns {body is { tasks: unknown[] }}
+ */
+function isTasksResponse(body) {
+	return Boolean(body && typeof body === 'object' && 'tasks' in body && Array.isArray(body.tasks));
 }
 
 /**
