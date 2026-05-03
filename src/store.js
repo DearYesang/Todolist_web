@@ -36,6 +36,10 @@ import { derived, writable } from 'svelte/store';
  */
 
 const STORAGE_KEY = 'kanbanTasks';
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
+const MAX_TASK_SPAN_DAYS = 3650;
 
 export const DEFAULT_FILTERS = Object.freeze({
     priority: 'all',
@@ -72,6 +76,20 @@ export const CATEGORY_COLORS = [
 ];
 
 /**
+ * @param {number} value
+ */
+function padDatePart(value) {
+    return `${value}`.padStart(2, '0');
+}
+
+/**
+ * @param {Date} date
+ */
+function formatLocalDate(date) {
+    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+}
+
+/**
  * @returns {{ startDate: string; endDate: string }}
  */
 export function getDefaultDateRange() {
@@ -80,8 +98,8 @@ export function getDefaultDateRange() {
     end.setDate(end.getDate() + 2);
 
     return {
-        startDate: start.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0]
+        startDate: formatLocalDate(start),
+        endDate: formatLocalDate(end)
     };
 }
 
@@ -90,6 +108,109 @@ export function getDefaultDateRange() {
  */
 export function createId() {
     return `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is TaskStatus}
+ */
+function isTaskStatus(value) {
+    return value === 'todo' || value === 'doing' || value === 'done';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is TaskPriority}
+ */
+function isTaskPriority(value) {
+    return value === 'high' || value === 'medium' || value === 'low';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is TaskUrgency}
+ */
+function isTaskUrgency(value) {
+    return value === 'urgent' || value === 'normal';
+}
+
+/**
+ * @param {string} value
+ * @returns {Date | null}
+ */
+function parseDateString(value) {
+    if (!DATE_PATTERN.test(value)) return null;
+
+    const [year, month, day] = value.split('-').map(Number);
+    if (year < MIN_YEAR || year > MAX_YEAR) return null;
+
+    const date = new Date(year, month - 1, day);
+    if (
+        date.getFullYear() !== year
+        || date.getMonth() !== month - 1
+        || date.getDate() !== day
+    ) {
+        return null;
+    }
+
+    return date;
+}
+
+/**
+ * @param {string} dateString
+ * @param {number} offset
+ */
+function addDaysToDateString(dateString, offset) {
+    const date = parseDateString(dateString);
+    if (!date) return dateString;
+
+    date.setDate(date.getDate() + offset);
+    return formatLocalDate(date);
+}
+
+/**
+ * @param {unknown} rawStartDate
+ * @param {unknown} rawEndDate
+ * @returns {{ startDate: string; endDate: string }}
+ */
+export function normalizeDateRange(rawStartDate, rawEndDate) {
+    const defaults = getDefaultDateRange();
+    const startDate = typeof rawStartDate === 'string' && parseDateString(rawStartDate)
+        ? rawStartDate
+        : defaults.startDate;
+    let endDate = typeof rawEndDate === 'string' && parseDateString(rawEndDate)
+        ? rawEndDate
+        : defaults.endDate;
+
+    const start = parseDateString(startDate);
+    let end = parseDateString(endDate);
+    if (!start || !end) return defaults;
+
+    if (end.getTime() < start.getTime()) {
+        endDate = startDate;
+        end = start;
+    }
+
+    const spanDays = Math.round((end.getTime() - start.getTime()) / 86400000);
+    if (spanDays > MAX_TASK_SPAN_DAYS) {
+        endDate = addDaysToDateString(startDate, MAX_TASK_SPAN_DAYS);
+    }
+
+    return { startDate, endDate };
+}
+
+/**
+ * @returns {Storage | null}
+ */
+function getStorage() {
+    try {
+        const storage = globalThis.localStorage;
+        return storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
+            ? storage
+            : null;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -108,20 +229,39 @@ function normalizeSubtask(raw, index) {
 }
 
 /**
+ * @param {unknown[]} subtasksRaw
+ * @returns {Subtask[]}
+ */
+function normalizeSubtasks(subtasksRaw) {
+    const usedIds = new Set();
+
+    return subtasksRaw.map((item, index) => {
+        const subtask = normalizeSubtask(item, index);
+        let id = subtask.id;
+        while (usedIds.has(id)) {
+            id = `${createId()}-${index}`;
+        }
+        usedIds.add(id);
+
+        return id === subtask.id ? subtask : { ...subtask, id };
+    });
+}
+
+/**
  * @param {unknown} raw
  * @returns {Task}
  */
 export function normalizeTask(raw) {
     const source = /** @type {Record<string, unknown> | null | undefined} */ (raw);
-    const { startDate, endDate } = getDefaultDateRange();
     const subtasksRaw = Array.isArray(source?.subtasks) ? source.subtasks : [];
-    const priority = source?.priority === 'high' || source?.priority === 'medium' || source?.priority === 'low'
+    const { startDate, endDate } = normalizeDateRange(source?.startDate, source?.endDate);
+    const priority = isTaskPriority(source?.priority)
         ? source.priority
         : 'medium';
-    const urgency = source?.urgency === 'urgent' || source?.urgency === 'normal'
+    const urgency = isTaskUrgency(source?.urgency)
         ? source.urgency
         : 'normal';
-    const status = source?.status === 'todo' || source?.status === 'doing' || source?.status === 'done'
+    const status = isTaskStatus(source?.status)
         ? source.status
         : 'todo';
 
@@ -129,16 +269,95 @@ export function normalizeTask(raw) {
         id: typeof source?.id === 'string' && source.id ? source.id : createId(),
         text: typeof source?.text === 'string' ? source.text : '',
         status,
-        startDate: typeof source?.startDate === 'string' && source.startDate ? source.startDate : startDate,
-        endDate: typeof source?.endDate === 'string' && source.endDate ? source.endDate : endDate,
+        startDate,
+        endDate,
         priority,
         urgency,
         category: typeof source?.category === 'string' ? source.category.trim() : '',
         parentId: typeof source?.parentId === 'string' && source.parentId ? source.parentId : null,
-        subtasks: subtasksRaw.map((item, index) => normalizeSubtask(item, index)),
+        subtasks: normalizeSubtasks(subtasksRaw),
         collapsed: Boolean(source?.collapsed),
-        createdAt: typeof source?.createdAt === 'number' ? source.createdAt : Date.now()
+        createdAt: typeof source?.createdAt === 'number' && Number.isFinite(source.createdAt) ? source.createdAt : Date.now()
     };
+}
+
+/**
+ * @param {Task[]} taskList
+ * @param {Task} task
+ */
+function hasParentCycle(taskList, task) {
+    if (!task.parentId) return false;
+
+    const byId = new Map(taskList.map((item) => [item.id, item]));
+    const visited = new Set([task.id]);
+    /** @type {string | null} */
+    let parentId = task.parentId;
+
+    while (parentId) {
+        if (visited.has(parentId)) return true;
+        visited.add(parentId);
+
+        const parent = byId.get(parentId);
+        if (!parent) return false;
+        parentId = parent.parentId;
+    }
+
+    return false;
+}
+
+/**
+ * @param {unknown[]} rawTasks
+ * @returns {Task[]}
+ */
+export function normalizeTaskList(rawTasks) {
+    const usedIds = new Set();
+    const normalized = rawTasks.map((item, index) => {
+        const task = normalizeTask(item);
+        let id = task.id;
+        while (usedIds.has(id)) {
+            id = `${createId()}-${index}`;
+        }
+        usedIds.add(id);
+
+        return id === task.id ? task : { ...task, id };
+    });
+
+    const ids = new Set(normalized.map((task) => task.id));
+    const existingParentsOnly = normalized.map((task) =>
+        task.parentId && ids.has(task.parentId) && task.parentId !== task.id
+            ? task
+            : { ...task, parentId: null }
+    );
+
+    const acyclic = existingParentsOnly.map((task) =>
+        hasParentCycle(existingParentsOnly, task)
+            ? { ...task, parentId: null }
+            : task
+    );
+
+    const byId = new Map(acyclic.map((task) => [task.id, task]));
+    /** @type {Map<string, TaskStatus>} */
+    const statusCache = new Map();
+    /**
+     * @param {Task} task
+     * @returns {TaskStatus}
+     */
+    function getEffectiveStatus(task) {
+        const cached = statusCache.get(task.id);
+        if (cached) return cached;
+
+        const parent = task.parentId ? byId.get(task.parentId) : null;
+        const status = parent ? getEffectiveStatus(parent) : task.status;
+        statusCache.set(task.id, status);
+        return status;
+    }
+
+    return acyclic.map((task) => {
+        const status = getEffectiveStatus(task);
+        return task.status !== status
+            ? { ...task, status }
+            : task;
+    });
 }
 
 /**
@@ -146,11 +365,14 @@ export function normalizeTask(raw) {
  */
 function loadInitialTasks() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const storage = getStorage();
+        if (!storage) return [];
+
+        const raw = storage.getItem(STORAGE_KEY);
         if (!raw) return [];
 
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.map(normalizeTask) : [];
+        return Array.isArray(parsed) ? normalizeTaskList(parsed) : [];
     } catch (error) {
         console.error('Failed to load kanban tasks', error);
         return [];
@@ -160,9 +382,18 @@ function loadInitialTasks() {
 /** @type {import('svelte/store').Writable<Task[]>} */
 export const tasks = writable(loadInitialTasks());
 
+let isInitialTaskEmission = true;
 tasks.subscribe((value) => {
+    if (isInitialTaskEmission) {
+        isInitialTaskEmission = false;
+        return;
+    }
+
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+        const storage = getStorage();
+        if (!storage) return;
+
+        storage.setItem(STORAGE_KEY, JSON.stringify(value));
     } catch (error) {
         console.error('Failed to persist kanban tasks', error);
     }
@@ -204,10 +435,10 @@ export function resetFilters() {
 }
 
 /**
- * @param {Task[]} nextTasks
+ * @param {unknown[]} nextTasks
  */
 export function replaceTasks(nextTasks) {
-    tasks.set(nextTasks.map(normalizeTask));
+    tasks.set(normalizeTaskList(nextTasks));
 }
 
 /**
@@ -292,14 +523,21 @@ export function getDirectChildren(taskList, taskId) {
 /**
  * @param {Task[]} taskList
  * @param {string} taskId
+ * @param {string} taskIdToBecomeParent
  */
 export function canAssignParent(taskList, taskId, taskIdToBecomeParent) {
     if (taskId === taskIdToBecomeParent) return false;
 
     let current = taskList.find((task) => task.id === taskIdToBecomeParent) || null;
+    const visited = new Set();
     while (current) {
+        if (visited.has(current.id)) return false;
+        visited.add(current.id);
+
         if (current.parentId === taskId) return false;
-        current = current.parentId ? taskList.find((task) => task.id === current.parentId) || null : null;
+
+        const nextParentId = current.parentId;
+        current = nextParentId ? taskList.find((task) => task.id === nextParentId) || null : null;
     }
 
     return true;
@@ -310,6 +548,8 @@ export function canAssignParent(taskList, taskId, taskIdToBecomeParent) {
  * @param {string} nextStatus
  */
 export function moveTask(taskId, nextStatus) {
+    if (!isTaskStatus(nextStatus)) return;
+
     tasks.update((current) =>
         current.map((task) => {
             if (task.id !== taskId) return task;

@@ -17,6 +17,13 @@
     let selectedTaskId = $state(null);
 
     /**
+     * @param {string} id
+     */
+    function openTask(id) {
+        selectedTaskId = id;
+    }
+
+    /**
      * @param {Event} event
      */
     function importData(event) {
@@ -101,9 +108,9 @@
 <FilterBar />
 
 {#if $currentView === 'kanban'}
-    <KanbanBoard openTask={(id) => selectedTaskId = id} />
+    <KanbanBoard openTask={openTask} />
 {:else}
-    <GanttTimeline openTask={(id) => selectedTaskId = id} />
+    <GanttTimeline openTask={openTask} />
 {/if}
 
 {#if selectedTaskId}

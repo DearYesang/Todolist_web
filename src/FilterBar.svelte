@@ -8,6 +8,7 @@
         setUrgencyFilter
     } from './store.js';
 
+    /** @type {{ value: import('./store.js').PriorityFilter; label: string }[]} */
     const priorityOptions = [
         { value: 'all', label: '전체' },
         { value: 'high', label: '🔴 높음' },
@@ -15,6 +16,7 @@
         { value: 'low', label: '🟢 낮음' }
     ];
 
+    /** @type {{ value: import('./store.js').UrgencyFilter; label: string }[]} */
     const urgencyOptions = [
         { value: 'all', label: '전체' },
         { value: 'urgent', label: '🔥 시급' },

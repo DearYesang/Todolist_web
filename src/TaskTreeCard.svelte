@@ -14,6 +14,17 @@
         URGENCY_LABELS
     } from './store.js';
 
+    /** @type {{
+     *   task: import('./store.js').Task;
+     *   allTasks: import('./store.js').Task[];
+     *   childrenByParent: Record<string, import('./store.js').Task[]>;
+     *   depth?: number;
+     *   draggedId?: string | null;
+     *   openTask: (id: string) => void;
+     *   onDragStart: (event: DragEvent, taskId: string) => void;
+     *   onDragEnd: () => void;
+     *   onDropOnTask: (event: DragEvent, targetTaskId: string) => void;
+     * }} */
     let {
         task,
         allTasks,
@@ -41,11 +52,17 @@
     const completedSubtasks = $derived(task.subtasks.filter((subtask) => subtask.done).length);
     const subtaskProgress = $derived(task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100));
 
+    /**
+     * @param {MouseEvent} event
+     */
     function handleOpenTask(event) {
         event.stopPropagation();
         openTask(task.id);
     }
 
+    /**
+     * @param {DragEvent} event
+     */
     function handleDrop(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -53,6 +70,9 @@
         onDropOnTask(event, task.id);
     }
 
+    /**
+     * @param {Event} event
+     */
     function handleAddSubtask(event) {
         event.stopPropagation();
         if (!newSubtaskText.trim()) return;
@@ -61,12 +81,18 @@
         newSubtaskText = '';
     }
 
+    /**
+     * @param {KeyboardEvent} event
+     */
     function handleSubtaskKeydown(event) {
         if (event.key === 'Enter') {
             handleAddSubtask(event);
         }
     }
 
+    /**
+     * @param {MouseEvent} event
+     */
     function handleDeleteTask(event) {
         event.stopPropagation();
         const message = directChildren.length > 0

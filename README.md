@@ -1,43 +1,107 @@
-# Svelte + Vite
+# Todolist Web
 
-This template should help get you started developing with Svelte in Vite.
+SvelteKit 기반의 로컬 우선 Kanban/Gantt todo 앱입니다. 현재 버전은 브라우저 `localStorage`에 작업을 저장하고, JSON 백업/복원으로 데이터를 옮길 수 있습니다.
 
-## Recommended IDE Setup
+## Current Features
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+- Kanban board: `todo`, `doing`, `done` 컬럼과 드래그 이동
+- Gantt timeline: 작업 일정 시각화와 날짜 바 리사이즈
+- Task hierarchy: 상위/하위 작업, 접기/펼치기, cascade delete
+- Checklist: 작업별 체크리스트, 진행률, URL 링크 표시
+- Filters: 중요도, 시급성, 카테고리 필터
+- Backup: `kanban_backup_YYYY-MM-DD.json` 내보내기/불러오기
 
-## Need an official Svelte framework?
+## Tech Stack
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+- Svelte 5
+- SvelteKit
+- Vite build pipeline
+- Vitest
+- Browser `localStorage`
 
-## Technical considerations
+Legacy vanilla HTML/CSS/JS implementation is preserved on the `legacy` branch. The `main` branch tracks the Svelte app only.
 
-**Why use this over SvelteKit?**
+## Getting Started
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+```bash
+npm ci
+npm run dev
+```
 
-This template contains as little as possible to get started with Vite + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
+Build and preview:
 
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
+```bash
+npm run build
+npm run preview
+```
 
-**Why include `.vscode/extensions.json`?**
+Run tests:
 
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
+```bash
+npm test
+```
 
-**Why enable `checkJs` in the JS template?**
+## Data Model
 
-It is likely that most cases of changing variable types in runtime are likely to be accidental, rather than deliberate. This provides advanced typechecking out of the box. Should you like to take advantage of the dynamically-typed nature of JavaScript, it is trivial to change the configuration.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/sveltejs/svelte-hmr/tree/master/packages/svelte-hmr#preservation-of-local-state).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
+The current local backup format is an array of tasks:
 
 ```js
-// store.js
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+{
+  id: string,
+  text: string,
+  status: 'todo' | 'doing' | 'done',
+  startDate: 'YYYY-MM-DD',
+  endDate: 'YYYY-MM-DD',
+  priority: 'high' | 'medium' | 'low',
+  urgency: 'urgent' | 'normal',
+  category: string,
+  parentId: string | null,
+  subtasks: [{ id: string, text: string, done: boolean }],
+  collapsed: boolean,
+  createdAt: number
+}
 ```
+
+Imported data is normalized before it reaches the app store:
+
+- duplicate task and checklist IDs are repaired
+- invalid enum values fall back to safe defaults
+- invalid or inverted dates are corrected
+- very long task ranges are capped
+- missing, self-referential, or cyclic parent links are removed
+- child status is aligned with the effective parent lane
+
+## Current Limits
+
+- No user accounts yet
+- No server database yet
+- No cross-device sync yet
+- Calendar integration is planned but not implemented
+- Offline behavior is limited to browser storage
+
+## Roadmap
+
+Near-term:
+
+1. Stabilize local domain rules and tests.
+2. Add Neon Postgres through Drizzle.
+3. Add Better Auth with passkey-first login.
+4. Ship PWA install/offline basics.
+5. Add read-only iCalendar feed.
+
+Later:
+
+- Google/Microsoft calendar two-way sync
+- iPhone/iPad wrapper with Capacitor if native capabilities become necessary
+- Windows PWA first, Tauri only if desktop-native behavior is required
+- Rust worker only if calendar sync, recurring task expansion, or bulk import/export become heavy enough to justify a separate service
+
+See [SvelteKit migration notes](docs/SVELTEKIT_MIGRATION.md) and [database schema draft](docs/DATABASE_SCHEMA.md) for the proposed architecture.
+
+## Security Notes
+
+- Secrets must live in `.env` files and stay out of git.
+- Commit `.env.example`, not real credentials.
+- Calendar OAuth tokens should be encrypted at rest once sync is added.
+- iCalendar feed URLs should use revocable tokens.
+- All future write APIs must validate task ownership, date ranges, and parent graph integrity server-side.
