@@ -129,6 +129,18 @@ select {
     color: var(--text);
 }
 
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.62;
+    filter: none;
+}
+
+.btn:disabled:hover {
+    background: var(--surface-raised);
+    border-color: var(--border);
+    color: var(--text-secondary);
+}
+
 .btn-primary {
     border-color: #2ea043;
     background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
@@ -138,6 +150,14 @@ select {
 .btn-primary:hover {
     border-color: #3fb950;
     filter: brightness(1.06);
+}
+
+.btn-primary:disabled,
+.btn-primary:disabled:hover {
+    border-color: #2ea043;
+    background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+    color: #fff;
+    filter: none;
 }
 
 .btn-danger {
@@ -331,9 +351,18 @@ select {
 
 .form-actions {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
     gap: 10px;
     margin-top: 20px;
+}
+
+.form-error {
+    flex: 1 1 220px;
+    margin: 0;
+    color: var(--priority-high);
+    font-size: 12px;
+    line-height: 1.4;
 }
 
 .filter-bar {

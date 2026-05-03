@@ -7,6 +7,8 @@ import {
     normalizeTaskList
 } from './lib/shared/task-domain.js';
 import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
+import { createServerTask } from './lib/client/task-api.js';
+import { buildTaskCreateDraft, createLocalTaskFromDraft } from './lib/client/task-create.js';
 import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
 import { parseCreateTaskInput, TaskWriteError } from './lib/server/tasks/validation.js';
 import {
@@ -152,6 +154,110 @@ describe('task relationship mutations', () => {
         const child = get(tasks).find((task) => task.id === 'child');
         expect(child?.status).toBe('todo');
         expect(child?.parentId).toBe('parent');
+    });
+});
+
+describe('client task creation', () => {
+    it('builds strict server payloads and keeps server parent ids', () => {
+        const parent = normalizeTask({
+            id: '11111111-1111-4111-8111-111111111111',
+            text: 'Parent',
+            status: 'doing'
+        });
+
+        expect(buildTaskCreateDraft({
+            text: '  Child task  ',
+            priority: 'high',
+            urgency: 'urgent',
+            category: '  개발  ',
+            startDate: '2026-05-03',
+            endDate: '2026-05-04',
+            parent
+        })).toEqual({
+            payload: {
+                text: 'Child task',
+                status: 'doing',
+                startDate: '2026-05-03',
+                endDate: '2026-05-04',
+                priority: 'high',
+                urgency: 'urgent',
+                category: '개발',
+                parentId: '11111111-1111-4111-8111-111111111111'
+            },
+            parent,
+            hasLocalParent: false
+        });
+    });
+
+    it('keeps local parent relationships out of server payloads', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 4, 3, 12));
+
+        const parent = normalizeTask({
+            id: 'local-parent',
+            text: 'Local parent',
+            status: 'todo'
+        });
+        const draft = buildTaskCreateDraft({
+            text: 'Local child',
+            priority: 'medium',
+            urgency: 'normal',
+            category: '',
+            startDate: '2026-05-03',
+            endDate: '2026-05-05',
+            parent
+        });
+
+        expect(draft).not.toBeNull();
+        if (!draft) throw new Error('Expected a task create draft.');
+
+        expect(draft.hasLocalParent).toBe(true);
+        expect(draft.payload.parentId).toBeNull();
+
+        const localTask = createLocalTaskFromDraft(draft.payload, draft.parent);
+        expect(localTask.parentId).toBe('local-parent');
+        expect(localTask.status).toBe('todo');
+
+        vi.useRealTimers();
+    });
+
+    it('classifies task API responses for server create and fallback', async () => {
+        const serverTask = normalizeTask({
+            id: '22222222-2222-4222-8222-222222222222',
+            text: 'Server task'
+        });
+        const fetcher = vi.fn(async () => new Response(JSON.stringify({ task: serverTask }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        await expect(createServerTask({ text: 'Server task' }, fetcher)).resolves.toEqual({
+            ok: true,
+            task: serverTask
+        });
+        expect(fetcher).toHaveBeenCalledWith('/api/tasks', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ text: 'Server task' })
+        }));
+
+        await expect(createServerTask({}, async () => new Response(JSON.stringify({ message: 'Auth required.' }), {
+            status: 401,
+            headers: { 'content-type': 'application/json' }
+        }))).resolves.toMatchObject({
+            ok: false,
+            fallback: true,
+            status: 401
+        });
+
+        await expect(createServerTask({}, async () => new Response(JSON.stringify({ message: 'Invalid task.' }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' }
+        }))).resolves.toMatchObject({
+            ok: false,
+            fallback: false,
+            status: 400,
+            message: 'Invalid task.'
+        });
     });
 });
 
