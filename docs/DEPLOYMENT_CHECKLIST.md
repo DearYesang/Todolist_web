@@ -32,12 +32,14 @@ npm run build
 
 Production values for the personal deployment:
 
-- `BETTER_AUTH_URL=https://todokanban.com`
-- `BETTER_AUTH_TRUSTED_ORIGINS=https://todokanban.com`
-- `PASSKEY_ORIGIN=https://todokanban.com`
-- `PASSKEY_RP_ID=todokanban.com`
+- `BETTER_AUTH_URL=https://todokanban.vercel.app`
+- `BETTER_AUTH_TRUSTED_ORIGINS=https://todokanban.vercel.app`
+- `PASSKEY_ORIGIN=https://todokanban.vercel.app`
+- `PASSKEY_RP_ID=todokanban.vercel.app`
 - `AUTH_ALLOWED_EMAILS=scyea@naver.com,scyea1995@gmail.com`
-- `EMAIL_FROM=Todokanban <no-reply@todokanban.com>`
+- `EMAIL_FROM=Todokanban <onboarding@resend.dev>`
+
+`onboarding@resend.dev` only delivers to the email address associated with the Resend account. Use that email for the first passkey registration, or verify a custom domain later.
 
 Webhook email delivery remains available with `EMAIL_DELIVERY_WEBHOOK_URL` and `EMAIL_DELIVERY_WEBHOOK_SECRET` if Resend is not used.
 

@@ -5,7 +5,7 @@ import { getDb, schema } from '$lib/server/db/index.js';
 const EMAIL_VERIFICATION_PREFIX = 'passkey-email-verification:';
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const RECOVERY_CODE_COUNT = 10;
-const DEFAULT_RESEND_FROM = 'Todolist <onboarding@resend.dev>';
+const DEFAULT_RESEND_FROM = 'Todokanban <onboarding@resend.dev>';
 
 export class AccountSecurityConfigurationError extends Error {
 	/** @param {string} message */
