@@ -34,6 +34,8 @@ Better Auth server configuration lives under `src/lib/server/auth`; the SvelteKi
 
 PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker.js` caches the app shell and static assets for repeat visits.
 
+Local iCalendar export uses `src/lib/shared/calendar-ics.js`; the same generator can back a server `.ics` feed once tasks are database-backed.
+
 ## Target Shape
 
 ```txt
@@ -72,7 +74,7 @@ src/routes/api/export/+server.js
 3. Implement server routes/actions for task CRUD.
 4. Switch client mutations from local store writes to server calls with optimistic updates.
 5. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.
-6. Add read-only iCalendar feed after task data is server-backed.
+6. Add server-backed read-only iCalendar feed after task data is server-backed.
 7. Define conflict policy for offline server-backed writes.
 
 ## Domain Boundaries
