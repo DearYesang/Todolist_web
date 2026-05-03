@@ -252,6 +252,22 @@ select {
     font-size: 12px;
 }
 
+.calendar-sync-run-list {
+    display: grid;
+    gap: 4px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-light);
+}
+
+.calendar-sync-run-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
 .view-toggle {
     display: flex;
     overflow: hidden;

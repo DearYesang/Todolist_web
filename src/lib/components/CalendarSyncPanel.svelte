@@ -13,6 +13,7 @@
     let message = $state('');
     let providers = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarProviderRecord[]} */ ([]));
     let connections = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarConnectionRecord[]} */ ([]));
+    let syncRuns = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarSyncRunRecord[]} */ ([]));
 
     async function refresh() {
         if (!$session.data?.user) return;
@@ -21,6 +22,7 @@
         if (result.ok) {
             providers = result.providers;
             connections = result.connections;
+            syncRuns = result.syncRuns;
         } else {
             message = result.message;
         }
@@ -88,6 +90,13 @@
     function getProviderName(provider) {
         return providers.find((item) => item.id === provider)?.name ?? provider;
     }
+
+    /**
+     * @param {string} value
+     */
+    function formatDateTime(value) {
+        return new Date(value).toLocaleString('ko-KR');
+    }
 </script>
 
 {#if $session.data?.user}
@@ -109,8 +118,24 @@
                     <div class="calendar-connection-list">
                         {#each connections as connection}
                             <div class="calendar-connection-row">
-                                <span>{getProviderName(connection.provider)}</span>
+                                <span>
+                                    {getProviderName(connection.provider)}
+                                    {#if connection.latestSync}
+                                        · {connection.latestSync.status} · {formatDateTime(connection.latestSync.startedAt)}
+                                    {/if}
+                                </span>
                                 <button class="btn btn-small" onclick={() => disconnect(connection.id)} disabled={isWorking}>해제</button>
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+
+                {#if syncRuns.length > 0}
+                    <div class="calendar-sync-run-list">
+                        {#each syncRuns.slice(0, 3) as run}
+                            <div class="calendar-sync-run-row">
+                                <span>{getProviderName(run.provider)} · {run.status}</span>
+                                <span>{run.upserted}/{run.taskCount} · 실패 {run.failed}</span>
                             </div>
                         {/each}
                     </div>

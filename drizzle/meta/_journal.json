@@ -43,6 +43,13 @@
       "when": 1777804305018,
       "tag": "0005_fuzzy_blur",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777805390005,
+      "tag": "0006_previous_vulcan",
+      "breakpoints": true
     }
   ]
 }

@@ -12,7 +12,22 @@
  *   createdAt: string;
  *   updatedAt: string;
  *   expiresAt: string | null;
+ *   latestSync?: CalendarSyncRunRecord | null;
  * }} CalendarConnectionRecord
+ *
+ * @typedef {{
+ *   id: string;
+ *   connectionId: string;
+ *   provider: string;
+ *   status: string;
+ *   startedAt: string;
+ *   finishedAt: string | null;
+ *   taskCount: number;
+ *   upserted: number;
+ *   deleted: number;
+ *   failed: number;
+ *   message: string | null;
+ * }} CalendarSyncRunRecord
  *
  * @typedef {{
  *   connectionId: string;
@@ -20,13 +35,15 @@
  *   upserted: number;
  *   deleted: number;
  *   failed: number;
+ *   status?: string;
+ *   message?: string;
  * }} CalendarSyncSummary
  */
 
 /**
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<
- *   | { ok: true; providers: CalendarProviderRecord[]; connections: CalendarConnectionRecord[] }
+ *   | { ok: true; providers: CalendarProviderRecord[]; connections: CalendarConnectionRecord[]; syncRuns: CalendarSyncRunRecord[] }
  *   | { ok: false; status: number; message: string }
  * >}
  */
@@ -44,7 +61,8 @@ export async function listCalendarProviders(fetcher = globalThis.fetch) {
 			return {
 				ok: true,
 				providers: body.providers,
-				connections: body.connections
+				connections: body.connections,
+				syncRuns: body.syncRuns ?? []
 			};
 		}
 
@@ -138,7 +156,7 @@ async function readJsonBody(response) {
 
 /**
  * @param {unknown} body
- * @returns {body is { providers: CalendarProviderRecord[]; connections: CalendarConnectionRecord[] }}
+ * @returns {body is { providers: CalendarProviderRecord[]; connections: CalendarConnectionRecord[]; syncRuns?: CalendarSyncRunRecord[] }}
  */
 function isProviderListBody(body) {
 	return Boolean(
