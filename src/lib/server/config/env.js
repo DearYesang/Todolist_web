@@ -10,8 +10,12 @@ const MIN_SECRET_LENGTH = 32;
  * }} ConfigCheck
  */
 
-export function getRuntimeConfigReport() {
+/**
+ * @param {{ currentOrigin?: string }} [options]
+ */
+export function getRuntimeConfigReport(options = {}) {
 	const authRequired = Boolean(process.env.DATABASE_URL) || process.env.NODE_ENV === 'production';
+	const currentOrigin = normalizeOrigin(options.currentOrigin);
 	const calendarProviderConfigured = Boolean(
 		process.env.GOOGLE_CALENDAR_CLIENT_ID
 		|| process.env.GOOGLE_CALENDAR_CLIENT_SECRET
@@ -41,7 +45,8 @@ export function getRuntimeConfigReport() {
 		checkValue('GOOGLE_CALENDAR_CLIENT_ID', process.env.GOOGLE_CALENDAR_CLIENT_ID, false),
 		checkSecret('GOOGLE_CALENDAR_CLIENT_SECRET', process.env.GOOGLE_CALENDAR_CLIENT_SECRET, false),
 		checkValue('MICROSOFT_CALENDAR_CLIENT_ID', process.env.MICROSOFT_CALENDAR_CLIENT_ID, false),
-		checkSecret('MICROSOFT_CALENDAR_CLIENT_SECRET', process.env.MICROSOFT_CALENDAR_CLIENT_SECRET, false)
+		checkSecret('MICROSOFT_CALENDAR_CLIENT_SECRET', process.env.MICROSOFT_CALENDAR_CLIENT_SECRET, false),
+		...getCurrentOriginChecks(currentOrigin)
 	];
 	const blocking = checks.filter((check) => check.required && check.status !== 'ok');
 
@@ -62,6 +67,23 @@ export function getRuntimeConfigReport() {
 		checks,
 		blocking
 	};
+}
+
+/**
+ * @param {string | null} currentOrigin
+ * @returns {ConfigCheck[]}
+ */
+function getCurrentOriginChecks(currentOrigin) {
+	if (!currentOrigin || process.env.NODE_ENV !== 'production') {
+		return [];
+	}
+
+	return [
+		checkUrlMatchesCurrentOrigin('BETTER_AUTH_URL_CURRENT_ORIGIN', process.env.BETTER_AUTH_URL, currentOrigin, true),
+		checkTrustedOriginsIncludeCurrentOrigin(currentOrigin),
+		checkUrlMatchesCurrentOrigin('PASSKEY_ORIGIN_CURRENT_ORIGIN', process.env.PASSKEY_ORIGIN, currentOrigin, true),
+		checkPasskeyRpIdMatchesCurrentHost(currentOrigin)
+	];
 }
 
 export function getProductionConfigError() {
@@ -183,6 +205,82 @@ function checkTrustedOrigins() {
 	);
 }
 
+/**
+ * @param {string} key
+ * @param {string | undefined} value
+ * @param {string} currentOrigin
+ * @param {boolean} required
+ */
+function checkUrlMatchesCurrentOrigin(key, value, currentOrigin, required) {
+	if (!value) {
+		return createCheck(key, required, required ? 'missing' : 'optional', `${key} is ${required ? 'required' : 'optional'}.`);
+	}
+
+	const normalized = normalizeOrigin(value);
+	if (!normalized) {
+		return createCheck(key, required, 'invalid', `${key} must be a valid URL origin.`);
+	}
+
+	return createCheck(
+		key,
+		required,
+		normalized === currentOrigin ? 'ok' : 'invalid',
+		normalized === currentOrigin
+			? `${key} matches the current app origin.`
+			: `${key} must match the current app origin.`
+	);
+}
+
+/**
+ * @param {string} currentOrigin
+ */
+function checkTrustedOriginsIncludeCurrentOrigin(currentOrigin) {
+	const value = process.env.BETTER_AUTH_TRUSTED_ORIGINS;
+	if (!value) {
+		return createCheck('BETTER_AUTH_TRUSTED_ORIGINS_CURRENT_ORIGIN', true, 'missing', 'BETTER_AUTH_TRUSTED_ORIGINS must include the current app origin.');
+	}
+
+	const origins = value
+		.split(',')
+		.map((origin) => normalizeOrigin(origin.trim()))
+		.filter(Boolean);
+	const includesCurrent = origins.includes(currentOrigin);
+
+	return createCheck(
+		'BETTER_AUTH_TRUSTED_ORIGINS_CURRENT_ORIGIN',
+		true,
+		includesCurrent ? 'ok' : 'invalid',
+		includesCurrent
+			? 'BETTER_AUTH_TRUSTED_ORIGINS includes the current app origin.'
+			: 'BETTER_AUTH_TRUSTED_ORIGINS must include the current app origin.'
+	);
+}
+
+/**
+ * @param {string} currentOrigin
+ */
+function checkPasskeyRpIdMatchesCurrentHost(currentOrigin) {
+	const value = process.env.PASSKEY_RP_ID;
+	if (!value) {
+		return createCheck('PASSKEY_RP_ID_CURRENT_HOST', true, 'missing', 'PASSKEY_RP_ID must match the current app host.');
+	}
+
+	const hostname = getHostname(currentOrigin);
+	if (!hostname) {
+		return createCheck('PASSKEY_RP_ID_CURRENT_HOST', true, 'invalid', 'Current app origin must have a valid hostname.');
+	}
+
+	const matches = isHostCoveredByRpId(hostname, value.trim().toLowerCase());
+	return createCheck(
+		'PASSKEY_RP_ID_CURRENT_HOST',
+		true,
+		matches ? 'ok' : 'invalid',
+		matches
+			? 'PASSKEY_RP_ID is valid for the current app host.'
+			: 'PASSKEY_RP_ID must be valid for the current app host.'
+	);
+}
+
 function checkAllowedEmails() {
 	const value = process.env.AUTH_ALLOWED_EMAILS;
 	if (!value) {
@@ -228,4 +326,46 @@ function checkValue(key, value, required) {
  */
 function createCheck(key, required, status, message) {
 	return { key, required, status, message };
+}
+
+/**
+ * @param {string | undefined} value
+ */
+function normalizeOrigin(value) {
+	if (!value) {
+		return null;
+	}
+
+	try {
+		return new URL(value).origin;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * @param {string} value
+ */
+function getHostname(value) {
+	try {
+		return new URL(value).hostname.toLowerCase();
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * @param {string} hostname
+ * @param {string} rpId
+ */
+function isHostCoveredByRpId(hostname, rpId) {
+	if (hostname === rpId) {
+		return true;
+	}
+
+	if (hostname.endsWith('.vercel.app') || rpId.endsWith('.vercel.app')) {
+		return false;
+	}
+
+	return hostname.endsWith(`.${rpId}`);
 }

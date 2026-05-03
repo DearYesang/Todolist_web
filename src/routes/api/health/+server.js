@@ -3,7 +3,7 @@ import { getRuntimeConfigReport } from '$lib/server/config/env.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
-	const report = getRuntimeConfigReport();
+	const report = getRuntimeConfigReport({ currentOrigin: url.origin });
 	const strict = url.searchParams.get('strict') === 'true' || process.env.NODE_ENV === 'production';
 	const status = strict && !report.ok ? 503 : 200;
 
