@@ -117,7 +117,7 @@ function normalizeStorageOwner(ownerId) {
     return trimmed || DEFAULT_STORAGE_OWNER;
 }
 
-/** @type {import('svelte/store').Writable<'kanban' | 'gantt'>} */
+/** @type {import('svelte/store').Writable<'kanban' | 'gantt' | 'matrix'>} */
 export const currentView = writable('kanban');
 
 /** @type {import('svelte/store').Writable<import('../shared/task-domain.js').TaskFilters>} */

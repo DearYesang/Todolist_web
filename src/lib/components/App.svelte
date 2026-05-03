@@ -27,6 +27,7 @@
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
     import CalendarSyncPanel from './CalendarSyncPanel.svelte';
+    import EisenhowerMatrix from './EisenhowerMatrix.svelte';
     import FilterBar from './FilterBar.svelte';
     import GanttTimeline from './GanttTimeline.svelte';
     import KanbanBoard from './KanbanBoard.svelte';
@@ -304,6 +305,9 @@
             <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => $currentView = 'gantt'}>
                 📊 간트 뷰
             </button>
+            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => $currentView = 'matrix'}>
+                🧭 매트릭스
+            </button>
         </div>
     {/if}
 
@@ -367,8 +371,10 @@
 
     {#if $currentView === 'kanban'}
         <KanbanBoard openTask={openTask} />
-    {:else}
+    {:else if $currentView === 'gantt'}
         <GanttTimeline openTask={openTask} />
+    {:else}
+        <EisenhowerMatrix openTask={openTask} />
     {/if}
 
     {#if selectedTaskId}
