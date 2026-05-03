@@ -11,6 +11,8 @@
     let email = $state('');
     let name = $state('');
     let emailVerificationCode = $state('');
+    let verificationEmail = $state('');
+    let verificationExpiresAt = $state('');
     let recoveryCode = $state('');
     let passkeyName = $state('내 기기');
     let isRecoveryMode = $state(false);
@@ -39,13 +41,16 @@
                 name: name.trim() || normalizedEmail
             });
             if (!result.ok) {
-                authError = result.message;
+                authError = getAuthErrorMessage(result);
                 return;
             }
 
+            emailVerificationCode = '';
+            verificationEmail = result.email;
+            verificationExpiresAt = result.expiresAt;
             authMessage = result.previewCode
                 ? `확인 코드: ${result.previewCode}`
-                : '이메일로 확인 코드를 보냈습니다.';
+                : '새 확인 코드를 보냈습니다. 가장 최근 코드만 사용할 수 있습니다.';
         } finally {
             isWorking = false;
         }
@@ -61,6 +66,14 @@
         }
         if (!$session.data?.user && !isRecoveryMode && !emailVerificationCode.trim()) {
             authError = '이메일 확인 코드를 입력해 주세요.';
+            return;
+        }
+        if (!$session.data?.user && !isRecoveryMode && verificationEmail && verificationEmail !== normalizedEmail) {
+            authError = '현재 이메일로 새 확인 코드를 받아 주세요.';
+            return;
+        }
+        if (!$session.data?.user && !isRecoveryMode && isExpiredVerificationCode()) {
+            authError = '확인 코드가 만료되었습니다. 새 코드를 받아 주세요.';
             return;
         }
         if (!$session.data?.user && isRecoveryMode && !recoveryCode.trim()) {
@@ -142,6 +155,7 @@
             authMessage = '로그아웃되었습니다.';
             recoverySummary = null;
             newRecoveryCodes = [];
+            clearVerificationState();
             await $session.refetch();
         } finally {
             isWorking = false;
@@ -158,7 +172,7 @@
         try {
             const result = await createRecoveryCodes();
             if (!result.ok) {
-                authError = result.message;
+                authError = getAuthErrorMessage(result);
                 return;
             }
 
@@ -180,7 +194,7 @@
         try {
             const result = await revokeRecoveryCodes();
             if (!result.ok) {
-                authError = result.message;
+                authError = getAuthErrorMessage(result);
                 return;
             }
 
@@ -200,7 +214,35 @@
             return '데이터베이스 설정 후 이용할 수 있습니다.';
         }
 
-        return error.message || error.statusText || '인증 요청을 완료하지 못했습니다.';
+        const message = error.message || error.statusText || '';
+        if (/valid email verification code|required for passkey|INVALID_PASSKEY_EMAIL_CODE/i.test(message)) {
+            return '확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.';
+        }
+        if (/valid recovery code|INVALID_PASSKEY_RECOVERY_CODE/i.test(message)) {
+            return '복구 코드가 맞지 않거나 이미 사용되었습니다.';
+        }
+        if (/not allowed|EMAIL_NOT_ALLOWED/i.test(message)) {
+            return '가입이 허용된 이메일만 사용할 수 있습니다.';
+        }
+        if (/failed to verify registration/i.test(message)) {
+            return '패스키 등록을 확인하지 못했습니다. 새 확인 코드를 받아 다시 시도해 주세요.';
+        }
+        if (/authentication failed|passkey not found/i.test(message)) {
+            return '등록된 패스키를 찾지 못했습니다.';
+        }
+
+        return message || '인증 요청을 완료하지 못했습니다.';
+    }
+
+    function clearVerificationState() {
+        emailVerificationCode = '';
+        verificationEmail = '';
+        verificationExpiresAt = '';
+    }
+
+    function isExpiredVerificationCode() {
+        const expiresAt = Date.parse(verificationExpiresAt);
+        return Number.isFinite(expiresAt) && expiresAt <= Date.now();
     }
 </script>
 

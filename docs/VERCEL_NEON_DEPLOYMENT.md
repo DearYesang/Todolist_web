@@ -90,3 +90,16 @@ npm run db:migrate
 8. Create an iCalendar feed token and subscribe from Apple Calendar.
 9. Connect Google Calendar and run manual sync.
 10. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.
+
+## Vercel Dashboard Quick Guide
+
+Use the stable app URL as the source of truth: `https://todokanban-alpha.vercel.app`.
+
+The generated deployment URLs under **Deployments** can show `401`, `403`, or a forbidden thumbnail when Vercel protection is applied. That does not mean the production app is down. Use those URLs only for inspecting a specific build.
+
+For day-to-day checks:
+
+1. Open the stable app URL.
+2. Open `https://todokanban-alpha.vercel.app/api/health?strict=true`.
+3. In Vercel, use **Logs** for runtime errors and **Environment Variables** for secret changes.
+4. Ignore the deployment preview image if the stable app URL and strict health check are healthy.
