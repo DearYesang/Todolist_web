@@ -22,6 +22,8 @@ Better Auth owns the auth tables. The current Drizzle schema includes:
 
 When Better Auth or passkey plugin versions change, compare the schema against `npx auth@latest generate` before creating a new Drizzle migration. App tables keep user IDs as text; cross-table foreign keys can be tightened after task ownership services are implemented.
 
+Calendar subscription tokens are app-owned, but they reference Better Auth users and never store raw token values.
+
 ## App Tables
 
 ### workspaces
@@ -98,7 +100,25 @@ updated_at timestamptz not null default now()
 
 ## Calendar Tables
 
-Add these after read-only calendar export is stable.
+Provider sync tables are scaffolded ahead of the feature. Subscription tokens are active.
+
+### calendar_subscription_tokens
+
+```txt
+id uuid primary key
+user_id text not null references user(id) on delete cascade
+workspace_id uuid not null references workspaces(id) on delete cascade
+board_id uuid not null references boards(id) on delete cascade
+name text not null default 'Calendar feed'
+token_hash text not null unique
+token_prefix text not null
+created_at timestamptz not null default now()
+last_used_at timestamptz
+revoked_at timestamptz
+expires_at timestamptz
+```
+
+The raw token is generated with CSPRNG bytes and returned once. Store only `HMAC-SHA256(CALENDAR_TOKEN_SECRET, rawToken)`.
 
 ### calendar_connections
 
@@ -154,6 +174,9 @@ tasks(board_id, category)
 tasks(board_id, deleted_at)
 checklist_items(task_id, position)
 calendar_connections(workspace_id, provider)
+calendar_subscription_tokens(user_id)
+calendar_subscription_tokens(board_id)
+calendar_subscription_tokens(token_hash) unique
 calendar_event_links(task_id)
 sync_cursors(connection_id, resource)
 ```
@@ -179,6 +202,7 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Authenticated task list/create/update/soft-delete cascade.
 - Authenticated checklist create/update/delete.
 - Authenticated read-only `/api/calendar.ics` download backed by server tasks.
+- Revocable token-based `/api/calendar/subscriptions/[token].ics` feed backed by token hashes.
 - Parent ownership and cycle validation in the service layer.
 
-Server import/export and revocable calendar subscription tokens are still planned.
+Server append import/export is implemented. Replace import and two-way provider sync are still planned.

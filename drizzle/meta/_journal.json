@@ -22,6 +22,13 @@
       "when": 1777796700541,
       "tag": "0002_yellow_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777803034322,
+      "tag": "0003_powerful_bruce_banner",
+      "breakpoints": true
     }
   ]
 }

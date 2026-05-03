@@ -34,7 +34,7 @@ Better Auth server configuration lives under `src/lib/server/auth`; the SvelteKi
 
 PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker.js` caches the app shell and static assets for repeat visits.
 
-Local iCalendar export uses `src/lib/shared/calendar-ics.js`; `/api/calendar.ics` uses the same generator for authenticated server-backed calendar downloads.
+Local iCalendar export uses `src/lib/shared/calendar-ics.js`; `/api/calendar.ics` uses the same generator for authenticated server-backed calendar downloads. Revocable subscription URLs are available through `/api/calendar/tokens` and `/api/calendar/subscriptions/[token].ics`.
 
 Authenticated task routes now cover read/create/update/delete plus checklist create/update/delete:
 
@@ -43,7 +43,7 @@ Authenticated task routes now cover read/create/update/delete plus checklist cre
 - `src/routes/api/tasks/[taskId]/checklist/+server.js`
 - `src/routes/api/tasks/[taskId]/checklist/[itemId]/+server.js`
 
-Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until a server import/conflict policy exists.
+Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until a conflict policy exists. Server JSON import currently appends remapped tasks instead of replacing existing data.
 
 ## Target Shape
 
@@ -78,10 +78,10 @@ src/routes/api/export/+server.js
 
 ## Next Steps
 
-1. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during server import.
-2. Add revocable-token iCalendar subscription feed after token strategy is defined.
-3. Define conflict policy for offline server-backed writes.
-4. Add route/component tests around auth and sync flows once UI flows stabilize.
+1. Add replace import with statement-level atomicity or transaction-capable DB access.
+2. Define conflict policy for offline server-backed writes.
+3. Add route/component tests around auth and sync flows once UI flows stabilize.
+4. Add account recovery before production passkey-only enforcement.
 
 ## Domain Boundaries
 

@@ -28,10 +28,18 @@ export async function listTasksForUser(userId) {
 		return [];
 	}
 
+	return listTasksForBoard(board.id);
+}
+
+/**
+ * @param {string} boardId
+ */
+export async function listTasksForBoard(boardId) {
+	const db = getDb();
 	const taskRows = await db
 		.select()
 		.from(schema.tasks)
-		.where(and(eq(schema.tasks.boardId, board.id), isNull(schema.tasks.deletedAt)))
+		.where(and(eq(schema.tasks.boardId, boardId), isNull(schema.tasks.deletedAt)))
 		.orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
 
 	if (taskRows.length === 0) {
@@ -45,6 +53,13 @@ export async function listTasksForUser(userId) {
 		.orderBy(asc(schema.checklistItems.position), asc(schema.checklistItems.createdAt));
 
 	return mapTaskRowsToClientTasks(taskRows, checklistRows);
+}
+
+/**
+ * @param {string} userId
+ */
+export async function ensurePersonalBoardForUser(userId) {
+	return getOrCreatePersonalBoardForUser(getDb(), userId);
 }
 
 /**
