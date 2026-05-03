@@ -34,6 +34,26 @@ const FALLBACK_STATUSES = new Set([401, 409, 503]);
  *   status: number;
  *   message: string;
  * }} DeleteServerTaskResult
+ *
+ * @typedef {{
+ *   receivedTasks: number;
+ *   importedTasks: number;
+ *   skippedTasks: number;
+ *   importedChecklistItems: number;
+ *   skippedChecklistItems: number;
+ *   repairedParentLinks: number;
+ * }} TaskImportSummary
+ *
+ * @typedef {{
+ *   ok: true;
+ *   tasks: import('../shared/task-domain.js').Task[];
+ *   summary: TaskImportSummary;
+ * } | {
+ *   ok: false;
+ *   fallback: boolean;
+ *   status: number;
+ *   message: string;
+ * }} ImportServerTasksResult
  */
 
 /**
@@ -57,6 +77,80 @@ export async function listServerTasks(fetcher = globalThis.fetch) {
 			return {
 				ok: true,
 				tasks: normalizeTaskList(body.tasks)
+			};
+		}
+
+		return {
+			ok: false,
+			fallback: FALLBACK_STATUSES.has(response.status),
+			status: response.status,
+			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
+		};
+	} catch {
+		return createFallbackResult('Task API request could not be completed.');
+	}
+}
+
+/**
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<ListServerTasksResult>}
+ */
+export async function exportServerTasks(fetcher = globalThis.fetch) {
+	if (typeof fetcher !== 'function') {
+		return createFallbackResult('Task API is not available.');
+	}
+
+	try {
+		const response = await fetcher('/api/export', {
+			headers: {
+				accept: 'application/json'
+			}
+		});
+		const body = await readJsonBody(response);
+
+		if (response.ok && Array.isArray(body)) {
+			return {
+				ok: true,
+				tasks: normalizeTaskList(body)
+			};
+		}
+
+		return {
+			ok: false,
+			fallback: FALLBACK_STATUSES.has(response.status),
+			status: response.status,
+			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
+		};
+	} catch {
+		return createFallbackResult('Task API request could not be completed.');
+	}
+}
+
+/**
+ * @param {unknown[]} tasks
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<ImportServerTasksResult>}
+ */
+export async function importServerTasks(tasks, fetcher = globalThis.fetch) {
+	if (typeof fetcher !== 'function') {
+		return createFallbackResult('Task API is not available.');
+	}
+
+	try {
+		const response = await fetcher('/api/import', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json'
+			},
+			body: JSON.stringify(tasks)
+		});
+		const body = await readJsonBody(response);
+
+		if (response.ok && isImportResponse(body)) {
+			return {
+				ok: true,
+				tasks: normalizeTaskList(body.tasks),
+				summary: body.summary
 			};
 		}
 
@@ -313,6 +407,22 @@ function isDeleteResponse(body) {
 		&& typeof body === 'object'
 		&& 'deleted' in body
 		&& typeof /** @type {{ deleted?: unknown }} */ (body).deleted === 'number'
+	);
+}
+
+/**
+ * @param {unknown} body
+ * @returns {body is { tasks: unknown[]; summary: TaskImportSummary }}
+ */
+function isImportResponse(body) {
+	return Boolean(
+		body
+		&& typeof body === 'object'
+		&& 'tasks' in body
+		&& Array.isArray(body.tasks)
+		&& 'summary' in body
+		&& body.summary
+		&& typeof body.summary === 'object'
 	);
 }
 

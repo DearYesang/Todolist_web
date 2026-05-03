@@ -12,11 +12,14 @@ import {
     createServerTask,
     deleteServerChecklistItem,
     deleteServerTask,
+    exportServerTasks,
+    importServerTasks,
     listServerTasks,
     updateServerChecklistItem,
     updateServerTask
 } from './lib/client/task-api.js';
 import { buildTaskCreateDraft, createLocalTaskFromDraft } from './lib/client/task-create.js';
+import { planTaskImport } from './lib/server/tasks/import-planner.js';
 import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
 import {
     assertValidTaskDateRange,
@@ -413,6 +416,132 @@ describe('client task creation', () => {
             `/api/tasks/${serverTask.id}/checklist/77777777-7777-4777-8777-777777777777`,
             expect.objectContaining({ method: 'DELETE' })
         );
+    });
+
+    it('calls server import and export endpoints', async () => {
+        const serverTask = normalizeTask({
+            id: '88888888-8888-4888-8888-888888888888',
+            text: 'Imported task'
+        });
+        const exportFetcher = vi.fn(async () => new Response(JSON.stringify([serverTask]), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        }));
+
+        await expect(exportServerTasks(exportFetcher)).resolves.toEqual({
+            ok: true,
+            tasks: [serverTask]
+        });
+        expect(exportFetcher).toHaveBeenCalledWith('/api/export', expect.objectContaining({
+            headers: { accept: 'application/json' }
+        }));
+
+        const summary = {
+            receivedTasks: 1,
+            importedTasks: 1,
+            skippedTasks: 0,
+            importedChecklistItems: 0,
+            skippedChecklistItems: 0,
+            repairedParentLinks: 0
+        };
+        const importFetcher = vi.fn(async () => new Response(JSON.stringify({
+            tasks: [serverTask],
+            summary
+        }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' }
+        }));
+        const payload = [{ id: 'legacy-task', text: 'Imported task' }];
+
+        await expect(importServerTasks(payload, importFetcher)).resolves.toEqual({
+            ok: true,
+            tasks: [serverTask],
+            summary
+        });
+        expect(importFetcher).toHaveBeenCalledWith('/api/import', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify(payload)
+        }));
+    });
+});
+
+describe('server task import planning', () => {
+    it('remaps legacy ids and preserves valid parent/checklist relationships', () => {
+        const ids = [
+            '00000000-0000-4000-8000-000000000001',
+            '00000000-0000-4000-8000-000000000002',
+            '00000000-0000-4000-8000-000000000003'
+        ];
+        const { plans, summary } = planTaskImport([
+            {
+                id: 'parent',
+                text: 'Parent',
+                status: 'doing',
+                startDate: '2026-05-03',
+                endDate: '2026-05-04',
+                subtasks: [{ id: 'sub', text: '  Checklist  ', done: true }]
+            },
+            {
+                id: 'child',
+                text: 'Child',
+                status: 'todo',
+                parentId: 'parent',
+                startDate: '2026-05-04',
+                endDate: '2026-05-05'
+            }
+        ], {
+            idFactory: () => ids.shift() ?? '00000000-0000-4000-8000-000000000099'
+        });
+
+        expect(plans.map((plan) => ({
+            oldId: plan.oldId,
+            id: plan.id,
+            parentTaskId: plan.parentTaskId,
+            checklistItems: plan.checklistItems
+        }))).toEqual([
+            {
+                oldId: 'parent',
+                id: '00000000-0000-4000-8000-000000000001',
+                parentTaskId: null,
+                checklistItems: [{
+                    oldId: 'sub',
+                    id: '00000000-0000-4000-8000-000000000003',
+                    text: 'Checklist',
+                    done: true
+                }]
+            },
+            {
+                oldId: 'child',
+                id: '00000000-0000-4000-8000-000000000002',
+                parentTaskId: '00000000-0000-4000-8000-000000000001',
+                checklistItems: []
+            }
+        ]);
+        expect(summary).toEqual({
+            receivedTasks: 2,
+            importedTasks: 2,
+            skippedTasks: 0,
+            importedChecklistItems: 1,
+            skippedChecklistItems: 0,
+            repairedParentLinks: 0
+        });
+    });
+
+    it('rejects non-array imports and skips empty task titles', () => {
+        expect(() => planTaskImport({ text: 'Not an array' })).toThrow('Import payload must be an array of tasks.');
+
+        const { plans, summary } = planTaskImport([
+            { id: 'empty', text: '' },
+            { id: 'valid', text: 'Valid task', parentId: 'missing' }
+        ], {
+            idFactory: () => '99999999-9999-4999-8999-999999999999'
+        });
+
+        expect(plans).toHaveLength(1);
+        expect(plans[0].oldId).toBe('valid');
+        expect(plans[0].parentTaskId).toBeNull();
+        expect(summary.skippedTasks).toBe(1);
+        expect(summary.repairedParentLinks).toBe(0);
     });
 });
 
