@@ -1,4 +1,5 @@
 import { auth, authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
+import { normalizePasskeyRegistrationRequest } from '$lib/server/auth/passkey-request.js';
 
 /** @type {import('./$types').RequestHandler} */
 async function handleAuth({ request }) {
@@ -10,7 +11,7 @@ async function handleAuth({ request }) {
 		return Response.json({ message: authConfigurationError }, { status: 500 });
 	}
 
-	return auth.handler(request);
+	return auth.handler(await normalizePasskeyRegistrationRequest(request));
 }
 
 export const GET = handleAuth;

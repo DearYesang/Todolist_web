@@ -46,7 +46,12 @@ export const auth = betterAuth({
 					const registration = parsePasskeyRegistrationContext(context);
 					const existing = await ctx.context.internalAdapter.findUserByEmail(registration.email);
 					if (existing) {
-						await assertValidRecoveryCodeForEmail(registration.email, registration.recoveryCode);
+						if (await userHasRegisteredPasskeys(ctx, existing.user.id)) {
+							await assertValidRecoveryCodeForEmail(registration.email, registration.recoveryCode);
+						} else {
+							await assertValidPasskeyEmailCode(registration.email, registration.emailVerificationCode);
+						}
+
 						return {
 							id: existing.user.id,
 							name: existing.user.email,
@@ -66,7 +71,12 @@ export const auth = betterAuth({
 					const registration = parsePasskeyRegistrationContext(context);
 					const existing = await ctx.context.internalAdapter.findUserByEmail(registration.email);
 					if (existing) {
-						await consumeRecoveryCodeForEmail(registration.email, registration.recoveryCode);
+						if (await userHasRegisteredPasskeys(ctx, existing.user.id)) {
+							await consumeRecoveryCodeForEmail(registration.email, registration.recoveryCode);
+						} else {
+							await consumePasskeyEmailCode(registration.email, registration.emailVerificationCode);
+						}
+
 						return { userId: existing.user.id };
 					}
 
@@ -118,6 +128,22 @@ function normalizeRpID(value) {
 	} catch {
 		return trimmed;
 	}
+}
+
+/**
+ * @param {any} ctx
+ * @param {string} userId
+ */
+async function userHasRegisteredPasskeys(ctx, userId) {
+	const passkeys = await ctx.context.adapter.findMany({
+		model: 'passkey',
+		where: [{
+			field: 'userId',
+			value: userId
+		}]
+	});
+
+	return passkeys.length > 0;
 }
 
 function getAuthConfigurationError() {
