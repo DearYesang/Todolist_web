@@ -270,7 +270,12 @@ function checkPasskeyRpIdMatchesCurrentHost(currentOrigin) {
 		return createCheck('PASSKEY_RP_ID_CURRENT_HOST', true, 'invalid', 'Current app origin must have a valid hostname.');
 	}
 
-	const matches = isHostCoveredByRpId(hostname, value.trim().toLowerCase());
+	const rpId = normalizeRpId(value);
+	if (!rpId) {
+		return createCheck('PASSKEY_RP_ID_CURRENT_HOST', true, 'invalid', 'PASSKEY_RP_ID must be a valid host or URL.');
+	}
+
+	const matches = isHostCoveredByRpId(hostname, rpId);
 	return createCheck(
 		'PASSKEY_RP_ID_CURRENT_HOST',
 		true,
@@ -368,4 +373,20 @@ function isHostCoveredByRpId(hostname, rpId) {
 	}
 
 	return hostname.endsWith(`.${rpId}`);
+}
+
+/**
+ * @param {string | undefined} value
+ */
+function normalizeRpId(value) {
+	if (!value) {
+		return null;
+	}
+
+	const trimmed = value.trim().toLowerCase();
+	try {
+		return new URL(trimmed).hostname;
+	} catch {
+		return trimmed;
+	}
 }

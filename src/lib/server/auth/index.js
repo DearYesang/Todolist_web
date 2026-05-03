@@ -21,6 +21,7 @@ const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:5173';
 const secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET ?? 'todolist-build-only-secret-change-me';
 const trustedOrigins = parseList(process.env.BETTER_AUTH_TRUSTED_ORIGINS);
 const passkeyOrigin = process.env.PASSKEY_ORIGIN ?? baseURL ?? 'http://localhost:5173';
+const passkeyRpID = normalizeRpID(process.env.PASSKEY_RP_ID) ?? getHostname(passkeyOrigin);
 
 export const auth = betterAuth({
 	baseURL,
@@ -37,7 +38,7 @@ export const auth = betterAuth({
 	plugins: [
 		passkey({
 			rpName: 'Todolist',
-			rpID: process.env.PASSKEY_RP_ID ?? getHostname(passkeyOrigin),
+			rpID: passkeyRpID,
 			origin: passkeyOrigin,
 			registration: {
 				requireSession: false,
@@ -99,9 +100,23 @@ function parseList(value) {
 /** @param {string} value */
 function getHostname(value) {
 	try {
-		return new URL(value).hostname;
+		return new URL(value).hostname.toLowerCase();
 	} catch {
 		return 'localhost';
+	}
+}
+
+/** @param {string | undefined} value */
+function normalizeRpID(value) {
+	if (!value) {
+		return null;
+	}
+
+	const trimmed = value.trim().toLowerCase();
+	try {
+		return new URL(trimmed).hostname;
+	} catch {
+		return trimmed;
 	}
 }
 
