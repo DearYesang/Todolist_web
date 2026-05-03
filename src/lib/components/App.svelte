@@ -24,6 +24,13 @@
 
     onMount(() => {
         void syncServerTasks();
+        const handleOnline = () => {
+            void syncServerTasks();
+        };
+        window.addEventListener('online', handleOnline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+        };
     });
 
     /**

@@ -7,6 +7,7 @@ import {
     updateServerTask
 } from './task-api.js';
 import { isServerTaskId } from './task-create.js';
+import { enqueueOfflineMutation } from './offline-write-queue.js';
 import {
     addSubtaskToList,
     assignParentInList,
@@ -136,6 +137,25 @@ export function mergeTasks(nextTasks) {
 }
 
 /**
+ * @param {string} localTaskId
+ * @param {import('../shared/task-domain.js').Task} serverTask
+ */
+export function replaceLocalTaskWithServerTask(localTaskId, serverTask) {
+    tasks.update((current) =>
+        normalizeTaskList(current.map((task) => {
+            if (task.id === localTaskId) {
+                return {
+                    ...serverTask,
+                    collapsed: task.collapsed
+                };
+            }
+
+            return task.parentId === localTaskId ? { ...task, parentId: serverTask.id } : task;
+        }))
+    );
+}
+
+/**
  * @param {string} taskId
  * @param {string} nextStatus
  */
@@ -261,7 +281,14 @@ function syncTaskSnapshot(task) {
         return;
     }
 
-    void updateServerTask(task.id, toServerTaskPatch(task)).then(reportSyncFailure);
+    const patch = toServerTaskPatch(task);
+    void updateServerTask(task.id, patch).then((result) =>
+        syncReturnedTask(result, {
+            type: 'task.patch',
+            taskId: task.id,
+            patch
+        })
+    );
 }
 
 /**
@@ -272,7 +299,12 @@ function syncTaskDelete(taskId) {
         return;
     }
 
-    void deleteServerTask(taskId).then(reportSyncFailure);
+    void deleteServerTask(taskId).then((result) =>
+        reportSyncFailure(result, {
+            type: 'task.delete',
+            taskId
+        })
+    );
 }
 
 /**
@@ -284,7 +316,13 @@ function syncChecklistCreate(taskId, text) {
         return;
     }
 
-    void createServerChecklistItem(taskId, text).then(syncReturnedTask);
+    void createServerChecklistItem(taskId, text).then((result) =>
+        syncReturnedTask(result, {
+            type: 'checklist.create',
+            taskId,
+            text
+        })
+    );
 }
 
 /**
@@ -297,7 +335,14 @@ function syncChecklistPatch(taskId, subtaskId, patch) {
         return;
     }
 
-    void updateServerChecklistItem(taskId, subtaskId, patch).then(syncReturnedTask);
+    void updateServerChecklistItem(taskId, subtaskId, patch).then((result) =>
+        syncReturnedTask(result, {
+            type: 'checklist.patch',
+            taskId,
+            itemId: subtaskId,
+            patch
+        })
+    );
 }
 
 /**
@@ -309,7 +354,13 @@ function syncChecklistDelete(taskId, subtaskId) {
         return;
     }
 
-    void deleteServerChecklistItem(taskId, subtaskId).then(syncReturnedTask);
+    void deleteServerChecklistItem(taskId, subtaskId).then((result) =>
+        syncReturnedTask(result, {
+            type: 'checklist.delete',
+            taskId,
+            itemId: subtaskId
+        })
+    );
 }
 
 /**
@@ -336,22 +387,29 @@ function toServerTaskPatch(task) {
 }
 
 /**
- * @param {{ ok: true } | { ok: false; fallback: boolean; message: string }} result
+ * @param {{ ok: true } | { ok: false; fallback: boolean; message: string; status?: number }} result
+ * @param {import('./offline-write-queue.js').OfflineMutationInput} [mutation]
  */
-function reportSyncFailure(result) {
+function reportSyncFailure(result, mutation) {
     if (!result.ok && !result.fallback) {
         console.error('Failed to sync task mutation', result.message);
+        return;
+    }
+
+    if (!result.ok && result.fallback && mutation) {
+        enqueueOfflineMutation(mutation);
     }
 }
 
 /**
  * @param {{ ok: true; task: import('../shared/task-domain.js').Task } | { ok: false; fallback: boolean; message: string }} result
+ * @param {import('./offline-write-queue.js').OfflineMutationInput} [mutation]
  */
-function syncReturnedTask(result) {
+function syncReturnedTask(result, mutation) {
     if (result.ok) {
         mergeTasks([result.task]);
         return;
     }
 
-    reportSyncFailure(result);
+    reportSyncFailure(result, mutation);
 }
