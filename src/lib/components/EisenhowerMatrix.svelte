@@ -56,11 +56,18 @@
     let draggedId = $state(null);
     /** @type {string | null} */
     let hoveredQuadrant = $state(null);
+    let showDoneTasks = $state(false);
+
+    const hiddenDoneCount = $derived(
+        $tasks.filter((task) => task.status === 'done' && matchesFilters(task, $filters)).length
+    );
 
     const matrixData = $derived.by(() =>
         quadrants.map((quadrant) => {
             const quadrantTasks = $tasks.filter((task) =>
-                matchesFilters(task, $filters) && isTaskInQuadrant(task, quadrant)
+                matchesFilters(task, $filters)
+                && isTaskInQuadrant(task, quadrant)
+                && (showDoneTasks || task.status !== 'done')
             );
             const { roots, childrenByParent } = buildHierarchy(quadrantTasks);
 
@@ -151,6 +158,12 @@
         });
     }
 </script>
+
+<div class="eisenhower-toolbar">
+    <button class="btn btn-ghost eisenhower-done-toggle" onclick={() => showDoneTasks = !showDoneTasks}>
+        {showDoneTasks ? '완료 숨기기' : `완료 보기${hiddenDoneCount > 0 ? ` (${hiddenDoneCount})` : ''}`}
+    </button>
+</div>
 
 <div class="eisenhower-board">
     {#each matrixData as quadrant (quadrant.id)}
