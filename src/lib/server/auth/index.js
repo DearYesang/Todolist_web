@@ -12,15 +12,16 @@ import {
 	consumeRecoveryCodeForEmail,
 	parsePasskeyRegistrationContext
 } from './account-security.js';
+import { getHostname, normalizeRpID, normalizeWebAuthnOrigin } from './webauthn-options.js';
 
 export const authDatabaseConfigured = Boolean(process.env.DATABASE_URL);
 export const authConfigurationError = getAuthConfigurationError();
 
 const authDb = authDatabaseConfigured ? getDb() : drizzle.mock({ schema });
-const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:5173';
+const baseURL = normalizeWebAuthnOrigin(process.env.BETTER_AUTH_URL) ?? 'http://localhost:5173';
 const secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET ?? 'todolist-build-only-secret-change-me';
 const trustedOrigins = parseList(process.env.BETTER_AUTH_TRUSTED_ORIGINS);
-const passkeyOrigin = process.env.PASSKEY_ORIGIN ?? baseURL ?? 'http://localhost:5173';
+const passkeyOrigin = normalizeWebAuthnOrigin(process.env.PASSKEY_ORIGIN) ?? baseURL;
 const passkeyRpID = normalizeRpID(process.env.PASSKEY_RP_ID) ?? getHostname(passkeyOrigin);
 
 export const auth = betterAuth({
@@ -105,29 +106,6 @@ function parseList(value) {
 		.split(',')
 		.map((item) => item.trim())
 		.filter(Boolean);
-}
-
-/** @param {string} value */
-function getHostname(value) {
-	try {
-		return new URL(value).hostname.toLowerCase();
-	} catch {
-		return 'localhost';
-	}
-}
-
-/** @param {string | undefined} value */
-function normalizeRpID(value) {
-	if (!value) {
-		return null;
-	}
-
-	const trimmed = value.trim().toLowerCase();
-	try {
-		return new URL(trimmed).hostname;
-	} catch {
-		return trimmed;
-	}
 }
 
 /**
