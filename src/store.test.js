@@ -8,6 +8,7 @@ import {
 } from './lib/shared/task-domain.js';
 import { extractBackupTasks } from './lib/shared/task-backup.js';
 import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
+import { createTaskCalendarFilename } from './lib/client/calendar-download.js';
 import {
     createServerChecklistItem,
     createServerTask,
@@ -911,6 +912,15 @@ describe('calendar export', () => {
         expect(calendar).toContain('SUMMARY:Review\\, ship\\; celebrate');
         expect(calendar).toContain('CATEGORIES:Release');
         expect(calendar).toContain('Checklist:\\n- [x] QA pass');
+    });
+
+    it('creates safe filenames for individual task calendar downloads', () => {
+        const filename = createTaskCalendarFilename(
+            { text: 'Review / ship: celebrate?' },
+            new Date('2026-05-03T00:00:00.000Z')
+        );
+
+        expect(filename).toBe('todolist_Review_-_ship-_celebrate_2026-05-03.ics');
     });
 });
 

@@ -9,6 +9,7 @@
         toggleCollapse,
         toggleSubtask
     } from '$lib/client/task-store.js';
+    import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
         PRIORITY_LABELS,
@@ -104,6 +105,14 @@
         if (confirm(message)) {
             deleteTaskCascade(task.id);
         }
+    }
+
+    /**
+     * @param {MouseEvent} event
+     */
+    function handleCalendarDownload(event) {
+        event.stopPropagation();
+        downloadTaskCalendar(task);
     }
 
     /**
@@ -309,7 +318,10 @@
             {/if}
         </div>
 
-        <button class="btn btn-danger" onclick={handleDeleteTask}>🗑</button>
+        <div class="card-secondary-actions">
+            <button class="btn btn-calendar btn-small" onclick={handleCalendarDownload}>📅 추가</button>
+            <button class="btn btn-danger" onclick={handleDeleteTask}>🗑</button>
+        </div>
     </div>
 </div>
 

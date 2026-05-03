@@ -20,7 +20,6 @@
     } from '$lib/client/task-store.js';
     import { extractBackupTasks } from '$lib/shared/task-backup.js';
     import { normalizeTaskList } from '$lib/shared/task-domain.js';
-    import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
     import CalendarSyncPanel from './CalendarSyncPanel.svelte';
@@ -197,17 +196,6 @@
         URL.revokeObjectURL(url);
     }
 
-    function exportCalendarData() {
-        const data = createTaskCalendar(get(tasks));
-        const blob = new Blob([data], { type: 'text/calendar;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = `todolist_calendar_${new Date().toISOString().split('T')[0]}.ics`;
-        anchor.click();
-        URL.revokeObjectURL(url);
-    }
-
     function handleClearDone() {
         const doneCount = get(tasks).filter((task) => task.status === 'done').length;
         if (doneCount === 0) return;
@@ -247,7 +235,6 @@
             <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
             <button class="btn" onclick={() => document.getElementById('import-file')?.click()}>📂 불러오기</button>
             <button class="btn" onclick={exportData}>💾 내보내기</button>
-            <button class="btn" onclick={exportCalendarData}>📅 캘린더</button>
             <button class="btn" onclick={handleClearDone}>🧹 정리</button>
         {/if}
     </div>
