@@ -30,6 +30,8 @@ Components now import directly from `src/lib/client/task-store.js` and `src/lib/
 
 Neon/Drizzle schema and lazy DB initialization live under `src/lib/server/db`.
 
+Better Auth server configuration lives under `src/lib/server/auth`; the SvelteKit hook mounts auth routes only when `DATABASE_URL` is configured.
+
 ## Target Shape
 
 ```txt
@@ -53,17 +55,18 @@ src/lib/shared/task-domain.js
 src/lib/server/auth/
 src/lib/server/db/
 src/lib/server/tasks/
-src/routes/+layout.server.ts
+src/hooks.server.js
+src/routes/+layout.server.js
 src/routes/+page.svelte
-src/routes/api/tasks/+server.ts
-src/routes/api/import/+server.ts
-src/routes/api/export/+server.ts
+src/routes/api/tasks/+server.js
+src/routes/api/import/+server.js
+src/routes/api/export/+server.js
 ```
 
 ## Next Steps
 
 1. Add SvelteKit route-level smoke tests or Playwright once UI flows stabilize.
-2. Add Better Auth and wire session data through `hooks.server.ts`.
+2. Build account onboarding UI around passkey registration and sign-in.
 3. Implement server routes/actions for task CRUD.
 4. Switch client mutations from local store writes to server calls with optimistic updates.
 5. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.

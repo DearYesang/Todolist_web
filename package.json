@@ -31,7 +31,10 @@
     "esbuild": "^0.25.0"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.9",
+    "@better-auth/passkey": "^1.6.9",
     "@neondatabase/serverless": "^1.1.0",
+    "better-auth": "^1.6.9",
     "drizzle-orm": "^0.45.2"
   }
 }
