@@ -36,6 +36,8 @@ PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker
 
 Local iCalendar export uses `src/lib/shared/calendar-ics.js`; the same generator can back a server `.ics` feed once tasks are database-backed.
 
+`src/routes/api/tasks/+server.js` exposes an authenticated server read path for database-backed tasks. Client writes still use the local store until the write and transaction policy is explicit.
+
 ## Target Shape
 
 ```txt
@@ -71,7 +73,7 @@ src/routes/api/export/+server.js
 
 1. Add SvelteKit route-level smoke tests or Playwright once UI flows stabilize.
 2. Build account onboarding UI around passkey registration and sign-in.
-3. Implement server routes/actions for task CRUD.
+3. Implement server task writes with an explicit transaction/conflict policy.
 4. Switch client mutations from local store writes to server calls with optimistic updates.
 5. Keep JSON import/export compatible by mapping legacy `id` and `parentId` values during import.
 6. Add server-backed read-only iCalendar feed after task data is server-backed.

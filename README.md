@@ -91,6 +91,7 @@ The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persis
 
 - Auth backend routes exist, but account onboarding UI is not implemented yet
 - Server database schema exists, but the app still reads/writes local browser storage
+- Server task read API exists, but client mutations are not server-backed yet
 - No cross-device sync yet
 - Calendar subscription and two-way sync are planned but not implemented
 - Offline writes are still local-only; the installed app shell is cached for repeat visits
