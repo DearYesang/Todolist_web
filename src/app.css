@@ -123,6 +123,66 @@ select {
     color: var(--priority-high);
 }
 
+.calendar-feed-panel {
+    position: relative;
+}
+
+.calendar-feed-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 200;
+    width: min(420px, 88vw);
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+}
+
+.calendar-feed-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.calendar-feed-url {
+    width: 100%;
+    min-width: 0;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--text);
+    font-size: 12px;
+}
+
+.calendar-token-list {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.calendar-token-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.calendar-token-row .revoked {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.calendar-feed-message {
+    margin: 10px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
 .view-toggle {
     display: flex;
     overflow: hidden;
@@ -1271,6 +1331,21 @@ select {
     .auth-input {
         flex: 1 1 160px;
         width: auto;
+    }
+
+    .calendar-feed-panel,
+    .calendar-feed-panel > .btn {
+        flex: 1 1 120px;
+    }
+
+    .calendar-feed-panel > .btn {
+        width: 100%;
+    }
+
+    .calendar-feed-popover {
+        left: 0;
+        right: auto;
+        width: 100%;
     }
 
     .add-panel,
