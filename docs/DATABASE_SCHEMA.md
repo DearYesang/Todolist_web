@@ -61,6 +61,8 @@ updated_at timestamptz not null default now()
 unique (workspace_id, name)
 ```
 
+The current client has a third `matrix` view, but `default_view` is not yet user-configurable or persisted by the API. Add `matrix` to this check only when default view persistence is implemented.
+
 ### tasks
 
 ```txt
@@ -221,6 +223,7 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Personal `Personal` workspace and `Inbox` board provisioning for first authenticated task creation.
 - Authenticated task list/create/update/soft-delete cascade.
 - Authenticated checklist create/update/delete.
+- Partial task response merge policy that preserves valid parent links during checklist sync.
 - Authenticated read-only `/api/calendar.ics` download backed by server tasks.
 - Revocable token-based `/api/calendar/subscriptions/[token].ics` feed backed by token hashes.
 - OAuth-backed Google/Microsoft calendar connections with encrypted provider tokens.

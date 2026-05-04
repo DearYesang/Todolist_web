@@ -43,7 +43,7 @@ Authenticated task routes now cover read/create/update/delete plus checklist cre
 - `src/routes/api/tasks/[taskId]/checklist/+server.js`
 - `src/routes/api/tasks/[taskId]/checklist/[itemId]/+server.js`
 
-Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until they can be created server-side. Server JSON import supports append and replace modes. Stale offline writes are surfaced in a conflict panel with exportable details.
+Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until they can be created server-side. Server JSON import supports append and replace modes. Stale offline writes are surfaced in a conflict panel with exportable details. Partial task responses are merged into the existing full client graph before parent-link validation so checklist writes do not temporarily detach child tasks.
 
 ## Target Shape
 
@@ -78,9 +78,10 @@ src/routes/api/export/+server.js
 
 ## Next Steps
 
-1. Add route/component tests around auth and sync flows once UI flows stabilize.
-2. Add apply/keep-server actions for multi-device conflict resolution.
-3. Add background calendar workers and provider webhooks.
+1. Add route/component tests around auth, passkey management, and nested task sync flows.
+2. Run real-device smoke tests for matrix view, nested checklist sync, and offline reload.
+3. Add apply/keep-server actions for multi-device conflict resolution.
+4. Add background calendar workers and provider webhooks.
 
 ## Domain Boundaries
 
@@ -100,6 +101,7 @@ The client should own:
 - filters
 - optimistic UI state
 - drag/resize interaction previews
+- Kanban, Gantt, and Eisenhower presentation state
 
 ## Auth Plan
 
