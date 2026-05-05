@@ -79,15 +79,15 @@ Production passkey registration is limited by `AUTH_ALLOWED_EMAILS`. For this de
 
 Production email verification can use Resend with `RESEND_API_KEY` and `EMAIL_FROM`. For the free `todokanban-alpha.vercel.app` deployment, `Todokanban <onboarding@resend.dev>` works only for the email address associated with the Resend account. `EMAIL_DELIVERY_WEBHOOK_URL` remains available as a webhook fallback.
 
-Google/Microsoft OAuth calendar provider sync is scaffolded but hidden from the primary UI while the personal workflow stays `.ics`-first. Re-enabling provider sync requires `CALENDAR_OAUTH_ENCRYPTION_KEY` plus the relevant OAuth client credentials. Optional Vercel Cron background sync uses `CRON_SECRET` and `CALENDAR_BACKGROUND_SYNC_MAX_USERS`.
+Google/Microsoft OAuth calendar provider sync is scaffolded but hidden from the primary UI while the personal workflow stays `.ics`-first. Re-enabling provider sync later requires `CALENDAR_OAUTH_ENCRYPTION_KEY` plus the relevant OAuth client credentials. Optional Vercel Cron background sync uses `CRON_SECRET` and `CALENDAR_BACKGROUND_SYNC_MAX_USERS`.
 
-For Google Calendar OAuth, create a Google Auth Platform app and add the production redirect URI:
+If provider sync is re-enabled later, create a Google Auth Platform app and add the production redirect URI:
 
 ```text
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
 
-If the Google app is still in Testing, add the Google account used for sync, such as `scyea1995@gmail.com`, under **Audience -> Test users** before connecting. Testing authorizations expire after 7 days, so long-running personal sync is better with the app moved to **In production** after the smoke test.
+If the Google app is still in Testing, add the Google account used for sync, such as `scyea1995@gmail.com`, under **Audience -> Test users** before connecting. Testing authorizations expire after 7 days, so long-running personal provider sync is better with the app moved to **In production** after the smoke test.
 
 ## Data Model
 
@@ -154,7 +154,7 @@ See [deployment checklist](docs/DEPLOYMENT_CHECKLIST.md) before promoting this b
 
 - Secrets must live in `.env` files and stay out of git.
 - Commit `.env.example`, not real credentials.
-- Calendar OAuth tokens are encrypted at rest with `CALENDAR_OAUTH_ENCRYPTION_KEY`.
-- iCalendar feed URLs should use revocable tokens.
+- Calendar OAuth tokens are encrypted at rest with `CALENDAR_OAUTH_ENCRYPTION_KEY` if provider sync is re-enabled.
+- Whole-board `.ics` feed URLs use revocable tokens.
 - Set `CALENDAR_TOKEN_SECRET`, `ACCOUNT_RECOVERY_SECRET`, and `CALENDAR_OAUTH_ENCRYPTION_KEY` separately from auth secrets before production use.
 - All future write APIs must validate task ownership, date ranges, and parent graph integrity server-side.

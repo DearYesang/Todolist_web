@@ -34,7 +34,7 @@ Better Auth server configuration lives under `src/lib/server/auth`; the SvelteKi
 
 PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker.js` caches the app shell and static assets for repeat visits.
 
-Task-level iCalendar downloads use `src/lib/shared/calendar-ics.js`; `/api/calendar.ics` uses the same generator for authenticated server-backed calendar downloads. Revocable iCal URLs are available through `/api/calendar/tokens` and `/api/calendar/subscriptions/[token].ics`.
+Task-level iCalendar downloads use `src/lib/shared/calendar-ics.js`; `/api/calendar.ics` uses the same generator for authenticated server-backed calendar downloads. The visible calendar flow is `.ics`-first: `전체 일정 동기화` creates revocable whole-board `.ics` URLs through `/api/calendar/tokens` and `/api/calendar/subscriptions/[token].ics`, while task cards and detail panels download single-task `.ics` files.
 
 Authenticated task routes now cover read/create/update/delete plus checklist create/update/delete:
 
@@ -78,10 +78,9 @@ src/routes/api/export/+server.js
 
 ## Next Steps
 
-1. Add route/component tests around auth, passkey management, and nested task sync flows.
-2. Run real-device smoke tests for matrix view, nested checklist sync, and offline reload.
-3. Run production Google Calendar OAuth smoke and verify daily Vercel Cron provider sync.
-4. Add provider webhooks and recurring calendar events.
+1. Run real-device smoke tests for matrix view, nested checklist sync, Gantt checklist toggles, `.ics` calendar flows, and offline reload.
+2. Add any missing route/component tests found during that real-device smoke pass.
+3. Keep Google/Microsoft provider sync, Vercel Cron verification, provider webhooks, and recurring calendar events deferred unless `.ics` becomes insufficient.
 
 ## Domain Boundaries
 
@@ -93,7 +92,7 @@ The server domain layer should own:
 - parent graph validation
 - cascade delete
 - user/workspace authorization
-- calendar export and sync state
+- calendar `.ics` export and optional provider sync state
 
 The client should own:
 
