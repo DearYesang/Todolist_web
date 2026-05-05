@@ -401,14 +401,17 @@
 
     {#if appUnlocked}
         <div class="view-toggle">
-            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => selectView('kanban')}>
-                📋 칸반 뷰
+            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => selectView('kanban')} aria-label="칸반 뷰">
+                <span class="view-icon" aria-hidden="true">📋</span>
+                <span class="view-label">칸반</span>
             </button>
-            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => selectView('gantt')}>
-                📊 간트 뷰
+            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => selectView('gantt')} aria-label="간트 뷰">
+                <span class="view-icon" aria-hidden="true">📊</span>
+                <span class="view-label">간트</span>
             </button>
-            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => selectView('matrix')}>
-                🧭 매트릭스
+            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => selectView('matrix')} aria-label="매트릭스 뷰">
+                <span class="view-icon" aria-hidden="true">🧭</span>
+                <span class="view-label">매트릭스</span>
             </button>
         </div>
     {/if}
@@ -420,14 +423,33 @@
             {:else}
                 <AuthPanel />
             {/if}
-            <button class="btn refresh-btn" onclick={refreshAppData} disabled={isRefreshing}>
-                {isRefreshing ? '⏳ 새로고침 중' : '🔄 새로고침'}
+            <button
+                class="btn refresh-btn primary-action"
+                onclick={refreshAppData}
+                disabled={isRefreshing}
+                aria-label={isRefreshing ? '새로고침 중' : '새로고침'}
+                title={isRefreshing ? '새로고침 중' : '새로고침'}>
+                <span class="action-icon" aria-hidden="true">{isRefreshing ? '⏳' : '🔄'}</span>
+                <span class="action-label">{isRefreshing ? '새로고침 중' : '새로고침'}</span>
             </button>
             <CalendarFeedPanel />
             <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
-            <button class="btn" onclick={() => document.getElementById('import-file')?.click()}>📂 불러오기</button>
-            <button class="btn" onclick={exportData}>💾 내보내기</button>
-            <button class="btn" onclick={handleClearDone}>🧹 정리</button>
+            <button
+                class="btn utility-action"
+                onclick={() => document.getElementById('import-file')?.click()}
+                aria-label="백업 JSON 불러오기"
+                title="백업 JSON 불러오기">
+                <span class="action-icon" aria-hidden="true">📂</span>
+                <span class="action-label">불러오기</span>
+            </button>
+            <button class="btn utility-action" onclick={exportData} aria-label="백업 JSON 내보내기" title="백업 JSON 내보내기">
+                <span class="action-icon" aria-hidden="true">💾</span>
+                <span class="action-label">내보내기</span>
+            </button>
+            <button class="btn utility-action" onclick={handleClearDone} aria-label="완료 작업 정리" title="완료 작업 정리">
+                <span class="action-icon" aria-hidden="true">🧹</span>
+                <span class="action-label">정리</span>
+            </button>
         {/if}
     </div>
 </div>

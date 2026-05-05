@@ -107,10 +107,14 @@
 {#if $session.data?.user}
     <div class="calendar-feed-panel">
         <button
-            class="btn"
+            class="btn calendar-feed-trigger primary-action"
             class:active={isOpen}
-            onclick={() => isOpen = !isOpen}>
-            📅 전체 일정 동기화
+            onclick={() => isOpen = !isOpen}
+            aria-label="전체 일정 동기화"
+            title="전체 일정 동기화">
+            <span class="action-icon" aria-hidden="true">📅</span>
+            <span class="action-label action-label-full">전체 일정 동기화</span>
+            <span class="action-label action-label-short">일정</span>
         </button>
 
         {#if isOpen}
