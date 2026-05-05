@@ -81,7 +81,7 @@ Do not save these generated values in git. Paste only the required values into V
 9. Locally set `DATABASE_URL` to the Neon production URL and run `npm run db:migrate`.
 10. Trigger a Vercel production deploy from `main`.
 11. Run the smoke test below.
-12. Confirm Vercel registered the daily calendar cron job under **Settings -> Cron Jobs**.
+12. If provider calendar sync is re-enabled later, confirm Vercel registered the daily calendar cron job under **Settings -> Cron Jobs**.
 
 If Vercel cannot allocate the `todokanban-alpha` project name, stop before registering passkeys and update the four passkey origin values to the actual `*.vercel.app` host.
 
