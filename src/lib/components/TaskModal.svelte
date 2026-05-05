@@ -3,6 +3,7 @@
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import { getCategoryColor } from '$lib/shared/task-domain.js';
     import { fade, fly } from 'svelte/transition';
+    import DateRangePicker from './DateRangePicker.svelte';
 
     let { taskId, onclose } = $props();
 
@@ -33,6 +34,13 @@
     function downloadCalendar() {
         if (!task) return;
         downloadTaskCalendar(task);
+    }
+
+    /**
+     * @param {{ startDate: string; endDate: string }} range
+     */
+    function updateDateRange(range) {
+        updateTask(taskId, range);
     }
 
     /**
@@ -115,24 +123,13 @@
                         oninput={(event) => updateField('text', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
                 </div>
 
-                <div class="form-grid">
-                    <div class="form-section">
-                        <label for="modal-start-date">시작일</label>
-                        <input
-                            id="modal-start-date"
-                            type="date"
-                            value={task.startDate}
-                            oninput={(event) => updateField('startDate', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
-                    </div>
-
-                    <div class="form-section">
-                        <label for="modal-end-date">마감일</label>
-                        <input
-                            id="modal-end-date"
-                            type="date"
-                            value={task.endDate}
-                            oninput={(event) => updateField('endDate', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
-                    </div>
+                <div class="form-section">
+                    <label for="modal-date-start-date">일정</label>
+                    <DateRangePicker
+                        idPrefix="modal-date"
+                        startDate={task.startDate}
+                        endDate={task.endDate}
+                        onchange={updateDateRange} />
                 </div>
 
                 <div class="form-grid">

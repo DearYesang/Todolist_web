@@ -67,6 +67,21 @@ test('opens an offline cached board and centers the Gantt timeline on today', as
 	await expect(timeline).toBeVisible();
 });
 
+test('opens the task form date picker and Gantt checklist preview', async ({ page }) => {
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	await page.getByRole('button', { name: /새 작업 추가/ }).click();
+	await page.locator('.add-form .date-picker-toggle').click();
+	await expect(page.locator('.add-form .date-picker-popover')).toBeVisible();
+	await expect(page.locator('.add-form .date-picker-day.boundary').first()).toBeVisible();
+
+	await page.getByRole('button', { name: /간트 뷰/ }).click();
+	await page.locator('.gantt-sidebar-title', { hasText: 'E2E cached task' }).click();
+	await expect(page.locator('.gantt-checklist-preview', { hasText: 'E2E checklist one' })).toBeVisible();
+	await expect(page.locator('.gantt-checklist-preview', { hasText: 'E2E checklist done' })).toBeVisible();
+});
+
 test('keeps iPad-width Kanban columns side by side', async ({ page }) => {
 	await page.setViewportSize({ width: 1024, height: 1366 });
 	await seedOfflineBoard(page);
@@ -273,7 +288,10 @@ async function seedOfflineBoard(page) {
 				urgency: 'normal',
 				category: '',
 				parentId: null,
-				subtasks: [],
+				subtasks: [
+					{ id: 'local-e2e-checklist-one', text: 'E2E checklist one', done: false },
+					{ id: 'local-e2e-checklist-done', text: 'E2E checklist done', done: true }
+				],
 				collapsed: false,
 				createdAt: Date.now()
 			},

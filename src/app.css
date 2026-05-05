@@ -583,6 +583,128 @@ select {
     color: var(--text-muted);
 }
 
+.date-picker {
+    position: relative;
+}
+
+.date-picker-toggle,
+.date-picker-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--text);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.date-picker-toggle {
+    width: 42px;
+    height: 42px;
+}
+
+.date-picker-toggle:hover,
+.date-picker-nav:hover,
+.date-picker-day:hover {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    color: var(--accent);
+}
+
+.date-picker-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 50;
+    width: min(336px, calc(100vw - 48px));
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.side-panel .date-picker-popover {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.date-picker-header {
+    display: grid;
+    grid-template-columns: 36px 1fr 36px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.date-picker-header strong {
+    text-align: center;
+    font-size: 14px;
+}
+
+.date-picker-nav {
+    width: 36px;
+    height: 34px;
+    font-size: 22px;
+}
+
+.date-picker-weekdays,
+.date-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.date-picker-weekdays {
+    margin-bottom: 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.date-picker-day {
+    aspect-ratio: 1;
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all var(--transition);
+}
+
+.date-picker-day.muted {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.date-picker-day.today {
+    border-color: rgba(88, 166, 255, 0.45);
+}
+
+.date-picker-day.in-range {
+    background: rgba(88, 166, 255, 0.14);
+    color: var(--text);
+}
+
+.date-picker-day.boundary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+}
+
+.date-picker-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
 .pill-section {
     display: flex;
     align-items: center;
@@ -1278,23 +1400,84 @@ select {
 
 .gantt-sidebar-item {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    justify-content: flex-start;
     height: 36px;
     padding-right: 12px;
     border-bottom: 1px solid var(--border-light);
+    overflow: hidden;
+    transition: height var(--transition), background var(--transition);
+}
+
+.gantt-sidebar-title {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 36px;
     white-space: nowrap;
+    cursor: pointer;
+}
+
+.gantt-sidebar-title > span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.gantt-sidebar-item span {
-    overflow: hidden;
-    text-overflow: ellipsis;
+.gantt-sidebar-title:hover {
+    color: var(--accent);
 }
 
-.gantt-sidebar-item.done span {
+.gantt-sidebar-item.done .gantt-sidebar-title > span {
     color: var(--text-muted);
     text-decoration: line-through;
+}
+
+.gantt-checklist-count {
+    flex: 0 0 auto;
+    margin-left: 8px;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-decoration: none;
+}
+
+.gantt-checklist-preview {
+    width: 100%;
+    padding-right: 8px;
+    padding-bottom: 8px;
+}
+
+.gantt-checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 22px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.gantt-checklist-item span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gantt-checklist-item.done {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.gantt-checklist-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 26px;
+}
+
+.gantt-checklist-footer small {
+    color: var(--text-muted);
 }
 
 .gantt-link-line {

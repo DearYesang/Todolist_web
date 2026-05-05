@@ -9,6 +9,8 @@
     const dayMs = 86400000;
     const todayCenterPaddingDays = 18;
     let suppressBarClick = $state(false);
+    /** @type {string | null} */
+    let expandedChecklistTaskId = $state(null);
     /** @type {HTMLDivElement | null} */
     let timelineArea = $state(null);
     let hasCenteredToday = $state(false);
@@ -282,6 +284,36 @@
         openTask(taskId);
     }
 
+    /**
+     * @param {import('$lib/shared/task-domain.js').Task} task
+     */
+    function toggleChecklistPreview(task) {
+        if (task.subtasks.length === 0) {
+            openTask(task.id);
+            return;
+        }
+
+        expandedChecklistTaskId = expandedChecklistTaskId === task.id ? null : task.id;
+    }
+
+    /**
+     * @param {import('$lib/shared/task-domain.js').Task} task
+     */
+    function getRowHeight(task) {
+        if (expandedChecklistTaskId !== task.id || task.subtasks.length === 0) {
+            return 36;
+        }
+
+        return 72 + Math.min(task.subtasks.length, 3) * 22;
+    }
+
+    /**
+     * @param {import('$lib/shared/task-domain.js').Task} task
+     */
+    function getChecklistPreview(task) {
+        return task.subtasks.slice(0, 3);
+    }
+
     onDestroy(() => {
         clearResizeListeners();
     });
@@ -298,20 +330,47 @@
                 </div>
             {:else}
                 {#each ganttData.displayList as item (item.task.id)}
+                    {@const rowHeight = getRowHeight(item.task)}
                     <div
                         class="gantt-sidebar-item"
+                        class:expanded={expandedChecklistTaskId === item.task.id}
                         class:done={item.task.status === 'done'}
-                        style={`padding-left:${16 + item.depth * 24}px;`}>
-                        {#if item.depth > 0}
-                            <div class="gantt-link-line"></div>
-                        {/if}
-                        <span
+                        style={`height:${rowHeight}px;`}>
+                        <div
+                            class="gantt-sidebar-title"
                             role="button"
                             tabindex="0"
-                            onclick={() => openTask(item.task.id)}
-                            onkeydown={(event) => event.key === 'Enter' && openTask(item.task.id)}>
-                            {item.task.status === 'done' ? '☑️' : '🗓️'} {item.task.text}
-                        </span>
+                            aria-expanded={expandedChecklistTaskId === item.task.id}
+                            style={`padding-left:${16 + item.depth * 24}px;`}
+                            onclick={() => toggleChecklistPreview(item.task)}
+                            onkeydown={(event) => event.key === 'Enter' && toggleChecklistPreview(item.task)}>
+                            {#if item.depth > 0}
+                                <div class="gantt-link-line"></div>
+                            {/if}
+                            <span>
+                                {item.task.status === 'done' ? '☑️' : '🗓️'} {item.task.text}
+                            </span>
+                            {#if item.task.subtasks.length > 0}
+                                <small class="gantt-checklist-count">{item.task.subtasks.filter((subtask) => subtask.done).length}/{item.task.subtasks.length}</small>
+                            {/if}
+                        </div>
+
+                        {#if expandedChecklistTaskId === item.task.id && item.task.subtasks.length > 0}
+                            <div class="gantt-checklist-preview" style={`padding-left:${16 + item.depth * 24}px;`}>
+                                {#each getChecklistPreview(item.task) as subtask (subtask.id)}
+                                    <div class="gantt-checklist-item" class:done={subtask.done}>
+                                        <span>{subtask.done ? '☑' : '☐'}</span>
+                                        <span>{subtask.text}</span>
+                                    </div>
+                                {/each}
+                                <div class="gantt-checklist-footer">
+                                    {#if item.task.subtasks.length > 3}
+                                        <small>+{item.task.subtasks.length - 3}개</small>
+                                    {/if}
+                                    <button class="btn btn-small" type="button" onclick={() => openTask(item.task.id)}>상세</button>
+                                </div>
+                            </div>
+                        {/if}
                     </div>
                 {/each}
             {/if}
@@ -335,7 +394,7 @@
                 {#each ganttData.displayList as item (item.task.id)}
                     {@const coords = getCoords(item.task)}
                     {@const color = getCategoryColor(item.task.category)}
-                    <div class="gantt-row">
+                    <div class="gantt-row" style={`height:${getRowHeight(item.task)}px;`}>
                         <div
                             class="gantt-bar-wrapper"
                             class:resizing={resizeState?.taskId === item.task.id}

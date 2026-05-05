@@ -6,6 +6,7 @@
     import { categories, tasks } from '$lib/client/task-store.js';
     import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
     import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
+    import DateRangePicker from './DateRangePicker.svelte';
 
     let isFormOpen = $state(false);
     let newTaskText = $state('');
@@ -179,12 +180,8 @@
                 </div>
 
                 <div class="form-row">
-                    <label class="form-label" for="start-date">일정</label>
-                    <div class="date-range">
-                        <input id="start-date" class="form-input form-date-input" type="date" bind:value={startDate} />
-                        <span class="range-separator">~</span>
-                        <input id="end-date" class="form-input form-date-input" type="date" bind:value={endDate} />
-                    </div>
+                    <label class="form-label" for="task-date-start-date">일정</label>
+                    <DateRangePicker idPrefix="task-date" bind:startDate bind:endDate />
                 </div>
 
                 <div class="form-row">
