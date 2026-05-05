@@ -82,6 +82,14 @@ Production email verification can use Resend with `RESEND_API_KEY` and `EMAIL_FR
 
 External calendar sync additionally requires `CALENDAR_OAUTH_ENCRYPTION_KEY` plus the relevant Google/Microsoft OAuth client credentials. Google Calendar is the first provider configured for the personal deployment. Optional Vercel Cron background sync uses `CRON_SECRET` and `CALENDAR_BACKGROUND_SYNC_MAX_USERS`.
 
+For Google Calendar OAuth, create a Google Auth Platform app and add the production redirect URI:
+
+```text
+https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
+```
+
+If the Google app is still in Testing, add the Google account used for sync, such as `scyea1995@gmail.com`, under **Audience -> Test users** before connecting. Testing authorizations expire after 7 days, so long-running personal sync is better with the app moved to **In production** after the smoke test.
+
 ## Data Model
 
 The current local backup format is an array of tasks. Import also accepts wrapper objects shaped like `{ "tasks": [...] }`, `{ "kanbanTasks": [...] }`, or `{ "data": { "tasks": [...] } }` so older/manual backups remain portable:
@@ -128,8 +136,9 @@ Near-term:
 
 1. Run real-device smoke tests for nested tasks, checklist sync, matrix view, and offline reload on Mac/iPhone/iPad/Windows.
 2. Run a real Google Calendar account sync smoke test after OAuth consent is connected.
-3. Expand conflict actions to checklist and import mutations if real use shows those conflicts often.
-4. Add provider webhooks and recurring calendar events.
+3. Move the Google OAuth app out of Testing if recurring re-authorization becomes annoying.
+4. Expand conflict actions to checklist and import mutations if real use shows those conflicts often.
+5. Add provider webhooks and recurring calendar events.
 
 Later:
 

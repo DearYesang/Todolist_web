@@ -59,6 +59,10 @@ Create the Google OAuth client as a Web application and add this authorized redi
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
 
+For the first smoke test, the Google OAuth app can stay in **Testing**, but the Google account used to connect Calendar must be added under **Google Auth Platform -> Audience -> Test users**. For this personal deployment, add `scyea1995@gmail.com` first. A non-Gmail address only works here if it is also a Google Account.
+
+Testing authorizations expire after 7 days. After the sync/delete smoke passes, move the app to **In production** if you want the personal Google Calendar connection to remain usable without weekly re-authorization. A personal app under 100 users can be used without completing full OAuth verification, but Google may show an unverified-app warning for sensitive scopes.
+
 Microsoft Calendar is optional for later:
 
 - `MICROSOFT_CALENDAR_CLIENT_ID`
@@ -79,7 +83,7 @@ Microsoft Calendar is optional for later:
 - Export and replace-import a JSON backup.
 - Create and revoke an iCal link.
 - Download a single task `.ics` file from a card or task detail panel.
-- Connect a Google or Microsoft calendar account in a staging OAuth app.
+- Connect a Google or Microsoft calendar account in a staging OAuth app. If Google returns `403 access_denied`, confirm the signed-in Google account is in the OAuth app's Test users list.
 - Run manual external calendar sync and confirm event links are created.
 - Mark a synced task done, run manual external calendar sync again, and confirm the provider event is deleted.
 - Confirm Vercel registered `/api/calendar/sync/cron` under Cron Jobs after deploy.

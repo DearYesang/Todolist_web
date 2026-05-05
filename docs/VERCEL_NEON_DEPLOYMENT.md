@@ -45,6 +45,10 @@ For Google Calendar, create a Google Cloud OAuth client as a Web application and
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
 
+If the Google OAuth consent app is still in **Testing**, add the Google account you use for sync under **Google Auth Platform -> Audience -> Test users** before pressing the app's Google Calendar connect button. For this deployment, start with `scyea1995@gmail.com`. If this is skipped, Google blocks the flow with `403 access_denied`.
+
+Testing-mode Google OAuth authorizations expire after 7 days. For a personal always-on calendar sync, run the first smoke in Testing, then consider switching the OAuth app to **In production** so the connection does not need weekly re-authorization. Personal-use apps under 100 users can continue without full verification, though Google can still show an unverified-app warning for sensitive scopes.
+
 `onboarding@resend.dev` is Resend's testing sender and can only deliver to the email address associated with the Resend account. For both allowed emails to receive codes independently, verify a custom email domain later and switch `EMAIL_FROM` to that domain.
 
 Generate secret values locally:

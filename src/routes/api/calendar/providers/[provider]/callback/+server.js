@@ -4,6 +4,10 @@ import {
 	CalendarSyncError,
 	completeCalendarProviderAuthorization
 } from '$lib/server/calendar/provider-sync.js';
+import {
+	createCalendarOAuthErrorMessage,
+	createCalendarSyncRedirect
+} from '$lib/server/calendar/oauth-status.js';
 import { CalendarProviderError } from '$lib/server/calendar/providers.js';
 import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
 
@@ -14,10 +18,27 @@ export async function GET({ params, request, url }) {
 		return authResult.response;
 	}
 
+	const oauthError = url.searchParams.get('error');
+	if (oauthError) {
+		throw redirect(302, createCalendarSyncRedirect({
+			status: 'error',
+			provider: params.provider,
+			message: createCalendarOAuthErrorMessage(
+				params.provider,
+				oauthError,
+				url.searchParams.get('error_description')
+			)
+		}));
+	}
+
 	const code = url.searchParams.get('code');
 	const state = url.searchParams.get('state');
 	if (!code || !state) {
-		return Response.json({ message: 'Calendar OAuth callback is missing code or state.' }, { status: 400 });
+		throw redirect(302, createCalendarSyncRedirect({
+			status: 'error',
+			provider: params.provider,
+			message: 'Calendar OAuth callback is missing code or state.'
+		}));
 	}
 
 	try {
@@ -25,10 +46,17 @@ export async function GET({ params, request, url }) {
 			userId: authResult.user.id,
 			sessionId: authResult.session.id
 		});
-		throw redirect(302, '/?calendarSync=connected');
+		throw redirect(302, createCalendarSyncRedirect({
+			status: 'connected',
+			provider: params.provider
+		}));
 	} catch (error) {
 		if (error instanceof CalendarSyncError || error instanceof CalendarProviderError || error instanceof CalendarTokenEncryptionError) {
-			return Response.json({ message: error.message }, { status: error.status });
+			throw redirect(302, createCalendarSyncRedirect({
+				status: 'error',
+				provider: params.provider,
+				message: error.message
+			}));
 		}
 
 		throw error;
