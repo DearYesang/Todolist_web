@@ -6,8 +6,8 @@ This document compares the current implementation against the working plan for t
 
 ## Production Snapshot
 
-- Latest production merge: `0024385 feat: simplify calendar actions and Gantt checklist` from PR #35.
-- Latest strict health smoke: `https://todokanban-alpha.vercel.app/api/health?strict=true` returned `ok: true` on 2026-05-05.
+- Latest production merge: `d075fba chore(deps-dev): bump the npm-development group with 4 updates`.
+- Latest strict health smoke: `https://todokanban-alpha.vercel.app/api/health?strict=true` returned `ok: true` on 2026-05-06.
 - Calendar direction: `.ics` is the active product path. The whole-board `.ics` link was manually confirmed, and Google/Microsoft provider sync is deferred behind existing route/service scaffolding.
 
 ## Plan vs State
