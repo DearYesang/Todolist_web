@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, or } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 import { isPlaceholderValue } from '$lib/server/config/env.js';
 import { ensurePersonalBoardForUser, listTasksForBoard } from '$lib/server/tasks/repository.js';
@@ -10,6 +10,7 @@ const TOKEN_PREVIEW_LENGTH = 12;
 const MAX_TOKEN_NAME_LENGTH = 80;
 const DEFAULT_TOKEN_TTL_DAYS = 30;
 const MAX_ACTIVE_TOKENS_PER_USER = 5;
+const LAST_USED_UPDATE_INTERVAL_MS = 60 * 60 * 1000;
 
 export class CalendarTokenConfigurationError extends Error {
 	constructor() {
@@ -118,10 +119,7 @@ export async function getCalendarTasksForToken(rawToken) {
 		return null;
 	}
 
-	await db
-		.update(schema.calendarSubscriptionTokens)
-		.set({ lastUsedAt: new Date() })
-		.where(eq(schema.calendarSubscriptionTokens.id, tokenRecord.id));
+	await refreshCalendarTokenLastUsedAt(db, tokenRecord);
 
 	return listTasksForBoard(tokenRecord.boardId);
 }
@@ -140,6 +138,27 @@ export function hashCalendarToken(rawToken) {
 	}
 
 	return createHmac('sha256', secret).update(rawToken).digest('hex');
+}
+
+/**
+ * @param {ReturnType<typeof getDb>} db
+ * @param {typeof schema.calendarSubscriptionTokens.$inferSelect} tokenRecord
+ */
+async function refreshCalendarTokenLastUsedAt(db, tokenRecord) {
+	const now = new Date();
+	const lastUsedAt = tokenRecord.lastUsedAt;
+	if (lastUsedAt && now.getTime() - lastUsedAt.getTime() < LAST_USED_UPDATE_INTERVAL_MS) {
+		return;
+	}
+
+	const cutoff = new Date(now.getTime() - LAST_USED_UPDATE_INTERVAL_MS);
+	await db
+		.update(schema.calendarSubscriptionTokens)
+		.set({ lastUsedAt: now })
+		.where(and(
+			eq(schema.calendarSubscriptionTokens.id, tokenRecord.id),
+			or(isNull(schema.calendarSubscriptionTokens.lastUsedAt), lt(schema.calendarSubscriptionTokens.lastUsedAt, cutoff))
+		));
 }
 
 export class CalendarTokenLimitError extends Error {

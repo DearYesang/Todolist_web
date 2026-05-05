@@ -31,6 +31,16 @@ export async function assertRateLimit(key, options) {
 }
 
 /**
+ * Use for public read endpoints where rate limiting must not add per-request DB
+ * writes. This is best-effort because serverless instances do not share memory.
+ * @param {string} key
+ * @param {{ limit: number; windowMs: number; message?: string }} options
+ */
+export function assertVolatileRateLimit(key, options) {
+	assertMemoryRateLimit(key, options);
+}
+
+/**
  * @param {string} key
  * @param {{ limit: number; windowMs: number; message?: string }} options
  */

@@ -75,6 +75,13 @@ The database and auth clients are initialized so local tests and builds do not r
 
 Calendar subscription tokens also require `CALENDAR_TOKEN_SECRET`. Raw subscription tokens are returned only once and stored as HMAC hashes in Postgres.
 
+Security posture for the public repository:
+
+- Keep real secrets only in local `.env` files or Vercel environment variables.
+- GitHub secret scanning and push protection are enabled for `DearYesang/Todolist_web`.
+- CI runs `npm audit --audit-level=low`; Dependabot monitors npm/GitHub Actions updates and security updates are enabled.
+- Local analysis scratch files such as `problems_*.txt` are ignored.
+
 Production passkey registration is limited by `AUTH_ALLOWED_EMAILS`. Keep real personal emails in Vercel environment variables only; the public example uses `primary@example.com,backup@example.com`.
 
 Production email verification can use Resend with `RESEND_API_KEY` and `EMAIL_FROM`. For the free `todokanban-alpha.vercel.app` deployment, `Todokanban <onboarding@resend.dev>` works only for the email address associated with the Resend account. `EMAIL_DELIVERY_WEBHOOK_URL` remains available as a webhook fallback.
