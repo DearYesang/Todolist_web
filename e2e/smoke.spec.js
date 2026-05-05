@@ -109,6 +109,61 @@ test('opens the Eisenhower matrix view with all quadrants', async ({ page }) => 
 	await expect(page.getByRole('button', { name: /완료 숨기기/ })).toBeVisible();
 });
 
+test('remembers the selected view across reloads', async ({ page }) => {
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	await page.getByRole('button', { name: /매트릭스/ }).click();
+	await expect(page.getByRole('heading', { name: '즉시 실행' })).toBeVisible();
+
+	await page.reload();
+	await expect(page.getByRole('heading', { name: '즉시 실행' })).toBeVisible();
+	await expect(page.getByRole('button', { name: /매트릭스/ })).toHaveClass(/active/);
+});
+
+test('keeps nested checklist tasks attached on iPhone-sized offline reloads', async ({ page }) => {
+	await page.setViewportSize({ width: 393, height: 852 });
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	const child = page.locator('.task-card', { hasText: 'Nested child task' }).first();
+	await expect(child).toBeVisible();
+	await expect(child).toHaveAttribute('style', /margin-left:\s*32px/);
+
+	await child.locator('.add-subtask-input').fill('Offline checklist note');
+	await child.locator('.add-subtask-input').press('Enter');
+	await expect(child.getByText('Offline checklist note')).toBeVisible();
+
+	await page.reload();
+	const reloadedChild = page.locator('.task-card', { hasText: 'Nested child task' }).first();
+	await expect(reloadedChild).toBeVisible();
+	await expect(reloadedChild).toHaveAttribute('style', /margin-left:\s*32px/);
+	await expect(reloadedChild.getByText('Offline checklist note')).toBeVisible();
+});
+
+test('keeps the matrix view framed on iPad Pro width', async ({ page }) => {
+	await page.setViewportSize({ width: 1024, height: 1366 });
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	await page.getByRole('button', { name: /매트릭스/ }).click();
+
+	const board = page.locator('.eisenhower-board');
+	await expect(board).toBeVisible();
+	const box = await board.boundingBox();
+	expect(box).toBeTruthy();
+	expect(box.x).toBeGreaterThanOrEqual(0);
+	expect(box.x + box.width).toBeLessThanOrEqual(1024);
+
+	const first = page.locator('.eisenhower-quadrant').nth(0);
+	const second = page.locator('.eisenhower-quadrant').nth(1);
+	const [firstBox, secondBox] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+	expect(firstBox).toBeTruthy();
+	expect(secondBox).toBeTruthy();
+	expect(Math.abs(firstBox.y - secondBox.y)).toBeLessThan(4);
+	expect(firstBox.x).toBeLessThan(secondBox.x);
+});
+
 /**
  * @param {import('@playwright/test').Page} page
  */
@@ -134,6 +189,10 @@ async function seedOfflineBoard(page) {
 			name: null,
 			cachedAt: Date.now()
 		}));
+		if (localStorage.getItem('kanbanTasks:e2e-user')) {
+			return;
+		}
+
 		localStorage.setItem('kanbanTasks:e2e-user', JSON.stringify([
 			{
 				id: 'local-urgent-important',
@@ -187,6 +246,34 @@ async function seedOfflineBoard(page) {
 				urgency: 'normal',
 				category: '',
 				parentId: null,
+				subtasks: [],
+				collapsed: false,
+				createdAt: Date.now()
+			},
+			{
+				id: 'local-parent-task',
+				text: 'Nested parent task',
+				status: 'todo',
+				startDate: formatDate(past),
+				endDate: formatDate(past),
+				priority: 'medium',
+				urgency: 'normal',
+				category: '',
+				parentId: null,
+				subtasks: [],
+				collapsed: false,
+				createdAt: Date.now()
+			},
+			{
+				id: 'local-child-task',
+				text: 'Nested child task',
+				status: 'todo',
+				startDate: formatDate(past),
+				endDate: formatDate(past),
+				priority: 'medium',
+				urgency: 'normal',
+				category: '',
+				parentId: 'local-parent-task',
 				subtasks: [],
 				collapsed: false,
 				createdAt: Date.now()

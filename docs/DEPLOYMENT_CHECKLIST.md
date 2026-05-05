@@ -50,6 +50,8 @@ Google Calendar provider sync additionally needs:
 - `CALENDAR_OAUTH_ENCRYPTION_KEY`
 - `GOOGLE_CALENDAR_CLIENT_ID`
 - `GOOGLE_CALENDAR_CLIENT_SECRET`
+- `CRON_SECRET` for the optional daily Vercel Cron sync endpoint
+- `CALENDAR_BACKGROUND_SYNC_MAX_USERS` if the default `10` connected users per cron run should change
 
 Create the Google OAuth client as a Web application and add this authorized redirect URI:
 
@@ -80,8 +82,9 @@ Microsoft Calendar is optional for later:
 - Connect a Google or Microsoft calendar account in a staging OAuth app.
 - Run manual external calendar sync and confirm event links are created.
 - Mark a synced task done, run manual external calendar sync again, and confirm the provider event is deleted.
+- Confirm Vercel registered `/api/calendar/sync/cron` under Cron Jobs after deploy.
 - Confirm a logged-out browser cannot see the board.
 - Confirm an unauthorized email cannot request a verification code.
 - Go offline, edit an existing server task, come back online, and confirm the queued write flushes.
-- If a version conflict is forced, confirm the conflict panel shows the dropped offline mutation and can export a JSON report.
+- If a version conflict is forced, confirm the conflict panel can apply a task update/delete locally, keep the server version, and export a JSON report.
 - On an already logged-in device, go offline, reload, and confirm the local board still opens.

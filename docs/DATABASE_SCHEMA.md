@@ -61,7 +61,7 @@ updated_at timestamptz not null default now()
 unique (workspace_id, name)
 ```
 
-The current client has a third `matrix` view, but `default_view` is not yet user-configurable or persisted by the API. Add `matrix` to this check only when default view persistence is implemented.
+The current client has a third `matrix` view and remembers the selected view per device in `localStorage`. `boards.default_view` is not yet user-configurable or persisted by the API. Add `matrix` to this check only if default view becomes a cross-device database preference.
 
 ### tasks
 
@@ -228,8 +228,10 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Revocable token-based `/api/calendar/subscriptions/[token].ics` feed backed by token hashes.
 - OAuth-backed Google/Microsoft calendar connections with encrypted provider tokens.
 - Manual calendar provider sync that upserts linked all-day events, deletes provider events for completed or removed tasks, and records durable sync runs.
+- Secured daily calendar cron endpoint for connected provider users.
 - Email-code passkey onboarding and hashed recovery codes.
 - Offline client write queue for retryable server mutations.
+- Conflict review details with apply-local and keep-server actions for task update/delete conflicts.
 - Parent ownership and cycle validation in the service layer.
 
-Server append/replace import, provider sync foundations, and conflict review details are implemented. Background calendar workers, provider webhooks, and apply/keep-server conflict actions are still planned.
+Server append/replace import, provider sync foundations, secured cron sync, and task conflict actions are implemented. Provider webhooks, recurring events, and checklist/import conflict replay are still planned.

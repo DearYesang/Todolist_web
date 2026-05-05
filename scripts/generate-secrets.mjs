@@ -5,6 +5,7 @@ const secrets = [
 	['ACCOUNT_RECOVERY_SECRET', randomSecret(48), 'HMAC secret for recovery and email verification codes.'],
 	['CALENDAR_TOKEN_SECRET', randomSecret(48), 'HMAC secret for revocable iCalendar feed tokens.'],
 	['CALENDAR_OAUTH_ENCRYPTION_KEY', randomSecret(32), 'AES-GCM key material for Google/Microsoft OAuth tokens.'],
+	['CRON_SECRET', randomSecret(32), 'Bearer secret automatically sent by Vercel Cron.'],
 	['EMAIL_DELIVERY_WEBHOOK_SECRET', randomSecret(32), 'Optional webhook bearer secret if Resend is not used.']
 ];
 

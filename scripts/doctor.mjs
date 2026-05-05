@@ -20,7 +20,9 @@ const checks = [
 	checkValue('GOOGLE_CALENDAR_CLIENT_ID', process.env.GOOGLE_CALENDAR_CLIENT_ID, false),
 	checkSecret('GOOGLE_CALENDAR_CLIENT_SECRET', process.env.GOOGLE_CALENDAR_CLIENT_SECRET, false),
 	checkValue('MICROSOFT_CALENDAR_CLIENT_ID', process.env.MICROSOFT_CALENDAR_CLIENT_ID, false),
-	checkSecret('MICROSOFT_CALENDAR_CLIENT_SECRET', process.env.MICROSOFT_CALENDAR_CLIENT_SECRET, false)
+	checkSecret('MICROSOFT_CALENDAR_CLIENT_SECRET', process.env.MICROSOFT_CALENDAR_CLIENT_SECRET, false),
+	checkSecret('CRON_SECRET', process.env.CRON_SECRET, false),
+	checkPositiveInteger('CALENDAR_BACKGROUND_SYNC_MAX_USERS', process.env.CALENDAR_BACKGROUND_SYNC_MAX_USERS, false)
 ];
 
 const blocking = checks.filter((check) => check.required && check.status !== 'ok');
@@ -88,6 +90,14 @@ function checkEmailList(key, value, required) {
 function checkValue(key, value, required) {
 	if (!value) return createCheck(key, required, required ? 'missing' : 'optional', required ? 'required.' : 'optional.');
 	if (isPlaceholder(value)) return createCheck(key, required, 'placeholder', 'must be replaced.');
+	return createCheck(key, required, 'ok', 'configured.');
+}
+
+function checkPositiveInteger(key, value, required) {
+	if (!value) return createCheck(key, required, required ? 'missing' : 'optional', required ? 'required.' : 'optional.');
+	if (isPlaceholder(value)) return createCheck(key, required, 'placeholder', 'must be replaced.');
+	const number = Number(value);
+	if (!Number.isInteger(number) || number <= 0) return createCheck(key, required, 'invalid', 'must be a positive integer.');
 	return createCheck(key, required, 'ok', 'configured.');
 }
 

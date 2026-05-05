@@ -46,6 +46,8 @@ export function getRuntimeConfigReport(options = {}) {
 		checkSecret('GOOGLE_CALENDAR_CLIENT_SECRET', process.env.GOOGLE_CALENDAR_CLIENT_SECRET, false),
 		checkValue('MICROSOFT_CALENDAR_CLIENT_ID', process.env.MICROSOFT_CALENDAR_CLIENT_ID, false),
 		checkSecret('MICROSOFT_CALENDAR_CLIENT_SECRET', process.env.MICROSOFT_CALENDAR_CLIENT_SECRET, false),
+		checkSecret('CRON_SECRET', process.env.CRON_SECRET, false),
+		checkPositiveInteger('CALENDAR_BACKGROUND_SYNC_MAX_USERS', process.env.CALENDAR_BACKGROUND_SYNC_MAX_USERS, false),
 		...getCurrentOriginChecks(currentOrigin)
 	];
 	const blocking = checks.filter((check) => check.required && check.status !== 'ok');
@@ -203,6 +205,24 @@ function checkTrustedOrigins() {
 		invalid ? 'invalid' : 'ok',
 		invalid ? 'BETTER_AUTH_TRUSTED_ORIGINS contains an invalid origin.' : 'BETTER_AUTH_TRUSTED_ORIGINS is configured.'
 	);
+}
+
+/**
+ * @param {string} key
+ * @param {string | undefined} value
+ * @param {boolean} required
+ */
+function checkPositiveInteger(key, value, required) {
+	if (!value) {
+		return createCheck(key, required, required ? 'missing' : 'optional', `${key} is ${required ? 'required' : 'optional'}.`);
+	}
+
+	const number = Number(value);
+	if (!Number.isInteger(number) || number <= 0) {
+		return createCheck(key, required, 'invalid', `${key} must be a positive integer.`);
+	}
+
+	return createCheck(key, required, 'ok', `${key} is configured.`);
 }
 
 /**

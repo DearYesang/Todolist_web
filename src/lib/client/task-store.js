@@ -26,7 +26,9 @@ import {
 export * from '../shared/task-domain.js';
 
 const STORAGE_KEY = 'kanbanTasks';
+const VIEW_STORAGE_KEY = 'todokanbanCurrentView';
 const DEFAULT_STORAGE_OWNER = 'anonymous';
+const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 
 let taskStorageOwner = DEFAULT_STORAGE_OWNER;
 
@@ -118,8 +120,40 @@ function normalizeStorageOwner(ownerId) {
     return trimmed || DEFAULT_STORAGE_OWNER;
 }
 
-/** @type {import('svelte/store').Writable<'kanban' | 'gantt' | 'matrix'>} */
-export const currentView = writable('kanban');
+/** @typedef {'kanban' | 'gantt' | 'matrix'} AppView */
+
+/** @type {import('svelte/store').Writable<AppView>} */
+export const currentView = writable(readInitialView());
+
+currentView.subscribe((value) => {
+    try {
+        const storage = getStorage();
+        if (!storage || !isAppView(value)) return;
+
+        storage.setItem(VIEW_STORAGE_KEY, value);
+    } catch (error) {
+        console.error('Failed to persist current view', error);
+    }
+});
+
+/** @returns {AppView} */
+function readInitialView() {
+    try {
+        const storage = getStorage();
+        const stored = storage?.getItem(VIEW_STORAGE_KEY);
+        return isAppView(stored) ? stored : 'kanban';
+    } catch {
+        return 'kanban';
+    }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is AppView}
+ */
+function isAppView(value) {
+    return typeof value === 'string' && VALID_VIEWS.has(value);
+}
 
 /** @type {import('svelte/store').Writable<import('../shared/task-domain.js').TaskFilters>} */
 export const filters = writable({ ...DEFAULT_FILTERS });
