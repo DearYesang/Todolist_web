@@ -146,7 +146,7 @@
     }
 </script>
 
-<div class="add-panel">
+<div class="add-panel" class:open={isFormOpen}>
     <button class="add-toggle" class:active={isFormOpen} onclick={() => isFormOpen = !isFormOpen}>
         {isFormOpen ? '－ 닫기' : '＋ 새 작업 추가...'}
     </button>

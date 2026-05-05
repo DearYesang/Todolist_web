@@ -343,7 +343,7 @@
                         class="gantt-sidebar-item"
                         class:expanded={expandedChecklistTaskId === item.task.id}
                         class:done={item.task.status === 'done'}
-                        style={`height:${rowHeight}px;`}>
+                        style={`--gantt-row-height:${rowHeight}px;`}>
                         <div
                             class="gantt-sidebar-title"
                             role="button"
@@ -406,7 +406,7 @@
                 {#each ganttData.displayList as item (item.task.id)}
                     {@const coords = getCoords(item.task)}
                     {@const color = getCategoryColor(item.task.category)}
-                    <div class="gantt-row" style={`height:${getRowHeight(item.task)}px;`}>
+                    <div class="gantt-row" style={`--gantt-row-height:${getRowHeight(item.task)}px;`}>
                         <div
                             class="gantt-bar-wrapper"
                             class:resizing={resizeState?.taskId === item.task.id}

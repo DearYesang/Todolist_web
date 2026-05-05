@@ -14,6 +14,7 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 - Filters: 중요도, 시급성, 카테고리 필터
 - Backup: `kanban_backup_YYYY-MM-DD.json` 내보내기/불러오기
 - Calendar integration: 전체 일정 동기화용 `.ics` 링크, 작업별 all-day `.ics` 다운로드, 로그인 세션용 `/api/calendar.ics` 제공
+- Responsive PWA UI: iPhone-sized screens use compact header actions and touch-oriented add/detail sheets; iPad-sized screens keep a small-desktop layout
 - Passkey onboarding: 허용 이메일 기반 패스키 생성, 복구 코드, 패스키 로그인, 로그아웃 UI
 - Server sync: 인증된 작업 생성/조회/수정/삭제와 체크리스트 생성/수정/삭제, 부분 응답 merge 시 parent link 보존
 - Offline queue: 실패한 서버 write와 오프라인 JSON import를 사용자별 localStorage queue에 저장하고 다음 동기화 때 재시도, task 수정/삭제 충돌은 내 변경 적용 또는 서버 유지 선택 가능
