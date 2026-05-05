@@ -1474,9 +1474,18 @@ select {
     min-height: 22px;
     color: var(--text-secondary);
     font-size: 12px;
+    cursor: pointer;
 }
 
-.gantt-checklist-item span:last-child {
+.gantt-checklist-item input {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.gantt-checklist-item span {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1485,6 +1494,9 @@ select {
 
 .gantt-checklist-item.done {
     color: var(--text-muted);
+}
+
+.gantt-checklist-item.done span {
     text-decoration: line-through;
 }
 

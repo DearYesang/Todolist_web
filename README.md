@@ -5,7 +5,7 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 ## Current Features
 
 - Kanban board: `todo`, `doing`, `done` 컬럼과 드래그 이동
-- Gantt timeline: 작업 일정 시각화, 날짜 바 리사이즈, 작업 목록 체크리스트 미리보기
+- Gantt timeline: 작업 일정 시각화, 날짜 바 리사이즈, 작업 목록 체크리스트 미리보기와 완료 토글
 - Eisenhower matrix: 중요도/시급도 기준 4분면 보기, 완료 작업 기본 숨김과 필요 시 표시
 - View preference: 마지막으로 선택한 Kanban/Gantt/Eisenhower 뷰를 계정별로 저장하고, 오프라인에서는 기기별 캐시를 사용
 - Task hierarchy: 상위/하위 작업, 접기/펼치기, cascade delete
