@@ -2,6 +2,9 @@ import { normalizeTaskList } from './task-domain.js';
 
 const PRODUCT_ID = '-//Todolist//Kanban Calendar//KO';
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const ICS_LINE_BYTE_LIMIT = 75;
+const ICS_CONTINUATION_PREFIX = ' ';
+const textEncoder = new TextEncoder();
 
 /**
  * @param {unknown[]} rawTasks
@@ -113,21 +116,41 @@ function escapeIcsText(value) {
  * @param {string} line
  */
 function foldIcsLine(line) {
-	if (line.length <= 75) {
+	if (getUtf8ByteLength(line) <= ICS_LINE_BYTE_LIMIT) {
 		return line;
 	}
 
-	const chunks = [line.slice(0, 75)];
-	let rest = line.slice(75);
+	const chunks = [];
+	let chunk = '';
+	let chunkBytes = 0;
+	let prefix = '';
+	let limit = ICS_LINE_BYTE_LIMIT;
 
-	while (rest.length > 74) {
-		chunks.push(` ${rest.slice(0, 74)}`);
-		rest = rest.slice(74);
+	for (const char of line) {
+		const charBytes = getUtf8ByteLength(char);
+		if (chunk && chunkBytes + charBytes > limit) {
+			chunks.push(`${prefix}${chunk}`);
+			prefix = ICS_CONTINUATION_PREFIX;
+			limit = ICS_LINE_BYTE_LIMIT - getUtf8ByteLength(ICS_CONTINUATION_PREFIX);
+			chunk = char;
+			chunkBytes = charBytes;
+			continue;
+		}
+
+		chunk += char;
+		chunkBytes += charBytes;
 	}
 
-	if (rest) {
-		chunks.push(` ${rest}`);
+	if (chunk) {
+		chunks.push(`${prefix}${chunk}`);
 	}
 
 	return chunks.join('\r\n');
+}
+
+/**
+ * @param {string} value
+ */
+function getUtf8ByteLength(value) {
+	return textEncoder.encode(value).length;
 }

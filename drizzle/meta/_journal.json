@@ -57,6 +57,13 @@
       "when": 1777822324101,
       "tag": "0007_awesome_night_nurse",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777968940805,
+      "tag": "0008_high_mephisto",
+      "breakpoints": true
     }
   ]
 }

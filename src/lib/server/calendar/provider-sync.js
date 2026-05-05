@@ -432,38 +432,30 @@ async function getFreshAccessToken(connection) {
 async function upsertEventLink(connectionId, taskId, externalEventId, etag) {
 	const db = getDb();
 	const now = new Date();
-	const [existing] = await db
-		.select()
-		.from(schema.calendarEventLinks)
-		.where(and(
-			eq(schema.calendarEventLinks.connectionId, connectionId),
-			eq(schema.calendarEventLinks.taskId, taskId)
-		))
-		.limit(1);
-
-	if (existing) {
-		await db
-			.update(schema.calendarEventLinks)
-			.set({
+	await db
+		.insert(schema.calendarEventLinks)
+		.values({
+			taskId,
+			connectionId,
+			externalCalendarId: 'primary',
+			externalEventId,
+			etag,
+			lastSyncedAt: now,
+			syncStatus: 'active'
+		})
+		.onConflictDoUpdate({
+			target: [
+				schema.calendarEventLinks.connectionId,
+				schema.calendarEventLinks.taskId
+			],
+			set: {
 				externalCalendarId: 'primary',
 				externalEventId,
 				etag,
 				lastSyncedAt: now,
 				syncStatus: 'active'
-			})
-			.where(eq(schema.calendarEventLinks.id, existing.id));
-		return;
-	}
-
-	await db.insert(schema.calendarEventLinks).values({
-		taskId,
-		connectionId,
-		externalCalendarId: 'primary',
-		externalEventId,
-		etag,
-		lastSyncedAt: now,
-		syncStatus: 'active'
-	});
+			}
+		});
 }
 
 /**
