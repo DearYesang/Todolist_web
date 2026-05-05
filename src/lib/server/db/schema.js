@@ -322,6 +322,10 @@ export const calendarEventLinks = pgTable(
 	},
 	(table) => [
 		index('calendar_event_links_task_id_idx').on(table.taskId),
+		uniqueIndex('calendar_event_links_connection_task_uidx').on(
+			table.connectionId,
+			table.taskId
+		),
 		uniqueIndex('calendar_event_links_external_event_uidx').on(
 			table.connectionId,
 			table.externalCalendarId,

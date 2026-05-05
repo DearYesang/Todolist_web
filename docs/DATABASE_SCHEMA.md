@@ -148,6 +148,7 @@ external_event_id text not null
 etag text
 last_synced_at timestamptz
 sync_status text not null default 'active'
+unique (connection_id, task_id)
 unique (connection_id, external_calendar_id, external_event_id)
 ```
 
@@ -198,6 +199,7 @@ calendar_subscription_tokens(user_id)
 calendar_subscription_tokens(board_id)
 calendar_subscription_tokens(token_hash) unique
 calendar_event_links(task_id)
+calendar_event_links(connection_id, task_id) unique
 sync_cursors(connection_id, resource)
 calendar_sync_runs(user_id, started_at)
 calendar_sync_runs(connection_id, started_at)
