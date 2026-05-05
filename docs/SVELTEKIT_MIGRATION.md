@@ -43,7 +43,7 @@ Authenticated task routes now cover read/create/update/delete plus checklist cre
 - `src/routes/api/tasks/[taskId]/checklist/+server.js`
 - `src/routes/api/tasks/[taskId]/checklist/[itemId]/+server.js`
 
-Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until they can be created server-side. Server JSON import supports append and replace modes. Stale offline writes are surfaced in a conflict panel with exportable details. Partial task responses are merged into the existing full client graph before parent-link validation so checklist writes do not temporarily detach child tasks.
+Client mutations are optimistic. Server UUID-backed records sync to the API; local-only IDs remain in the fallback cache until they can be created server-side. Server JSON import supports append and replace modes. Stale offline writes are surfaced in a conflict panel with exportable details. Task update/delete conflicts can be replayed locally or dismissed in favor of the server. Partial task responses are merged into the existing full client graph before parent-link validation so checklist writes do not temporarily detach child tasks.
 
 ## Target Shape
 
@@ -80,8 +80,8 @@ src/routes/api/export/+server.js
 
 1. Add route/component tests around auth, passkey management, and nested task sync flows.
 2. Run real-device smoke tests for matrix view, nested checklist sync, and offline reload.
-3. Add apply/keep-server actions for multi-device conflict resolution.
-4. Add background calendar workers and provider webhooks.
+3. Run production Google Calendar OAuth smoke and verify daily Vercel Cron provider sync.
+4. Add provider webhooks and recurring calendar events.
 
 ## Domain Boundaries
 
@@ -98,6 +98,7 @@ The server domain layer should own:
 The client should own:
 
 - current view state
+- per-device current view persistence
 - filters
 - optimistic UI state
 - drag/resize interaction previews

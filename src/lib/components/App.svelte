@@ -17,10 +17,12 @@
     import {
         clearDoneTasks,
         currentView,
+        deleteTaskCascade,
         replaceTasks,
         resetFilters,
         setTaskStorageOwner,
-        tasks
+        tasks,
+        updateTask
     } from '$lib/client/task-store.js';
     import { extractBackupTasks } from '$lib/shared/task-backup.js';
     import { normalizeTaskList } from '$lib/shared/task-domain.js';
@@ -196,6 +198,65 @@
         conflictDetailsOpen = false;
     }
 
+    /**
+     * @param {string} conflictId
+     */
+    function dismissSyncConflict(conflictId) {
+        syncConflicts = syncConflicts.filter((conflict) => conflict.id !== conflictId);
+        if (syncConflicts.length === 0) {
+            conflictDetailsOpen = false;
+        }
+    }
+
+    /**
+     * @param {import('$lib/client/offline-conflicts.js').OfflineConflictSummary} conflict
+     */
+    function keepServerConflict(conflict) {
+        dismissSyncConflict(conflict.id);
+        syncNotice = '서버의 최신 상태를 유지했습니다.';
+    }
+
+    /**
+     * @param {import('$lib/client/offline-conflicts.js').OfflineConflictSummary} conflict
+     */
+    function applyLocalConflict(conflict) {
+        const mutation = conflict.mutation;
+        if (mutation.type === 'task.patch') {
+            const { expectedVersion: _expectedVersion, ...patch } = mutation.patch;
+            if (!get(tasks).some((task) => task.id === mutation.taskId)) {
+                syncNotice = '대상 작업을 찾지 못했습니다. 최신 상태를 확인해 주세요.';
+                return;
+            }
+
+            updateTask(mutation.taskId, patch);
+            dismissSyncConflict(conflict.id);
+            syncNotice = '내 변경을 최신 서버 상태 위에 다시 적용했습니다.';
+            return;
+        }
+
+        if (mutation.type === 'task.delete') {
+            if (!get(tasks).some((task) => task.id === mutation.taskId)) {
+                syncNotice = '대상 작업이 이미 없습니다. 서버 상태를 유지합니다.';
+                dismissSyncConflict(conflict.id);
+                return;
+            }
+
+            deleteTaskCascade(mutation.taskId);
+            dismissSyncConflict(conflict.id);
+            syncNotice = '삭제 변경을 최신 서버 상태 위에 다시 적용했습니다.';
+            return;
+        }
+
+        syncNotice = '이 충돌은 자동 적용보다 내역 저장 후 수동 확인이 안전합니다.';
+    }
+
+    /**
+     * @param {import('$lib/client/offline-conflicts.js').OfflineConflictSummary} conflict
+     */
+    function canApplyLocalConflict(conflict) {
+        return conflict.mutation.type === 'task.patch' || conflict.mutation.type === 'task.delete';
+    }
+
     function downloadConflictReport() {
         if (syncConflicts.length === 0) return;
 
@@ -352,6 +413,16 @@
                             <strong>{conflict.title}</strong>
                             <span>{conflict.target}</span>
                             <small>{conflict.detail}</small>
+                            <div class="sync-conflict-row-actions">
+                                <button
+                                    class="btn btn-small"
+                                    onclick={() => applyLocalConflict(conflict)}
+                                    disabled={!canApplyLocalConflict(conflict)}
+                                    title={canApplyLocalConflict(conflict) ? '내 오프라인 변경을 최신 서버 상태 위에 다시 적용합니다.' : '이 충돌은 내역 저장 후 수동 확인이 안전합니다.'}>
+                                    내 변경 적용
+                                </button>
+                                <button class="btn btn-small" onclick={() => keepServerConflict(conflict)}>서버 유지</button>
+                            </div>
                         </div>
                     {/each}
                 </div>

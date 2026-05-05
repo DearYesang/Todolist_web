@@ -35,6 +35,8 @@ CALENDAR_OAUTH_ENCRYPTION_KEY="..."
 GOOGLE_CALENDAR_CLIENT_ID="..."
 GOOGLE_CALENDAR_CLIENT_SECRET="..."
 CALENDAR_SYNC_MAX_TASKS="250"
+CALENDAR_BACKGROUND_SYNC_MAX_USERS="10"
+CRON_SECRET="..."
 ```
 
 For Google Calendar, create a Google Cloud OAuth client as a Web application and register:
@@ -57,6 +59,7 @@ The command prints values for:
 - `ACCOUNT_RECOVERY_SECRET`
 - `CALENDAR_TOKEN_SECRET`
 - `CALENDAR_OAUTH_ENCRYPTION_KEY`
+- `CRON_SECRET`
 - `EMAIL_DELIVERY_WEBHOOK_SECRET` if webhook delivery is used later
 
 Do not save these generated values in git. Paste only the required values into Vercel Production environment variables.
@@ -74,6 +77,7 @@ Do not save these generated values in git. Paste only the required values into V
 9. Locally set `DATABASE_URL` to the Neon production URL and run `npm run db:migrate`.
 10. Trigger a Vercel production deploy from `main`.
 11. Run the smoke test below.
+12. Confirm Vercel registered the daily calendar cron job under **Settings -> Cron Jobs**.
 
 If Vercel cannot allocate the `todokanban-alpha` project name, stop before registering passkeys and update the four passkey origin values to the actual `*.vercel.app` host.
 
@@ -99,6 +103,17 @@ npm run db:migrate
 10. Connect Google Calendar and run manual external calendar sync.
 11. Mark a previously synced task done, run external calendar sync again, and confirm the provider event is deleted.
 12. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.
+13. Trigger the secured calendar cron manually with `Authorization: Bearer $CRON_SECRET`, or wait for the daily Vercel Cron run and confirm runtime logs show `/api/calendar/sync/cron`.
+
+## Calendar Cron
+
+The repository includes `vercel.json` with one daily Hobby-compatible cron:
+
+```txt
+0 21 * * *
+```
+
+That runs at 21:00 UTC, which is 06:00 in Korea Standard Time. Vercel automatically sends `Authorization: Bearer $CRON_SECRET` when the Production environment has a `CRON_SECRET` variable. Keep the UI sync button as the immediate manual path; the cron is only a daily safety net for connected provider calendars.
 
 ## Vercel Dashboard Quick Guide
 

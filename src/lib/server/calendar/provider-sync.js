@@ -20,6 +20,7 @@ import {
 
 const OAUTH_STATE_PREFIX = 'calendar-oauth-state:';
 const DEFAULT_SYNC_TASK_LIMIT = 250;
+const DEFAULT_BACKGROUND_SYNC_USER_LIMIT = 10;
 /** @type {Set<string>} */
 const syncLocks = new Set();
 
@@ -198,6 +199,41 @@ export async function syncCalendarProvidersForUser(userId) {
 	} finally {
 		syncLocks.delete(userId);
 	}
+}
+
+/**
+ * @param {{ maxUsers?: number }} [options]
+ */
+export async function syncCalendarProvidersForConnectedUsers(options = {}) {
+	const maxUsers = normalizePositiveInteger(options.maxUsers, getBackgroundSyncUserLimit());
+	const connectionRows = await getDb()
+		.select({ userId: schema.calendarConnections.userId })
+		.from(schema.calendarConnections);
+	const userIds = [...new Set(connectionRows.map((row) => row.userId))].slice(0, maxUsers);
+	const results = [];
+
+	for (const userId of userIds) {
+		try {
+			results.push({
+				userId,
+				ok: true,
+				result: await syncCalendarProvidersForUser(userId)
+			});
+		} catch (error) {
+			results.push({
+				userId,
+				ok: false,
+				message: readErrorMessage(error) ?? 'Calendar background sync failed.'
+			});
+		}
+	}
+
+	return {
+		ok: results.every((result) => result.ok),
+		users: userIds.length,
+		limit: maxUsers,
+		results
+	};
 }
 
 /**
@@ -550,8 +586,20 @@ export function shouldSyncTaskToProvider(task) {
 }
 
 function getSyncTaskLimit() {
-	const configured = Number(process.env.CALENDAR_SYNC_MAX_TASKS ?? DEFAULT_SYNC_TASK_LIMIT);
-	return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : DEFAULT_SYNC_TASK_LIMIT;
+	return normalizePositiveInteger(process.env.CALENDAR_SYNC_MAX_TASKS, DEFAULT_SYNC_TASK_LIMIT);
+}
+
+function getBackgroundSyncUserLimit() {
+	return normalizePositiveInteger(process.env.CALENDAR_BACKGROUND_SYNC_MAX_USERS, DEFAULT_BACKGROUND_SYNC_USER_LIMIT);
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ */
+function normalizePositiveInteger(value, fallback) {
+	const configured = Number(value ?? fallback);
+	return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : fallback;
 }
 
 /**

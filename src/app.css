@@ -709,7 +709,7 @@ select {
 
 .sync-conflict-row {
     display: grid;
-    grid-template-columns: minmax(96px, 0.7fr) minmax(140px, 1fr) minmax(160px, 1.2fr);
+    grid-template-columns: minmax(96px, 0.7fr) minmax(140px, 1fr) minmax(160px, 1.2fr) minmax(170px, auto);
     gap: 8px;
     padding: 8px 10px;
     border: 1px solid rgba(210, 153, 34, 0.24);
@@ -729,6 +729,13 @@ select {
 
 .sync-conflict-row small {
     color: var(--text-muted);
+}
+
+.sync-conflict-row-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 .filter-label {
@@ -1688,11 +1695,20 @@ select {
         order: 3;
         width: 100%;
         margin-left: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .view-toggle::-webkit-scrollbar {
+        display: none;
     }
 
     .view-btn {
         flex: 1 1 0;
         min-height: 44px;
+        padding: 8px 10px;
+        white-space: nowrap;
     }
 
     .header-actions {
@@ -1813,9 +1829,26 @@ select {
         gap: 12px;
     }
 
+    .eisenhower-toolbar {
+        justify-content: stretch;
+    }
+
+    .eisenhower-done-toggle {
+        width: 100%;
+    }
+
     .eisenhower-quadrant {
         min-height: 320px;
         border-radius: var(--radius-sm);
+    }
+
+    .eisenhower-header {
+        padding: 12px;
+    }
+
+    .eisenhower-list {
+        min-height: 220px;
+        padding: 10px;
     }
 
     .column {
@@ -1888,8 +1921,13 @@ select {
         justify-content: stretch;
     }
 
-    .sync-notice-actions .btn {
+    .sync-notice-actions .btn,
+    .sync-conflict-row-actions .btn {
         flex: 1;
+    }
+
+    .sync-conflict-row-actions {
+        justify-content: stretch;
     }
 
     .panel-footer-actions {
@@ -1904,6 +1942,53 @@ select {
     .side-panel {
         width: 100%;
         border-left: none;
+    }
+}
+
+@media (max-width: 430px) {
+    .header {
+        align-items: stretch;
+    }
+
+    .header h1 {
+        flex: 1 1 100%;
+        font-size: 19px;
+    }
+
+    .view-toggle {
+        border-radius: var(--radius);
+    }
+
+    .view-btn {
+        font-size: 13px;
+    }
+
+    .btn {
+        padding-left: 11px;
+        padding-right: 11px;
+    }
+
+    .task-card {
+        padding: 12px 10px;
+    }
+
+    .card-text {
+        font-size: 14px;
+        overflow-wrap: anywhere;
+    }
+
+    .date-tag {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .gantt-sidebar {
+        max-height: 42dvh;
+        overflow-y: auto;
+    }
+
+    .gantt-day-header {
+        font-size: 11px;
     }
 }
 
@@ -1951,6 +2036,14 @@ select {
     .header-actions {
         flex-wrap: wrap;
         max-width: 760px;
+    }
+
+    .eisenhower-board {
+        gap: 14px;
+    }
+
+    .eisenhower-quadrant {
+        min-height: 360px;
     }
 
     .column {
