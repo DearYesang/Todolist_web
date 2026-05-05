@@ -9,6 +9,33 @@ test('keeps the private app locked before login', async ({ page }) => {
 	await expect(page.getByRole('button', { name: /불러오기/ })).toBeHidden();
 });
 
+test('keeps locked auth controls within an iPhone viewport', async ({ page }) => {
+	await page.setViewportSize({ width: 393, height: 852 });
+	await page.goto('/', { waitUntil: 'networkidle' });
+	await page.waitForTimeout(500);
+
+	const authPanel = page.locator('.locked-app-state .auth-panel');
+	await expect(authPanel).toBeVisible();
+
+	const boxes = await authPanel.locator('input, button').evaluateAll((elements) =>
+		elements.map((element) => {
+			const box = element.getBoundingClientRect();
+			return {
+				left: box.left,
+				right: box.right,
+				width: box.width
+			};
+		})
+	);
+
+	expect(boxes.length).toBeGreaterThan(0);
+	for (const box of boxes) {
+		expect(box.left).toBeGreaterThanOrEqual(0);
+		expect(box.right).toBeLessThanOrEqual(393);
+		expect(box.width).toBeGreaterThan(0);
+	}
+});
+
 test('opens an offline cached board and centers the Gantt timeline on today', async ({ page }) => {
 	await seedOfflineBoard(page);
 
