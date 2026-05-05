@@ -1,6 +1,8 @@
 import { building } from '$app/environment';
 import { authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
 
+const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
+
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
 	if (!isTrustedUnsafeApiRequest(event)) {
@@ -9,14 +11,14 @@ export async function handle({ event, resolve }) {
 
 	if (!authDatabaseConfigured) {
 		if (isAuthRoute(event.url.pathname)) {
-			return withSecurityHeaders(Response.json({ message: 'Auth database is not configured.' }, { status: 503 }), event);
+			return withSecurityHeaders(Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 503 }), event);
 		}
 
 		return withSecurityHeaders(await resolve(event), event);
 	}
 
 	if (authConfigurationError && isAuthRoute(event.url.pathname)) {
-		return withSecurityHeaders(Response.json({ message: authConfigurationError }, { status: 500 }), event);
+		return withSecurityHeaders(Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 500 }), event);
 	}
 
 	if (building) {

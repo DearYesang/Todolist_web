@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { json } from '@sveltejs/kit';
 import { getRuntimeConfigReport } from '$lib/server/config/env.js';
 
@@ -38,7 +39,17 @@ function shouldExposeDetails(request) {
 	}
 
 	const token = process.env.HEALTH_DETAILS_TOKEN;
-	return Boolean(token && token.length >= 32 && request.headers.get('authorization') === `Bearer ${token}`);
+	const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+	return Boolean(token && token.length >= 32 && secretsMatch(bearer, token));
+}
+
+/**
+ * @param {string | undefined} candidate
+ * @param {string} secret
+ */
+function secretsMatch(candidate, secret) {
+	if (!candidate || candidate.length !== secret.length) return false;
+	return timingSafeEqual(Buffer.from(candidate), Buffer.from(secret));
 }
 
 /**

@@ -12,14 +12,27 @@ import {
 } from '$lib/server/security/rate-limit.js';
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 60;
+const IP_RATE_LIMIT_MAX_REQUESTS = 120;
+const TOKEN_RATE_LIMIT_MAX_REQUESTS = 60;
+const CALENDAR_TOKEN_PATTERN = /^cal_[A-Za-z0-9_-]{16,128}$/;
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET(event) {
 	const { params } = event;
 	try {
+		assertVolatileRateLimit(createRateLimitKey(event, 'calendar-feed-ip'), {
+			limit: IP_RATE_LIMIT_MAX_REQUESTS,
+			windowMs: RATE_LIMIT_WINDOW_MS,
+			message: 'Too many calendar feed requests.'
+		});
+		if (!isCalendarSubscriptionToken(params.token)) {
+			return new Response('Not found', {
+				status: 404,
+				headers: { 'cache-control': 'no-store' }
+			});
+		}
 		assertVolatileRateLimit(createCalendarFeedRateLimitKey(event), {
-			limit: RATE_LIMIT_MAX_REQUESTS,
+			limit: TOKEN_RATE_LIMIT_MAX_REQUESTS,
 			windowMs: RATE_LIMIT_WINDOW_MS,
 			message: 'Too many calendar feed requests.'
 		});
@@ -64,4 +77,9 @@ function createCalendarFeedRateLimitKey(event) {
 /** @param {string} rawToken */
 function hashRateLimitToken(rawToken) {
 	return createHash('sha256').update(rawToken).digest('base64url').slice(0, 32);
+}
+
+/** @param {string} rawToken */
+function isCalendarSubscriptionToken(rawToken) {
+	return CALENDAR_TOKEN_PATTERN.test(rawToken);
 }

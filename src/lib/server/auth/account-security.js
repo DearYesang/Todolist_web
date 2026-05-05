@@ -85,7 +85,7 @@ export function parsePasskeyRegistrationContext(context) {
 		assertAllowedAccountEmail(email);
 	} catch (error) {
 		if (error instanceof AccountSecurityPolicyError) {
-			throwPasskeyInputError('가입이 허용된 이메일만 사용할 수 있습니다.', 'EMAIL_NOT_ALLOWED', 'FORBIDDEN');
+			throwPasskeyInputError('패스키 등록 요청을 완료할 수 없습니다.', 'INVALID_PASSKEY_REGISTRATION_CONTEXT');
 		}
 		throw error;
 	}

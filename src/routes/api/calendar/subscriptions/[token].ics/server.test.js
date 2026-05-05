@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCalendarTasksForToken } from '$lib/server/calendar/tokens.js';
-import { resetRateLimitBuckets } from '$lib/server/security/rate-limit.js';
+import { getMemoryRateLimitBucketCount, resetRateLimitBuckets } from '$lib/server/security/rate-limit.js';
 import { GET } from './+server.js';
+
+const VALID_TOKEN = `cal_${'a'.repeat(43)}`;
 
 vi.mock('$lib/server/calendar/tokens.js', async (importOriginal) => ({
 	...(await importOriginal()),
@@ -24,7 +26,7 @@ describe('/api/calendar/subscriptions/[token].ics route', () => {
 		expect(response.headers.get('cache-control')).toBe('private, no-store');
 		expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow, noarchive');
 		expect(body).toContain('BEGIN:VCALENDAR');
-		expect(getCalendarTasksForToken).toHaveBeenCalledWith('cal_token');
+		expect(getCalendarTasksForToken).toHaveBeenCalledWith(VALID_TOKEN);
 	});
 
 	it('rate limits repeated token and IP requests before touching the database', async () => {
@@ -39,13 +41,23 @@ describe('/api/calendar/subscriptions/[token].ics route', () => {
 		expect(blocked.headers.get('retry-after')).toEqual(expect.any(String));
 		expect(getCalendarTasksForToken).toHaveBeenCalledTimes(60);
 	});
+
+	it('rejects invalid token shapes without creating per-token buckets or hitting the database', async () => {
+		for (let index = 0; index < 10; index += 1) {
+			const response = await GET(createEvent(`not-a-token-${index}`));
+			expect(response.status).toBe(404);
+		}
+
+		expect(getCalendarTasksForToken).not.toHaveBeenCalled();
+		expect(getMemoryRateLimitBucketCount()).toBe(1);
+	});
 });
 
 /**
  * @param {string} token
  * @param {string} ip
  */
-function createEvent(token = 'cal_token', ip = '203.0.113.10') {
+function createEvent(token = VALID_TOKEN, ip = '203.0.113.10') {
 	return /** @type {any} */ ({
 		params: { token },
 		request: new Request(`https://todo.example.com/api/calendar/subscriptions/${token}.ics`),

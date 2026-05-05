@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 
+const MAX_MEMORY_BUCKETS = 2000;
+
 /** @type {Map<string, { count: number; resetAt: number }>} */
 const buckets = new Map();
 
@@ -48,6 +50,10 @@ function assertMemoryRateLimit(key, options) {
 	const now = Date.now();
 	const existing = buckets.get(key);
 	if (!existing || existing.resetAt <= now) {
+		pruneExpiredMemoryBuckets(now);
+		if (!existing) {
+			pruneOldestMemoryBuckets();
+		}
 		buckets.set(key, { count: 1, resetAt: now + options.windowMs });
 		return;
 	}
@@ -128,6 +134,10 @@ export function resetRateLimitBuckets() {
 	buckets.clear();
 }
 
+export function getMemoryRateLimitBucketCount() {
+	return buckets.size;
+}
+
 /**
  * @param {{ getClientAddress: () => string }} event
  */
@@ -136,5 +146,24 @@ function safeClientAddress(event) {
 		return event.getClientAddress();
 	} catch {
 		return 'unknown';
+	}
+}
+
+/** @param {number} now */
+function pruneExpiredMemoryBuckets(now) {
+	for (const [key, bucket] of buckets) {
+		if (bucket.resetAt <= now) {
+			buckets.delete(key);
+		}
+	}
+}
+
+function pruneOldestMemoryBuckets() {
+	while (buckets.size >= MAX_MEMORY_BUCKETS) {
+		const oldestKey = buckets.keys().next().value;
+		if (typeof oldestKey !== 'string') {
+			return;
+		}
+		buckets.delete(oldestKey);
 	}
 }

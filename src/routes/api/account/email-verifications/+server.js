@@ -3,7 +3,10 @@ import { authConfigurationError, authDatabaseConfigured } from '$lib/server/auth
 import {
 	AccountSecurityConfigurationError,
 	AccountSecurityPolicyError,
-	createPasskeyEmailVerification
+	assertAllowedAccountEmail,
+	createPasskeyEmailVerification,
+	isAccountEmail,
+	normalizeAccountEmail
 } from '$lib/server/auth/account-security.js';
 import {
 	assertRateLimit,
@@ -13,16 +16,18 @@ import {
 } from '$lib/server/security/rate-limit.js';
 
 const MAX_BODY_BYTES = 10_000;
+const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST(event) {
 	const { request } = event;
 	if (!authDatabaseConfigured) {
-		return json({ message: 'Auth database is not configured.' }, { status: 503 });
+		return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 503 });
 	}
 
 	if (authConfigurationError) {
-		return json({ message: authConfigurationError }, { status: 500 });
+		return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 500 });
 	}
 
 	let payload;
@@ -38,7 +43,23 @@ export async function POST(event) {
 	}
 
 	try {
-		const email = typeof payload?.email === 'string' ? payload.email : '';
+		const email = normalizeAccountEmail(payload?.email);
+		await assertRateLimit(createRateLimitKey(event, 'email-verification-ip'), {
+			limit: 20,
+			windowMs: 15 * 60 * 1000,
+			message: 'Too many email verification requests.'
+		});
+		if (!isAccountEmail(email)) {
+			return createGenericAcceptedResponse(email);
+		}
+		try {
+			assertAllowedAccountEmail(email);
+		} catch (error) {
+			if (error instanceof AccountSecurityPolicyError) {
+				return createGenericAcceptedResponse(email);
+			}
+			throw error;
+		}
 		await assertRateLimit(createRateLimitKey(event, 'email-verification-send', email), {
 			limit: 5,
 			windowMs: 15 * 60 * 1000,
@@ -63,13 +84,26 @@ export async function POST(event) {
 		}
 
 		if (error instanceof AccountSecurityConfigurationError) {
-			return json({ message: error.message }, { status: error.status });
+			return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: error.status });
 		}
 
 		if (error instanceof AccountSecurityPolicyError) {
-			return json({ message: error.message }, { status: error.status });
+			return createGenericAcceptedResponse(typeof payload?.email === 'string' ? payload.email : '');
 		}
 
 		throw error;
 	}
+}
+
+/** @param {string} email */
+function createGenericAcceptedResponse(email) {
+	return json({
+		email: normalizeAccountEmail(email),
+		expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS).toISOString()
+	}, {
+		status: 201,
+		headers: {
+			'cache-control': 'private, no-store'
+		}
+	});
 }
