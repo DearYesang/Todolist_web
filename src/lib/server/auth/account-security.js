@@ -486,7 +486,7 @@ async function deliverEmailVerification(message) {
 		return { previewCode: false };
 	}
 
-	if (process.env.NODE_ENV !== 'production' || process.env.EMAIL_VERIFICATION_DEV_CODES === 'true') {
+	if (process.env.NODE_ENV !== 'production') {
 		return { previewCode: true };
 	}
 

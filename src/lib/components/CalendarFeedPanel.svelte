@@ -13,7 +13,7 @@
     let isOpen = $state(false);
     let isWorking = $state(false);
     let message = $state('');
-    let expiresInDays = $state(90);
+    let expiresInDays = $state(30);
 
     $effect(() => {
         if ($session.data?.user && isOpen) {
@@ -34,7 +34,7 @@
         message = '';
         isWorking = true;
         try {
-            const result = await createCalendarToken('전체 일정 동기화', { expiresInDays });
+            const result = await createCalendarToken('전체 일정 비밀 링크', { expiresInDays });
             if (!result.ok) {
                 message = result.message;
                 return;
@@ -42,7 +42,7 @@
 
             latestUrl = new URL(result.url, window.location.origin).toString();
             tokens = [result.record, ...tokens];
-            message = '전체 일정 동기화 링크가 생성되었습니다.';
+            message = '전체 일정 비밀 링크가 생성되었습니다. 이 주소를 아는 사람은 일정 내용을 볼 수 있습니다.';
         } finally {
             isWorking = false;
         }
@@ -64,7 +64,7 @@
             }
 
             tokens = tokens.map((token) => token.id === tokenId && result.token ? result.token : token);
-            message = '전체 일정 동기화 링크가 해지되었습니다.';
+            message = '전체 일정 비밀 링크가 해지되었습니다.';
         } finally {
             isWorking = false;
         }
@@ -75,7 +75,7 @@
 
         try {
             await navigator.clipboard.writeText(latestUrl);
-            message = '전체 일정 동기화 링크를 복사했습니다.';
+            message = '전체 일정 비밀 링크를 복사했습니다.';
         } catch {
             message = '복사하지 못했습니다.';
         }
@@ -116,13 +116,16 @@
         {#if isOpen}
             <div class="calendar-feed-popover">
                 <div class="calendar-feed-actions">
-                    <select class="calendar-feed-select" bind:value={expiresInDays} aria-label="전체 일정 동기화 링크 만료">
+                    <p class="calendar-feed-warning">
+                        이 링크는 비밀번호 없이 전체 일정을 읽는 비밀 주소입니다. 캘린더 앱에 추가할 때만 복사하고, 의심되면 바로 중지하세요.
+                    </p>
+                    <select class="calendar-feed-select" bind:value={expiresInDays} aria-label="전체 일정 비밀 링크 만료">
+                        <option value={7}>7일</option>
                         <option value={30}>30일</option>
                         <option value={90}>90일</option>
-                        <option value={180}>180일</option>
                         <option value={365}>1년</option>
                     </select>
-                    <button class="btn btn-primary" onclick={handleCreate} disabled={isWorking}>동기화 링크 만들기</button>
+                    <button class="btn btn-primary" onclick={handleCreate} disabled={isWorking}>비밀 링크 만들기</button>
                     {#if latestUrl}
                         <button class="btn" onclick={copyLatestUrl}>복사</button>
                     {/if}

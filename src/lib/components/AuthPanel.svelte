@@ -11,6 +11,8 @@
         listUserPasskeys,
         updateUserPasskeyName
     } from '$lib/client/passkey-management-api.js';
+    import { clearOfflineWriteQueue } from '$lib/client/offline-write-queue.js';
+    import { clearLocalTaskCache } from '$lib/client/task-store.js';
 
     const session = authClient.useSession();
 
@@ -32,6 +34,7 @@
     let passkeyListError = $state('');
     let passkeyDrafts = $state(/** @type {Record<string, string>} */ ({}));
     let managedPasskeys = $state(/** @type {import('$lib/client/passkey-management-api.js').ManagedPasskey[]} */ ([]));
+    let clearLocalDataOnSignOut = $state(true);
 
     onMount(() => {
         passkeyName = createSuggestedPasskeyName();
@@ -182,6 +185,11 @@
             }
 
             authMessage = '로그아웃되었습니다.';
+            if (clearLocalDataOnSignOut) {
+                clearOfflineWriteQueue();
+                clearLocalTaskCache();
+                authMessage = '로그아웃했고 이 기기의 오프라인 캐시를 삭제했습니다.';
+            }
             recoverySummary = null;
             newRecoveryCodes = [];
             clearVerificationState();
@@ -459,6 +467,10 @@
         </button>
         <button class="btn" onclick={generateRecoveryCodes} disabled={isWorking}>복구 코드</button>
         <button class="btn" onclick={deleteRecoveryCodes} disabled={isWorking}>복구 폐기</button>
+        <label class="auth-cache-option" title="이 기기에 저장된 작업 캐시와 오프라인 대기 변경을 로그아웃 때 삭제합니다.">
+            <input type="checkbox" bind:checked={clearLocalDataOnSignOut} />
+            캐시 삭제
+        </label>
         <button class="btn" onclick={signOut} disabled={isWorking}>로그아웃</button>
     {:else}
         <input class="auth-input" type="email" bind:value={email} placeholder="email@example.com" autocomplete="email" />

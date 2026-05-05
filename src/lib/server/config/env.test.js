@@ -49,7 +49,7 @@ describe('runtime config report', () => {
 		process.env.BETTER_AUTH_TRUSTED_ORIGINS = 'https://todokanban-alpha.vercel.app';
 		process.env.PASSKEY_ORIGIN = 'https://todokanban-alpha.vercel.app';
 		process.env.PASSKEY_RP_ID = 'todokanban-alpha.vercel.app';
-		process.env.AUTH_ALLOWED_EMAILS = 'scyea@naver.com,scyea1995@gmail.com';
+		process.env.AUTH_ALLOWED_EMAILS = 'primary@example.com,backup@example.com';
 		process.env.ACCOUNT_RECOVERY_SECRET = 'recovery-secret-with-more-than-32-characters';
 		process.env.RESEND_API_KEY = 'resend-api-key-with-more-than-32-characters';
 		process.env.EMAIL_FROM = 'Todokanban <onboarding@resend.dev>';
@@ -60,6 +60,29 @@ describe('runtime config report', () => {
 		expect(report.emailDeliveryReady).toBe(true);
 	});
 
+	it('blocks production when preview email verification codes are enabled', () => {
+		process.env.NODE_ENV = 'production';
+		process.env.DATABASE_URL = 'postgresql://user:pass@host/db';
+		process.env.BETTER_AUTH_SECRET = 'auth-secret-with-more-than-32-characters';
+		process.env.BETTER_AUTH_URL = 'https://todo.example.com';
+		process.env.BETTER_AUTH_TRUSTED_ORIGINS = 'https://todo.example.com';
+		process.env.PASSKEY_ORIGIN = 'https://todo.example.com';
+		process.env.PASSKEY_RP_ID = 'todo.example.com';
+		process.env.AUTH_ALLOWED_EMAILS = 'user@example.com';
+		process.env.ACCOUNT_RECOVERY_SECRET = 'recovery-secret-with-more-than-32-characters';
+		process.env.EMAIL_VERIFICATION_DEV_CODES = 'true';
+		process.env.CALENDAR_TOKEN_SECRET = 'calendar-token-secret-with-more-than-32-characters';
+
+		const report = getRuntimeConfigReport();
+
+		expect(report.ok).toBe(false);
+		expect(report.emailDeliveryReady).toBe(false);
+		expect(report.blocking.map((check) => check.key)).toEqual(expect.arrayContaining([
+			'EMAIL_VERIFICATION_DEV_CODES',
+			'RESEND_API_KEY'
+		]));
+	});
+
 	it('blocks production health when the current origin does not match auth and passkey origins', () => {
 		process.env.NODE_ENV = 'production';
 		process.env.DATABASE_URL = 'postgresql://user:pass@host/db';
@@ -68,7 +91,7 @@ describe('runtime config report', () => {
 		process.env.BETTER_AUTH_TRUSTED_ORIGINS = 'https://todokanban.vercel.app';
 		process.env.PASSKEY_ORIGIN = 'https://todokanban.vercel.app';
 		process.env.PASSKEY_RP_ID = 'todokanban.vercel.app';
-		process.env.AUTH_ALLOWED_EMAILS = 'scyea@naver.com,scyea1995@gmail.com';
+		process.env.AUTH_ALLOWED_EMAILS = 'primary@example.com,backup@example.com';
 		process.env.ACCOUNT_RECOVERY_SECRET = 'recovery-secret-with-more-than-32-characters';
 		process.env.RESEND_API_KEY = 'resend-api-key-with-more-than-32-characters';
 		process.env.EMAIL_FROM = 'Todokanban <onboarding@resend.dev>';
@@ -93,7 +116,7 @@ describe('runtime config report', () => {
 		process.env.BETTER_AUTH_TRUSTED_ORIGINS = 'https://todokanban-alpha.vercel.app';
 		process.env.PASSKEY_ORIGIN = 'https://todokanban-alpha.vercel.app';
 		process.env.PASSKEY_RP_ID = 'todokanban-alpha.vercel.app';
-		process.env.AUTH_ALLOWED_EMAILS = 'scyea@naver.com,scyea1995@gmail.com';
+		process.env.AUTH_ALLOWED_EMAILS = 'primary@example.com,backup@example.com';
 		process.env.ACCOUNT_RECOVERY_SECRET = 'recovery-secret-with-more-than-32-characters';
 		process.env.RESEND_API_KEY = 'resend-api-key-with-more-than-32-characters';
 		process.env.EMAIL_FROM = 'Todokanban <onboarding@resend.dev>';
@@ -113,7 +136,7 @@ describe('runtime config report', () => {
 		process.env.BETTER_AUTH_TRUSTED_ORIGINS = 'https://todokanban-alpha.vercel.app';
 		process.env.PASSKEY_ORIGIN = 'https://todokanban-alpha.vercel.app';
 		process.env.PASSKEY_RP_ID = 'https://todokanban-alpha.vercel.app/';
-		process.env.AUTH_ALLOWED_EMAILS = 'scyea@naver.com,scyea1995@gmail.com';
+		process.env.AUTH_ALLOWED_EMAILS = 'primary@example.com,backup@example.com';
 		process.env.ACCOUNT_RECOVERY_SECRET = 'recovery-secret-with-more-than-32-characters';
 		process.env.RESEND_API_KEY = 'resend-api-key-with-more-than-32-characters';
 		process.env.EMAIL_FROM = 'Todokanban <onboarding@resend.dev>';

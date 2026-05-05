@@ -24,7 +24,7 @@ describe('account security passkey errors', () => {
 	});
 
 	it('returns a client-safe error for missing email verification codes', async () => {
-		await expect(assertValidPasskeyEmailCode('scyea@naver.com', '')).rejects.toMatchObject({
+		await expect(assertValidPasskeyEmailCode('primary@example.com', '')).rejects.toMatchObject({
 			name: 'APIError',
 			statusCode: 400,
 			body: {
@@ -34,7 +34,7 @@ describe('account security passkey errors', () => {
 	});
 
 	it('returns a client-safe error for missing recovery codes', async () => {
-		await expect(assertValidRecoveryCodeForEmail('scyea@naver.com', '')).rejects.toMatchObject({
+		await expect(assertValidRecoveryCodeForEmail('primary@example.com', '')).rejects.toMatchObject({
 			name: 'APIError',
 			statusCode: 400,
 			body: {

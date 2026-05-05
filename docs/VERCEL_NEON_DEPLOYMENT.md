@@ -4,7 +4,7 @@
 
 - App domain: `https://todokanban-alpha.vercel.app`
 - Passkey RP ID: `todokanban-alpha.vercel.app`
-- Allowed registration emails: `scyea@naver.com`, `scyea1995@gmail.com`
+- Allowed registration emails: real personal emails in Vercel env; public examples use `primary@example.com`, `backup@example.com`
 - Email delivery: Resend sandbox sender for the first free deployment
 - Primary calendar flow: `.ics` whole-board sync links and per-task `.ics` downloads
 - External calendar provider sync: scaffolded, but hidden from the primary UI unless `.ics` becomes insufficient
@@ -26,10 +26,11 @@ BETTER_AUTH_URL="https://todokanban-alpha.vercel.app"
 BETTER_AUTH_TRUSTED_ORIGINS="https://todokanban-alpha.vercel.app"
 PASSKEY_ORIGIN="https://todokanban-alpha.vercel.app"
 PASSKEY_RP_ID="todokanban-alpha.vercel.app"
-AUTH_ALLOWED_EMAILS="scyea@naver.com,scyea1995@gmail.com"
+AUTH_ALLOWED_EMAILS="primary@example.com,backup@example.com"
 ACCOUNT_RECOVERY_SECRET="..."
 RESEND_API_KEY="..."
 EMAIL_FROM="Todokanban <onboarding@resend.dev>"
+EMAIL_VERIFICATION_DEV_CODES="false"
 CALENDAR_TOKEN_SECRET="..."
 CALENDAR_OAUTH_ENCRYPTION_KEY="..."
 GOOGLE_CALENDAR_CLIENT_ID="..."
@@ -37,6 +38,7 @@ GOOGLE_CALENDAR_CLIENT_SECRET="..."
 CALENDAR_SYNC_MAX_TASKS="250"
 CALENDAR_BACKGROUND_SYNC_MAX_USERS="10"
 CRON_SECRET="..."
+HEALTH_DETAILS_TOKEN="..."
 ```
 
 Google Calendar OAuth provider sync is currently deferred. If it is re-enabled, create a Google Cloud OAuth client as a Web application and register:
@@ -45,7 +47,7 @@ Google Calendar OAuth provider sync is currently deferred. If it is re-enabled, 
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
 
-If the Google OAuth consent app is still in **Testing**, add the Google account you use for sync under **Google Auth Platform -> Audience -> Test users** before pressing the app's Google Calendar connect button. For this deployment, start with `scyea1995@gmail.com`. If this is skipped, Google blocks the flow with `403 access_denied`.
+If the Google OAuth consent app is still in **Testing**, add the real Google account you use for sync under **Google Auth Platform -> Audience -> Test users** before pressing the app's Google Calendar connect button. Do not commit the real account address to the public repo. If this is skipped, Google blocks the flow with `403 access_denied`.
 
 Testing-mode Google OAuth authorizations expire after 7 days. For a personal always-on calendar sync, run the first smoke in Testing, then consider switching the OAuth app to **In production** so the connection does not need weekly re-authorization. Personal-use apps under 100 users can continue without full verification, though Google can still show an unverified-app warning for sensitive scopes.
 
@@ -64,6 +66,7 @@ The command prints values for:
 - `CALENDAR_TOKEN_SECRET`
 - `CALENDAR_OAUTH_ENCRYPTION_KEY`
 - `CRON_SECRET`
+- `HEALTH_DETAILS_TOKEN`
 - `EMAIL_DELIVERY_WEBHOOK_SECRET` if webhook delivery is used later
 
 Do not save these generated values in git. Paste only the required values into Vercel Production environment variables.
@@ -95,10 +98,10 @@ npm run db:migrate
 
 ## Smoke Test
 
-1. Open `https://todokanban-alpha.vercel.app/api/health?strict=true`.
+1. Open `https://todokanban-alpha.vercel.app/api/health?strict=true` and confirm minimal readiness. Use `Authorization: Bearer $HEALTH_DETAILS_TOKEN` only when detailed config checks are needed.
 2. Open `https://todokanban-alpha.vercel.app/api/auth/passkey/generate-authenticate-options` and confirm it is handled by the auth route rather than a SvelteKit `404` page.
 3. Confirm the board is hidden before login.
-4. Request a verification code for `scyea@naver.com`.
+4. Request a verification code for your real allowlisted email.
 5. Confirm an unlisted email is rejected.
 6. Register a passkey and generate recovery codes.
 7. Add a task, reload, edit, and delete it.

@@ -1201,11 +1201,11 @@ describe('account security helpers', () => {
     });
 
     it('limits registration to configured personal emails', () => {
-        process.env.AUTH_ALLOWED_EMAILS = 'scyea@naver.com, scyea1995@gmail.com';
+        process.env.AUTH_ALLOWED_EMAILS = 'primary@example.com, backup@example.com';
 
-        expect(() => assertAllowedAccountEmail(' SCYEA@NAVER.COM ')).not.toThrow();
+        expect(() => assertAllowedAccountEmail(' PRIMARY@EXAMPLE.COM ')).not.toThrow();
         expect(() => parsePasskeyRegistrationContext(JSON.stringify({
-            email: 'scyea1995@gmail.com',
+            email: 'backup@example.com',
             emailVerificationCode: '123456'
         }))).not.toThrow();
         expect(() => assertAllowedAccountEmail('other@example.com')).toThrow('not allowed');

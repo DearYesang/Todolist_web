@@ -41,6 +41,18 @@ describe('server hook API write guard', () => {
 		expect(await response.text()).toBe('ok');
 		expect(resolve).toHaveBeenCalledOnce();
 	});
+
+	it('adds baseline security headers to app responses', async () => {
+		const response = await handle({
+			event: /** @type {any} */ (createEvent('GET', '/')),
+			resolve: vi.fn(async () => new Response('ok'))
+		});
+
+		expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
+		expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+	});
 });
 
 /**

@@ -32,18 +32,18 @@ describe('auth session scope cache', () => {
 	it('stores the last authenticated user for offline unlock', () => {
 		const scope = cacheAuthScope({
 			id: 'user-id',
-			email: 'scyea@naver.com',
+			email: 'primary@example.com',
 			name: 'Yesang'
 		});
 
 		expect(scope).toMatchObject({
 			id: 'user-id',
-			email: 'scyea@naver.com',
+			email: 'primary@example.com',
 			name: 'Yesang'
 		});
 		expect(readCachedAuthScope()).toMatchObject({
 			id: 'user-id',
-			email: 'scyea@naver.com',
+			email: 'primary@example.com',
 			name: 'Yesang'
 		});
 
@@ -52,7 +52,7 @@ describe('auth session scope cache', () => {
 	});
 
 	it('ignores invalid cached records', () => {
-		storage.set('todokanbanAuthScope', JSON.stringify({ email: 'scyea@naver.com' }));
+		storage.set('todokanbanAuthScope', JSON.stringify({ email: 'primary@example.com' }));
 		expect(readCachedAuthScope()).toBeNull();
 	});
 });
