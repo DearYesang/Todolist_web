@@ -1731,6 +1731,18 @@ select {
         min-width: max-content;
     }
 
+    .locked-app-state .auth-panel {
+        width: min(100%, 420px);
+        min-width: 0;
+        align-items: stretch;
+        justify-content: center;
+    }
+
+    .locked-app-state .auth-input,
+    .locked-app-state .btn {
+        width: 100%;
+    }
+
     .auth-input {
         width: 170px;
         min-height: 44px;
