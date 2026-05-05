@@ -45,7 +45,7 @@ Production values for the personal deployment:
 
 Webhook email delivery remains available with `EMAIL_DELIVERY_WEBHOOK_URL` and `EMAIL_DELIVERY_WEBHOOK_SECRET` if Resend is not used.
 
-Google Calendar provider sync additionally needs:
+Google/Microsoft provider sync is currently hidden from the primary UI because the personal workflow is `.ics`-first. If provider sync is re-enabled later, it additionally needs:
 
 - `CALENDAR_OAUTH_ENCRYPTION_KEY`
 - `GOOGLE_CALENDAR_CLIENT_ID`
@@ -58,6 +58,10 @@ Create the Google OAuth client as a Web application and add this authorized redi
 ```text
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
+
+For the first smoke test, the Google OAuth app can stay in **Testing**, but the Google account used to connect Calendar must be added under **Google Auth Platform -> Audience -> Test users**. For this personal deployment, add `scyea1995@gmail.com` first. A non-Gmail address only works here if it is also a Google Account.
+
+Testing authorizations expire after 7 days. After the sync/delete smoke passes, move the app to **In production** if you want the personal Google Calendar connection to remain usable without weekly re-authorization. A personal app under 100 users can be used without completing full OAuth verification, but Google may show an unverified-app warning for sensitive scopes.
 
 Microsoft Calendar is optional for later:
 
@@ -77,12 +81,12 @@ Microsoft Calendar is optional for later:
 - Generate and store recovery codes.
 - Create, edit, delete, and reload a task.
 - Export and replace-import a JSON backup.
-- Create and revoke an iCal link.
+- Create and revoke a whole-board `.ics` sync link from `전체 일정 동기화`.
 - Download a single task `.ics` file from a card or task detail panel.
-- Connect a Google or Microsoft calendar account in a staging OAuth app.
-- Run manual external calendar sync and confirm event links are created.
-- Mark a synced task done, run manual external calendar sync again, and confirm the provider event is deleted.
-- Confirm Vercel registered `/api/calendar/sync/cron` under Cron Jobs after deploy.
+- If provider sync is re-enabled, connect a Google or Microsoft calendar account in a staging OAuth app. If Google returns `403 access_denied`, confirm the signed-in Google account is in the OAuth app's Test users list.
+- If provider sync is re-enabled, run manual external calendar sync and confirm event links are created.
+- If provider sync is re-enabled, mark a synced task done, run manual external calendar sync again, and confirm the provider event is deleted.
+- If provider sync is re-enabled, confirm Vercel registered `/api/calendar/sync/cron` under Cron Jobs after deploy.
 - Confirm a logged-out browser cannot see the board.
 - Confirm an unauthorized email cannot request a verification code.
 - Go offline, edit an existing server task, come back online, and confirm the queued write flushes.

@@ -188,7 +188,7 @@
             <div class="panel-footer">
                 <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
                 <div class="panel-footer-actions">
-                    <button class="btn btn-calendar" onclick={downloadCalendar}>📅 캘린더 추가</button>
+                    <button class="btn btn-calendar" onclick={downloadCalendar}>📅 일정 추가(.ics)</button>
                     <button class="btn btn-primary" onclick={onclose}>완료</button>
                 </div>
             </div>

@@ -1,4 +1,5 @@
 <script>
+    import { onMount } from 'svelte';
     import { authClient } from '$lib/client/auth-client.js';
     import {
         deleteCalendarConnection,
@@ -14,6 +15,15 @@
     let providers = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarProviderRecord[]} */ ([]));
     let connections = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarConnectionRecord[]} */ ([]));
     let syncRuns = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarSyncRunRecord[]} */ ([]));
+
+    onMount(() => {
+        const oauthStatus = readCalendarSyncStatus();
+        if (!oauthStatus) return;
+
+        isOpen = true;
+        message = oauthStatus.message;
+        void refresh();
+    });
 
     async function refresh() {
         if (!$session.data?.user) return;
@@ -94,6 +104,15 @@
     }
 
     /**
+     * @param {string | null} provider
+     */
+    function getStaticProviderName(provider) {
+        if (provider === 'google') return 'Google Calendar';
+        if (provider === 'microsoft') return 'Microsoft Calendar';
+        return '외부 캘린더';
+    }
+
+    /**
      * @param {import('$lib/client/calendar-provider-api.js').CalendarProviderRecord} provider
      */
     function getProviderSetupHint(provider) {
@@ -112,6 +131,30 @@
      */
     function formatDateTime(value) {
         return new Date(value).toLocaleString('ko-KR');
+    }
+
+    function readCalendarSyncStatus() {
+        if (typeof window === 'undefined') return null;
+
+        const url = new URL(window.location.href);
+        const status = url.searchParams.get('calendarSync');
+        if (!status) return null;
+
+        const provider = url.searchParams.get('calendarSyncProvider');
+        const rawMessage = url.searchParams.get('calendarSyncMessage');
+        let nextMessage = rawMessage;
+        if (!nextMessage) {
+            nextMessage = status === 'connected'
+                ? `${getStaticProviderName(provider)} 연결이 완료되었습니다. 지금 동기화로 작업 일정을 반영할 수 있습니다.`
+                : `${getStaticProviderName(provider)} 연결을 완료하지 못했습니다.`;
+        }
+
+        url.searchParams.delete('calendarSync');
+        url.searchParams.delete('calendarSyncProvider');
+        url.searchParams.delete('calendarSyncMessage');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+
+        return { status, provider, message: nextMessage };
     }
 </script>
 
@@ -138,6 +181,14 @@
                     {/each}
                     <button class="btn btn-primary" onclick={syncNow} disabled={isWorking || connections.length === 0}>지금 동기화</button>
                 </div>
+
+                <details class="calendar-oauth-help">
+                    <summary>Google 연결 도움말</summary>
+                    <p>
+                        Google OAuth 앱이 Testing 상태이면 현재 로그인한 Google 계정을 Google Cloud의 Test users에 추가해야 합니다.
+                        개인 장기 동기화는 앱을 In production으로 전환해야 7일 후 재승인 문제를 줄일 수 있습니다.
+                    </p>
+                </details>
 
                 {#if connections.length > 0}
                     <div class="calendar-connection-list">

@@ -313,6 +313,26 @@ select {
     line-height: 1.35;
 }
 
+.calendar-oauth-help {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: rgba(13, 17, 23, 0.4);
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.calendar-oauth-help summary {
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.calendar-oauth-help p {
+    margin: 6px 0 0;
+}
+
 .calendar-connection-list {
     display: grid;
     gap: 6px;
@@ -1454,9 +1474,18 @@ select {
     min-height: 22px;
     color: var(--text-secondary);
     font-size: 12px;
+    cursor: pointer;
 }
 
-.gantt-checklist-item span:last-child {
+.gantt-checklist-item input {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.gantt-checklist-item span {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1465,6 +1494,9 @@ select {
 
 .gantt-checklist-item.done {
     color: var(--text-muted);
+}
+
+.gantt-checklist-item.done span {
     text-decoration: line-through;
 }
 

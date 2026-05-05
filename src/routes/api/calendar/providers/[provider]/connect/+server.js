@@ -4,6 +4,7 @@ import {
 	CalendarSyncError,
 	createCalendarProviderAuthorizationUrl
 } from '$lib/server/calendar/provider-sync.js';
+import { createCalendarSyncRedirect } from '$lib/server/calendar/oauth-status.js';
 import { CalendarProviderError } from '$lib/server/calendar/providers.js';
 import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
 
@@ -22,7 +23,11 @@ export async function GET({ params, request, url }) {
 		throw redirect(302, authorizationUrl);
 	} catch (error) {
 		if (error instanceof CalendarSyncError || error instanceof CalendarProviderError || error instanceof CalendarTokenEncryptionError) {
-			return Response.json({ message: error.message }, { status: error.status });
+			throw redirect(302, createCalendarSyncRedirect({
+				status: 'error',
+				provider: params.provider,
+				message: error.message
+			}));
 		}
 
 		throw error;

@@ -6,8 +6,8 @@
 - Passkey RP ID: `todokanban-alpha.vercel.app`
 - Allowed registration emails: `scyea@naver.com`, `scyea1995@gmail.com`
 - Email delivery: Resend sandbox sender for the first free deployment
-- Primary calendar feed: iCal subscription links
-- First external calendar provider: Google Calendar
+- Primary calendar flow: `.ics` whole-board sync links and per-task `.ics` downloads
+- External calendar provider sync: scaffolded, but hidden from the primary UI unless `.ics` becomes insufficient
 - Runtime region: Vercel Tokyo (`hnd1`) close to a Neon Asia region
 - DB migrations: manual
 
@@ -39,11 +39,15 @@ CALENDAR_BACKGROUND_SYNC_MAX_USERS="10"
 CRON_SECRET="..."
 ```
 
-For Google Calendar, create a Google Cloud OAuth client as a Web application and register:
+Google Calendar OAuth provider sync is currently deferred. If it is re-enabled, create a Google Cloud OAuth client as a Web application and register:
 
 ```text
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
+
+If the Google OAuth consent app is still in **Testing**, add the Google account you use for sync under **Google Auth Platform -> Audience -> Test users** before pressing the app's Google Calendar connect button. For this deployment, start with `scyea1995@gmail.com`. If this is skipped, Google blocks the flow with `403 access_denied`.
+
+Testing-mode Google OAuth authorizations expire after 7 days. For a personal always-on calendar sync, run the first smoke in Testing, then consider switching the OAuth app to **In production** so the connection does not need weekly re-authorization. Personal-use apps under 100 users can continue without full verification, though Google can still show an unverified-app warning for sensitive scopes.
 
 `onboarding@resend.dev` is Resend's testing sender and can only deliver to the email address associated with the Resend account. For both allowed emails to receive codes independently, verify a custom email domain later and switch `EMAIL_FROM` to that domain.
 
@@ -98,12 +102,12 @@ npm run db:migrate
 5. Confirm an unlisted email is rejected.
 6. Register a passkey and generate recovery codes.
 7. Add a task, reload, edit, and delete it.
-8. Create an iCal link and subscribe from Apple Calendar.
+8. Create a whole-board `.ics` sync link from `전체 일정 동기화` and subscribe from Apple Calendar or another calendar app.
 9. Download a single task `.ics` file from a task card or task detail panel.
-10. Connect Google Calendar and run manual external calendar sync.
-11. Mark a previously synced task done, run external calendar sync again, and confirm the provider event is deleted.
-12. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.
-13. Trigger the secured calendar cron manually with `Authorization: Bearer $CRON_SECRET`, or wait for the daily Vercel Cron run and confirm runtime logs show `/api/calendar/sync/cron`.
+10. On an already logged-in device, go offline, reload, edit a task, then reconnect and confirm sync.
+11. If provider sync is re-enabled, connect Google Calendar and run manual external calendar sync.
+12. If provider sync is re-enabled, mark a previously synced task done, run external calendar sync again, and confirm the provider event is deleted.
+13. If provider sync is re-enabled, trigger the secured calendar cron manually with `Authorization: Bearer $CRON_SECRET`, or wait for the daily Vercel Cron run and confirm runtime logs show `/api/calendar/sync/cron`.
 
 ## Calendar Cron
 
@@ -113,7 +117,7 @@ The repository includes `vercel.json` with one daily Hobby-compatible cron:
 0 21 * * *
 ```
 
-That runs at 21:00 UTC, which is 06:00 in Korea Standard Time. Vercel automatically sends `Authorization: Bearer $CRON_SECRET` when the Production environment has a `CRON_SECRET` variable. Keep the UI sync button as the immediate manual path; the cron is only a daily safety net for connected provider calendars.
+That runs at 21:00 UTC, which is 06:00 in Korea Standard Time. Vercel automatically sends `Authorization: Bearer $CRON_SECRET` when the Production environment has a `CRON_SECRET` variable. This cron is only useful if provider calendar sync is re-enabled; the current visible calendar flow uses `.ics` links instead.
 
 ## Vercel Dashboard Quick Guide
 

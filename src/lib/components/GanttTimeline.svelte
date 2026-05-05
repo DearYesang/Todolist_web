@@ -1,6 +1,6 @@
 <script>
     import { onDestroy, tick } from 'svelte';
-    import { filters, tasks, updateTask } from '$lib/client/task-store.js';
+    import { filters, tasks, toggleSubtask, updateTask } from '$lib/client/task-store.js';
     import { buildHierarchy, getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
 
     let { openTask } = $props();
@@ -297,6 +297,14 @@
     }
 
     /**
+     * @param {string} taskId
+     * @param {string} subtaskId
+     */
+    function toggleChecklistItem(taskId, subtaskId) {
+        toggleSubtask(taskId, subtaskId);
+    }
+
+    /**
      * @param {import('$lib/shared/task-domain.js').Task} task
      */
     function getRowHeight(task) {
@@ -358,10 +366,14 @@
                         {#if expandedChecklistTaskId === item.task.id && item.task.subtasks.length > 0}
                             <div class="gantt-checklist-preview" style={`padding-left:${16 + item.depth * 24}px;`}>
                                 {#each getChecklistPreview(item.task) as subtask (subtask.id)}
-                                    <div class="gantt-checklist-item" class:done={subtask.done}>
-                                        <span>{subtask.done ? '☑' : '☐'}</span>
+                                    <label class="gantt-checklist-item" class:done={subtask.done}>
+                                        <input
+                                            type="checkbox"
+                                            checked={subtask.done}
+                                            aria-label={`${subtask.text} 완료`}
+                                            onchange={() => toggleChecklistItem(item.task.id, subtask.id)} />
                                         <span>{subtask.text}</span>
-                                    </div>
+                                    </label>
                                 {/each}
                                 <div class="gantt-checklist-footer">
                                     {#if item.task.subtasks.length > 3}
