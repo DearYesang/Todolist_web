@@ -13,8 +13,7 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 - Date range picker: 작업 추가와 상세 수정에서 월간 캘린더로 시작일/마감일 선택
 - Filters: 중요도, 시급성, 카테고리 필터
 - Backup: `kanban_backup_YYYY-MM-DD.json` 내보내기/불러오기
-- Calendar integration: 작업별 all-day `.ics` 다운로드, iCal 구독 링크, 로그인 세션용 `/api/calendar.ics` 제공
-- External calendar sync: Google/Microsoft OAuth 연결, 암호화된 토큰 저장, 수동 provider sync, 보안 cron endpoint, 최근 sync 로그
+- Calendar integration: 전체 일정 동기화용 `.ics` 링크, 작업별 all-day `.ics` 다운로드, 로그인 세션용 `/api/calendar.ics` 제공
 - Passkey onboarding: 허용 이메일 기반 패스키 생성, 복구 코드, 패스키 로그인, 로그아웃 UI
 - Server sync: 인증된 작업 생성/조회/수정/삭제와 체크리스트 생성/수정/삭제, 부분 응답 merge 시 parent link 보존
 - Offline queue: 실패한 서버 write와 오프라인 JSON import를 사용자별 localStorage queue에 저장하고 다음 동기화 때 재시도, task 수정/삭제 충돌은 내 변경 적용 또는 서버 유지 선택 가능
@@ -80,7 +79,7 @@ Production passkey registration is limited by `AUTH_ALLOWED_EMAILS`. For this de
 
 Production email verification can use Resend with `RESEND_API_KEY` and `EMAIL_FROM`. For the free `todokanban-alpha.vercel.app` deployment, `Todokanban <onboarding@resend.dev>` works only for the email address associated with the Resend account. `EMAIL_DELIVERY_WEBHOOK_URL` remains available as a webhook fallback.
 
-External calendar sync additionally requires `CALENDAR_OAUTH_ENCRYPTION_KEY` plus the relevant Google/Microsoft OAuth client credentials. Google Calendar is the first provider configured for the personal deployment. Optional Vercel Cron background sync uses `CRON_SECRET` and `CALENDAR_BACKGROUND_SYNC_MAX_USERS`.
+Google/Microsoft OAuth calendar provider sync is scaffolded but hidden from the primary UI while the personal workflow stays `.ics`-first. Re-enabling provider sync requires `CALENDAR_OAUTH_ENCRYPTION_KEY` plus the relevant OAuth client credentials. Optional Vercel Cron background sync uses `CRON_SECRET` and `CALENDAR_BACKGROUND_SYNC_MAX_USERS`.
 
 For Google Calendar OAuth, create a Google Auth Platform app and add the production redirect URI:
 
@@ -126,7 +125,7 @@ The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persis
 
 - Email verification delivery uses Resend or `EMAIL_DELIVERY_WEBHOOK_URL` in production; local dev can show preview codes with `EMAIL_VERIFICATION_DEV_CODES=true`.
 - JSON import/export supports authenticated append and replace import/export. Replace import runs through Neon HTTP `batch()` so existing-task retirement and new inserts are all-or-nothing.
-- Google/Microsoft calendar sync is manual from the UI and can also run through the secured daily Vercel Cron endpoint. It uses the full task date range for all-day events, and completed tasks are removed from external providers on the next sync. Provider webhooks and recurring events are still future work.
+- Google/Microsoft calendar provider sync routes remain available for later, but the visible calendar workflow is currently `.ics`-first: whole-board sync links and per-task `.ics` downloads. Provider webhooks and recurring events are still future work.
 - Offline writes and offline JSON imports are queued per user and retried. `409` conflicts are detected, dropped from retry, surfaced with reviewable conflict details, and can be exported as JSON. Task update/delete conflicts can be replayed locally or dismissed in favor of the server; checklist/import conflict merge remains intentionally conservative.
 - Vercel functions are pinned to Tokyo (`hnd1`) to keep the app close to an Asia Neon region.
 
@@ -135,10 +134,10 @@ The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persis
 Near-term:
 
 1. Run real-device smoke tests for nested tasks, checklist sync, matrix view, and offline reload on Mac/iPhone/iPad/Windows.
-2. Run a real Google Calendar account sync smoke test after OAuth consent is connected.
-3. Move the Google OAuth app out of Testing if recurring re-authorization becomes annoying.
+2. Keep the `.ics` calendar flow polished on Mac/iPhone/iPad/Windows.
+3. Revisit Google Calendar OAuth only if `.ics` links are not enough for daily use.
 4. Expand conflict actions to checklist and import mutations if real use shows those conflicts often.
-5. Add provider webhooks and recurring calendar events.
+5. Add provider webhooks and recurring calendar events if provider sync is re-enabled.
 
 Later:
 

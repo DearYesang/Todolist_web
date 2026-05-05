@@ -34,7 +34,7 @@
         message = '';
         isWorking = true;
         try {
-            const result = await createCalendarToken('iCal feed', { expiresInDays });
+            const result = await createCalendarToken('전체 일정 동기화', { expiresInDays });
             if (!result.ok) {
                 message = result.message;
                 return;
@@ -42,7 +42,7 @@
 
             latestUrl = new URL(result.url, window.location.origin).toString();
             tokens = [result.record, ...tokens];
-            message = 'iCal 링크가 생성되었습니다.';
+            message = '전체 일정 동기화 링크가 생성되었습니다.';
         } finally {
             isWorking = false;
         }
@@ -64,7 +64,7 @@
             }
 
             tokens = tokens.map((token) => token.id === tokenId && result.token ? result.token : token);
-            message = 'iCal 링크가 해지되었습니다.';
+            message = '전체 일정 동기화 링크가 해지되었습니다.';
         } finally {
             isWorking = false;
         }
@@ -75,7 +75,7 @@
 
         try {
             await navigator.clipboard.writeText(latestUrl);
-            message = 'iCal 링크를 복사했습니다.';
+            message = '전체 일정 동기화 링크를 복사했습니다.';
         } catch {
             message = '복사하지 못했습니다.';
         }
@@ -110,26 +110,26 @@
             class="btn"
             class:active={isOpen}
             onclick={() => isOpen = !isOpen}>
-            📅 iCal 링크
+            📅 전체 일정 동기화
         </button>
 
         {#if isOpen}
             <div class="calendar-feed-popover">
                 <div class="calendar-feed-actions">
-                    <select class="calendar-feed-select" bind:value={expiresInDays} aria-label="iCal 링크 만료">
+                    <select class="calendar-feed-select" bind:value={expiresInDays} aria-label="전체 일정 동기화 링크 만료">
                         <option value={30}>30일</option>
                         <option value={90}>90일</option>
                         <option value={180}>180일</option>
                         <option value={365}>1년</option>
                     </select>
-                    <button class="btn btn-primary" onclick={handleCreate} disabled={isWorking}>iCal 링크 만들기</button>
+                    <button class="btn btn-primary" onclick={handleCreate} disabled={isWorking}>동기화 링크 만들기</button>
                     {#if latestUrl}
                         <button class="btn" onclick={copyLatestUrl}>복사</button>
                     {/if}
                 </div>
 
                 {#if latestUrl}
-                    <input class="calendar-feed-url" readonly value={latestUrl} aria-label="캘린더 구독 링크" />
+                    <input class="calendar-feed-url" readonly value={latestUrl} aria-label="전체 일정 동기화 링크" />
                 {/if}
 
                 {#if tokens.length > 0}
@@ -146,7 +146,7 @@
                                     class="btn btn-ghost"
                                     disabled={Boolean(token.revokedAt) || isWorking}
                                     onclick={() => handleRevoke(token.id)}>
-                                    링크 해지
+                                    동기화 중지
                                 </button>
                             </div>
                         {/each}

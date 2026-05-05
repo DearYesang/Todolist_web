@@ -90,6 +90,9 @@ test('opens the task form date picker and Gantt checklist preview', async ({ pag
 	await page.getByRole('button', { name: /간트 뷰/ }).click();
 	await page.locator('.gantt-sidebar-title', { hasText: 'E2E cached task' }).click();
 	await expect(page.getByRole('checkbox', { name: /E2E checklist one 완료/ })).toBeChecked();
+
+	await page.getByRole('button', { name: /칸반 뷰/ }).click();
+	await expect(page.getByRole('button', { name: /일정 추가/ }).first()).toBeVisible();
 });
 
 test('keeps iPad-width Kanban columns side by side', async ({ page }) => {

@@ -32,7 +32,6 @@
     import { normalizeTaskList } from '$lib/shared/task-domain.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
-    import CalendarSyncPanel from './CalendarSyncPanel.svelte';
     import EisenhowerMatrix from './EisenhowerMatrix.svelte';
     import FilterBar from './FilterBar.svelte';
     import GanttTimeline from './GanttTimeline.svelte';
@@ -425,7 +424,6 @@
                 {isRefreshing ? '⏳ 새로고침 중' : '🔄 새로고침'}
             </button>
             <CalendarFeedPanel />
-            <CalendarSyncPanel />
             <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
             <button class="btn" onclick={() => document.getElementById('import-file')?.click()}>📂 불러오기</button>
             <button class="btn" onclick={exportData}>💾 내보내기</button>

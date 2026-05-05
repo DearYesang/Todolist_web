@@ -363,7 +363,7 @@
         </div>
 
         <div class="card-secondary-actions">
-            <button class="btn btn-calendar btn-small" onclick={handleCalendarDownload}>📅 추가</button>
+            <button class="btn btn-calendar btn-small" onclick={handleCalendarDownload}>📅 일정 추가</button>
             <button class="btn btn-danger" onclick={handleDeleteTask}>🗑</button>
         </div>
     </div>
