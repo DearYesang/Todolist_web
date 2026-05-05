@@ -3,10 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeTask } from '../shared/task-domain.js';
 import {
 	addSubtask,
+	currentView,
 	deleteSubtask,
 	mergeTasks,
 	replaceTasks,
 	renameSubtask,
+	setCurrentView,
 	tasks,
 	toggleSubtask,
 	updateTask
@@ -37,15 +39,40 @@ describe('client task sync', () => {
 			}
 		});
 		replaceTasks([]);
+		setCurrentView('kanban');
 		setOfflineQueueOwner(null);
 	});
 
 	afterEach(() => {
 		replaceTasks([]);
+		setCurrentView('kanban');
 		setOfflineQueueOwner(null);
 		Reflect.deleteProperty(globalThis, 'fetch');
 		Reflect.deleteProperty(globalThis, 'localStorage');
 		Reflect.deleteProperty(globalThis, 'window');
+	});
+
+	it('applies the server board default view during task sync', async () => {
+		const task = normalizeTask({
+			id: '11111111-1111-4111-8111-111111111111',
+			text: 'Synced task'
+		});
+		const fetcher = vi.fn(async (url) => new Response(JSON.stringify(
+			url === '/api/board/preferences'
+				? { defaultView: 'matrix' }
+				: { tasks: [task] }
+		), {
+			status: 200,
+			headers: { 'content-type': 'application/json' }
+		}));
+
+		setCurrentView('kanban');
+		await syncServerTasks(fetcher);
+
+		expect(get(currentView)).toBe('matrix');
+		expect(fetcher).toHaveBeenCalledWith('/api/board/preferences', expect.objectContaining({
+			headers: { accept: 'application/json' }
+		}));
 	});
 
 	it('applies server UUID tasks as an authoritative snapshot while preserving pending local tasks', async () => {

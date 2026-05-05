@@ -55,13 +55,13 @@ primary key (workspace_id, user_id)
 id uuid primary key
 workspace_id uuid not null references workspaces(id) on delete cascade
 name text not null
-default_view text not null default 'kanban' check (default_view in ('kanban', 'gantt'))
+default_view text not null default 'kanban' check (default_view in ('kanban', 'gantt', 'matrix'))
 created_at timestamptz not null default now()
 updated_at timestamptz not null default now()
 unique (workspace_id, name)
 ```
 
-The current client has a third `matrix` view and remembers the selected view per device in `localStorage`. `boards.default_view` is not yet user-configurable or persisted by the API. Add `matrix` to this check only if default view becomes a cross-device database preference.
+Authenticated clients persist the selected Kanban/Gantt/Eisenhower view to `boards.default_view`, while `localStorage` remains the offline and logged-out fallback.
 
 ### tasks
 

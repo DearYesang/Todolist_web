@@ -12,14 +12,18 @@
         summarizeOfflineConflict
     } from '$lib/client/offline-conflicts.js';
     import { enqueueOfflineMutation, setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
-    import { exportServerTasks, importServerTasks } from '$lib/client/task-api.js';
+    import { exportServerTasks, importServerTasks, updateBoardPreferences } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
         clearDoneTasks,
+        clearPendingDefaultView,
         currentView,
         deleteTaskCascade,
+        markPendingDefaultView,
+        readPendingDefaultView,
         replaceTasks,
         resetFilters,
+        setCurrentView,
         setTaskStorageOwner,
         tasks,
         updateTask
@@ -140,8 +144,21 @@
     }
 
     async function runServerSync({ showSuccess = false } = {}) {
+        await flushPendingViewPreference();
         const result = await syncServerTasks();
         handleServerSyncResult(result, { showSuccess });
+    }
+
+    async function flushPendingViewPreference() {
+        const pendingView = readPendingDefaultView();
+        if (!pendingView || !$session.data?.user?.id || !navigator.onLine) {
+            return;
+        }
+
+        const result = await updateBoardPreferences({ defaultView: pendingView });
+        if (result.ok) {
+            clearPendingDefaultView();
+        }
     }
 
     /**
@@ -353,6 +370,31 @@
             }
         }
     }
+
+    /**
+     * @param {'kanban' | 'gantt' | 'matrix'} view
+     */
+    async function selectView(view) {
+        setCurrentView(view);
+
+        if (!$session.data?.user?.id) {
+            return;
+        }
+
+        if (!navigator.onLine) {
+            markPendingDefaultView(view);
+            return;
+        }
+
+        const result = await updateBoardPreferences({ defaultView: view });
+        if (result.ok) {
+            clearPendingDefaultView();
+        } else if (result.fallback) {
+            markPendingDefaultView(view);
+        } else {
+            syncNotice = result.message;
+        }
+    }
 </script>
 
 <div class="header">
@@ -360,13 +402,13 @@
 
     {#if appUnlocked}
         <div class="view-toggle">
-            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => $currentView = 'kanban'}>
+            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => selectView('kanban')}>
                 📋 칸반 뷰
             </button>
-            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => $currentView = 'gantt'}>
+            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => selectView('gantt')}>
                 📊 간트 뷰
             </button>
-            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => $currentView = 'matrix'}>
+            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => selectView('matrix')}>
                 🧭 매트릭스
             </button>
         </div>

@@ -176,7 +176,7 @@ export const boards = pgTable(
 	(table) => [
 		index('boards_workspace_id_idx').on(table.workspaceId),
 		uniqueIndex('boards_workspace_name_uidx').on(table.workspaceId, table.name),
-		check('boards_default_view_check', sql`${table.defaultView} in ('kanban', 'gantt')`)
+		check('boards_default_view_check', sql`${table.defaultView} in ('kanban', 'gantt', 'matrix')`)
 	]
 );
 
