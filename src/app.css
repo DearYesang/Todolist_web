@@ -125,6 +125,20 @@ select {
     font-size: 12px;
 }
 
+.auth-cache-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 34px;
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.auth-cache-option input {
+    accent-color: var(--accent);
+}
+
 .auth-error {
     color: var(--priority-high);
 }
@@ -223,7 +237,16 @@ select {
 
 .calendar-feed-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+}
+
+.calendar-feed-warning {
+    flex: 1 0 100%;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
 }
 
 .calendar-feed-url {

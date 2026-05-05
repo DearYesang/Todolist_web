@@ -8,7 +8,7 @@ const TOKEN_PREFIX = 'cal_';
 const TOKEN_BYTES = 32;
 const TOKEN_PREVIEW_LENGTH = 12;
 const MAX_TOKEN_NAME_LENGTH = 80;
-const DEFAULT_TOKEN_TTL_DAYS = 90;
+const DEFAULT_TOKEN_TTL_DAYS = 30;
 const MAX_ACTIVE_TOKENS_PER_USER = 5;
 
 export class CalendarTokenConfigurationError extends Error {
@@ -156,12 +156,12 @@ export class CalendarTokenLimitError extends Error {
  */
 function parseTokenName(value) {
 	if (typeof value !== 'string') {
-		return 'Calendar feed';
+		return '전체 일정 비밀 링크';
 	}
 
 	const name = value.trim();
 	if (!name) {
-		return 'Calendar feed';
+		return '전체 일정 비밀 링크';
 	}
 
 	return name.slice(0, MAX_TOKEN_NAME_LENGTH);

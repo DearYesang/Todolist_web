@@ -32,14 +32,16 @@ npm run build
 - `EMAIL_FROM`
 - `CALENDAR_TOKEN_SECRET`
 
-Production values for the personal deployment:
+Production value shape for the personal deployment. Keep the real personal emails in Vercel only:
 
 - `BETTER_AUTH_URL=https://todokanban-alpha.vercel.app`
 - `BETTER_AUTH_TRUSTED_ORIGINS=https://todokanban-alpha.vercel.app`
 - `PASSKEY_ORIGIN=https://todokanban-alpha.vercel.app`
 - `PASSKEY_RP_ID=todokanban-alpha.vercel.app`
-- `AUTH_ALLOWED_EMAILS=scyea@naver.com,scyea1995@gmail.com`
+- `AUTH_ALLOWED_EMAILS=primary@example.com,backup@example.com`
+- `EMAIL_VERIFICATION_DEV_CODES=false`
 - `EMAIL_FROM=Todokanban <onboarding@resend.dev>`
+- `HEALTH_DETAILS_TOKEN=<optional long random token for detailed health output>`
 
 `onboarding@resend.dev` only delivers to the email address associated with the Resend account. Use that email for the first passkey registration, or verify a custom domain later.
 
@@ -59,7 +61,7 @@ Create the Google OAuth client as a Web application and add this authorized redi
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
 
-For the first smoke test, the Google OAuth app can stay in **Testing**, but the Google account used to connect Calendar must be added under **Google Auth Platform -> Audience -> Test users**. For this personal deployment, add `scyea1995@gmail.com` first. A non-Gmail address only works here if it is also a Google Account.
+For the first smoke test, the Google OAuth app can stay in **Testing**, but the Google account used to connect Calendar must be added under **Google Auth Platform -> Audience -> Test users**. Use the real Google account from your private deployment env, not the public placeholder.
 
 Testing authorizations expire after 7 days. After the sync/delete smoke passes, move the app to **In production** if you want the personal Google Calendar connection to remain usable without weekly re-authorization. A personal app under 100 users can be used without completing full OAuth verification, but Google may show an unverified-app warning for sensitive scopes.
 
@@ -70,7 +72,8 @@ Microsoft Calendar is optional for later:
 
 ## Health Checks
 
-- `/api/health` returns non-secret readiness details.
+- `/api/health` and `/api/health?strict=true` return minimal production readiness.
+- Detailed production health output requires `Authorization: Bearer $HEALTH_DETAILS_TOKEN`.
 - `/api/health?strict=true` returns `503` if required production configuration is missing or unsafe.
 - `/api/auth/passkey/generate-authenticate-options` should not return a SvelteKit `404` page. A handled auth/config JSON response is fine; a page 404 means the Better Auth route is not mounted for the deployed host.
 

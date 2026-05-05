@@ -16,6 +16,8 @@ const MIN_SECRET_LENGTH = 32;
 export function getRuntimeConfigReport(options = {}) {
 	const authRequired = Boolean(process.env.DATABASE_URL) || process.env.NODE_ENV === 'production';
 	const currentOrigin = normalizeOrigin(options.currentOrigin);
+	const production = process.env.NODE_ENV === 'production';
+	const emailDevCodesEnabled = process.env.EMAIL_VERIFICATION_DEV_CODES === 'true';
 	const calendarProviderConfigured = Boolean(
 		process.env.GOOGLE_CALENDAR_CLIENT_ID
 		|| process.env.GOOGLE_CALENDAR_CLIENT_SECRET
@@ -24,17 +26,17 @@ export function getRuntimeConfigReport(options = {}) {
 	);
 	const resendConfigured = Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_FROM);
 	const webhookConfigured = Boolean(process.env.EMAIL_DELIVERY_WEBHOOK_URL);
-	const emailDeliveryRequired = process.env.NODE_ENV === 'production'
-		&& process.env.EMAIL_VERIFICATION_DEV_CODES !== 'true';
-	const calendarFeedRequired = process.env.NODE_ENV === 'production';
+	const emailDeliveryRequired = production;
+	const calendarFeedRequired = production;
 	const checks = [
 		checkDatabaseUrl(),
 		checkSecret('BETTER_AUTH_SECRET', process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET, authRequired),
-		checkUrl('BETTER_AUTH_URL', process.env.BETTER_AUTH_URL, process.env.NODE_ENV === 'production'),
+		checkUrl('BETTER_AUTH_URL', process.env.BETTER_AUTH_URL, production),
 		checkTrustedOrigins(),
-		checkUrl('PASSKEY_ORIGIN', process.env.PASSKEY_ORIGIN, process.env.NODE_ENV === 'production'),
-		checkValue('PASSKEY_RP_ID', process.env.PASSKEY_RP_ID, process.env.NODE_ENV === 'production'),
+		checkUrl('PASSKEY_ORIGIN', process.env.PASSKEY_ORIGIN, production),
+		checkValue('PASSKEY_RP_ID', process.env.PASSKEY_RP_ID, production),
 		checkAllowedEmails(),
+		checkEmailVerificationDevCodes(production, emailDevCodesEnabled),
 		checkSecret('ACCOUNT_RECOVERY_SECRET', process.env.ACCOUNT_RECOVERY_SECRET, authRequired),
 		checkUrl('EMAIL_DELIVERY_WEBHOOK_URL', process.env.EMAIL_DELIVERY_WEBHOOK_URL, emailDeliveryRequired && !resendConfigured),
 		checkSecret('EMAIL_DELIVERY_WEBHOOK_SECRET', process.env.EMAIL_DELIVERY_WEBHOOK_SECRET, false),
@@ -42,6 +44,7 @@ export function getRuntimeConfigReport(options = {}) {
 		checkValue('EMAIL_FROM', process.env.EMAIL_FROM, resendConfigured || (emailDeliveryRequired && !webhookConfigured)),
 		checkSecret('CALENDAR_TOKEN_SECRET', process.env.CALENDAR_TOKEN_SECRET, calendarFeedRequired),
 		checkSecret('CALENDAR_OAUTH_ENCRYPTION_KEY', process.env.CALENDAR_OAUTH_ENCRYPTION_KEY, calendarProviderConfigured),
+		checkSecret('HEALTH_DETAILS_TOKEN', process.env.HEALTH_DETAILS_TOKEN, false),
 		checkValue('GOOGLE_CALENDAR_CLIENT_ID', process.env.GOOGLE_CALENDAR_CLIENT_ID, false),
 		checkSecret('GOOGLE_CALENDAR_CLIENT_SECRET', process.env.GOOGLE_CALENDAR_CLIENT_SECRET, false),
 		checkValue('MICROSOFT_CALENDAR_CLIENT_ID', process.env.MICROSOFT_CALENDAR_CLIENT_ID, false),
@@ -57,11 +60,11 @@ export function getRuntimeConfigReport(options = {}) {
 		nodeEnv: process.env.NODE_ENV ?? 'development',
 		databaseConfigured: Boolean(process.env.DATABASE_URL),
 		authReady: authRequired && isCheckOk(checks, 'BETTER_AUTH_SECRET') && isCheckOk(checks, 'BETTER_AUTH_URL'),
-		emailDeliveryReady: (
-			isCheckOk(checks, 'EMAIL_DELIVERY_WEBHOOK_URL')
-			|| (isCheckOk(checks, 'RESEND_API_KEY') && isCheckOk(checks, 'EMAIL_FROM'))
-			|| process.env.EMAIL_VERIFICATION_DEV_CODES === 'true'
-		),
+			emailDeliveryReady: (
+				isCheckOk(checks, 'EMAIL_DELIVERY_WEBHOOK_URL')
+				|| (isCheckOk(checks, 'RESEND_API_KEY') && isCheckOk(checks, 'EMAIL_FROM'))
+				|| (!production && emailDevCodesEnabled)
+			),
 		calendarFeedReady: isCheckOk(checks, 'CALENDAR_TOKEN_SECRET'),
 		calendarProviderReady: isCheckOk(checks, 'CALENDAR_OAUTH_ENCRYPTION_KEY') && (
 			hasProvider('GOOGLE_CALENDAR') || hasProvider('MICROSOFT_CALENDAR')
@@ -322,6 +325,30 @@ function checkAllowedEmails() {
 		process.env.NODE_ENV === 'production',
 		invalid ? 'invalid' : 'ok',
 		invalid ? 'AUTH_ALLOWED_EMAILS must contain comma-separated email addresses.' : 'AUTH_ALLOWED_EMAILS is configured.'
+	);
+}
+
+/**
+ * @param {boolean} production
+ * @param {boolean} enabled
+ */
+function checkEmailVerificationDevCodes(production, enabled) {
+	if (production && enabled) {
+		return createCheck(
+			'EMAIL_VERIFICATION_DEV_CODES',
+			true,
+			'invalid',
+			'EMAIL_VERIFICATION_DEV_CODES must not be true in production.'
+		);
+	}
+
+	return createCheck(
+		'EMAIL_VERIFICATION_DEV_CODES',
+		false,
+		enabled ? 'ok' : 'optional',
+		enabled
+			? 'EMAIL_VERIFICATION_DEV_CODES is enabled for local development only.'
+			: 'EMAIL_VERIFICATION_DEV_CODES is disabled.'
 	);
 }
 

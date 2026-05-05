@@ -75,7 +75,7 @@ The database and auth clients are initialized so local tests and builds do not r
 
 Calendar subscription tokens also require `CALENDAR_TOKEN_SECRET`. Raw subscription tokens are returned only once and stored as HMAC hashes in Postgres.
 
-Production passkey registration is limited by `AUTH_ALLOWED_EMAILS`. For this deployment, set it to `scyea@naver.com,scyea1995@gmail.com`.
+Production passkey registration is limited by `AUTH_ALLOWED_EMAILS`. Keep real personal emails in Vercel environment variables only; the public example uses `primary@example.com,backup@example.com`.
 
 Production email verification can use Resend with `RESEND_API_KEY` and `EMAIL_FROM`. For the free `todokanban-alpha.vercel.app` deployment, `Todokanban <onboarding@resend.dev>` works only for the email address associated with the Resend account. `EMAIL_DELIVERY_WEBHOOK_URL` remains available as a webhook fallback.
 
@@ -87,7 +87,7 @@ If provider sync is re-enabled later, create a Google Auth Platform app and add 
 https://todokanban-alpha.vercel.app/api/calendar/providers/google/callback
 ```
 
-If the Google app is still in Testing, add the Google account used for sync, such as `scyea1995@gmail.com`, under **Audience -> Test users** before connecting. Testing authorizations expire after 7 days, so long-running personal provider sync is better with the app moved to **In production** after the smoke test.
+If the Google app is still in Testing, add the Google account used for sync, such as `your-google-account@gmail.com`, under **Audience -> Test users** before connecting. Testing authorizations expire after 7 days, so long-running personal provider sync is better with the app moved to **In production** after the smoke test.
 
 ## Data Model
 
@@ -123,7 +123,7 @@ The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persis
 
 ## Current Limits
 
-- Email verification delivery uses Resend or `EMAIL_DELIVERY_WEBHOOK_URL` in production; local dev can show preview codes with `EMAIL_VERIFICATION_DEV_CODES=true`.
+- Email verification delivery uses Resend or `EMAIL_DELIVERY_WEBHOOK_URL` in production; preview codes are local-development only and are blocked by production config checks.
 - JSON import/export supports authenticated append and replace import/export. Replace import runs through Neon HTTP `batch()` so existing-task retirement and new inserts are all-or-nothing.
 - Google/Microsoft calendar provider sync routes remain available for later, but the visible calendar workflow is currently `.ics`-first: whole-board sync links and per-task `.ics` downloads. Provider webhooks and recurring events are still future work.
 - Offline writes and offline JSON imports are queued per user and retried. `409` conflicts are detected, dropped from retry, surfaced with reviewable conflict details, and can be exported as JSON. Task update/delete conflicts can be replayed locally or dismissed in favor of the server; checklist/import conflict merge remains intentionally conservative.

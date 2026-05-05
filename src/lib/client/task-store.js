@@ -102,6 +102,22 @@ export function setTaskStorageOwner(ownerId) {
     tasks.set(loadInitialTasks());
 }
 
+export function clearLocalTaskCache() {
+    try {
+        const storage = getStorage();
+        if (!storage) return;
+
+        storage.removeItem(getTaskStorageKey());
+        storage.removeItem(PENDING_VIEW_STORAGE_KEY);
+        if (taskStorageOwner === DEFAULT_STORAGE_OWNER) {
+            storage.removeItem(STORAGE_KEY);
+        }
+        tasks.set([]);
+    } catch (error) {
+        console.error('Failed to clear local task cache', error);
+    }
+}
+
 function getTaskStorageKey() {
     return `${STORAGE_KEY}:${taskStorageOwner}`;
 }

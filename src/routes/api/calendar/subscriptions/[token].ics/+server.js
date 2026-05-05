@@ -12,12 +12,13 @@ export async function GET({ params }) {
 			return new Response('Not found', { status: 404 });
 		}
 
-		return new Response(createTaskCalendar(tasks, { calendarName: 'Todolist' }), {
-			headers: {
-				'content-type': 'text/calendar;charset=utf-8',
-				'cache-control': 'private, no-store'
-			}
-		});
+			return new Response(createTaskCalendar(tasks, { calendarName: 'Todolist' }), {
+				headers: {
+					'content-type': 'text/calendar;charset=utf-8',
+					'cache-control': 'private, no-store',
+					'x-robots-tag': 'noindex, nofollow, noarchive'
+				}
+			});
 	} catch (error) {
 		if (error instanceof CalendarTokenConfigurationError) {
 			return new Response('Calendar token configuration is unavailable.', { status: 503 });

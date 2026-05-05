@@ -97,6 +97,10 @@ export function getOfflineQueueSize() {
 	return loadOfflineQueue().length;
 }
 
+export function clearOfflineWriteQueue() {
+	saveOfflineQueue([]);
+}
+
 /**
  * @param {string | null | undefined} ownerId
  */
