@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
 	assertRateLimit,
+	assertVolatileRateLimit,
 	createRateLimitHeaders,
 	createRateLimitKey,
+	getMemoryRateLimitBucketCount,
 	RateLimitError,
 	resetRateLimitBuckets
 } from './rate-limit.js';
@@ -35,5 +37,13 @@ describe('server rate limit helper', () => {
 		}, 'email', ' USER@Example.COM ');
 
 		expect(key).toBe('email:203.0.113.9:user@example.com');
+	});
+
+	it('caps volatile memory buckets to avoid unbounded token spray growth', () => {
+		for (let index = 0; index < 2100; index += 1) {
+			assertVolatileRateLimit(`spray-${index}`, { limit: 1, windowMs: 60_000 });
+		}
+
+		expect(getMemoryRateLimitBucketCount()).toBeLessThanOrEqual(2000);
 	});
 });

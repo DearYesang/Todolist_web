@@ -1,5 +1,7 @@
 import { auth, authConfigurationError, authDatabaseConfigured } from './index.js';
 
+const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
+
 /**
  * @param {Request} request
  * @returns {Promise<
@@ -11,14 +13,14 @@ export async function requireAuthUser(request) {
 	if (!authDatabaseConfigured) {
 		return {
 			ok: false,
-			response: Response.json({ message: 'Auth database is not configured.' }, { status: 503 })
+			response: Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 503 })
 		};
 	}
 
 	if (authConfigurationError) {
 		return {
 			ok: false,
-			response: Response.json({ message: authConfigurationError }, { status: 500 })
+			response: Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 500 })
 		};
 	}
 

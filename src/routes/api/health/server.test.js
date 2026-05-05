@@ -60,4 +60,24 @@ describe('/api/health', () => {
 		expect(body.blocking.length).toBeGreaterThan(0);
 		expect(body.checks).toEqual(expect.any(Array));
 	});
+
+	it('does not return production details with an incorrect bearer token', async () => {
+		process.env.NODE_ENV = 'production';
+		process.env.HEALTH_DETAILS_TOKEN = 'health-token-with-more-than-32-characters';
+		delete process.env.DATABASE_URL;
+
+		const response = await GET(/** @type {any} */ ({
+			request: new Request('https://todo.example.com/api/health?strict=true', {
+				headers: {
+					authorization: 'Bearer health-token-with-more-than-32-characterz'
+				}
+			}),
+			url: new URL('https://todo.example.com/api/health?strict=true')
+		}));
+		const body = await response.json();
+
+		expect(response.status).toBe(503);
+		expect(body.blocking).toBeUndefined();
+		expect(body.checks).toBeUndefined();
+	});
 });
