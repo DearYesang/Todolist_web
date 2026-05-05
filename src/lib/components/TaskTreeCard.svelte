@@ -16,6 +16,7 @@
         STATUS_LABELS,
         URGENCY_LABELS
     } from '$lib/shared/task-domain.js';
+    import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
 
     /** @type {{
      *   task: import('$lib/shared/task-domain.js').Task;
@@ -42,6 +43,10 @@
 
     let isDragOver = $state(false);
     let newSubtaskText = $state('');
+    let isSubtaskComposing = $state(false);
+    let didSubtaskCompositionJustEnd = $state(false);
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let subtaskCompositionResetTimer = null;
 
     const children = $derived(childrenByParent[task.id] || []);
     const directChildren = $derived(allTasks.filter((candidate) => candidate.parentId === task.id));
@@ -77,6 +82,7 @@
      * @param {Event} event
      */
     function handleAddSubtask(event) {
+        event.preventDefault();
         event.stopPropagation();
         if (!newSubtaskText.trim()) return;
 
@@ -84,13 +90,49 @@
         newSubtaskText = '';
     }
 
+    function handleSubtaskCompositionStart() {
+        isSubtaskComposing = true;
+        didSubtaskCompositionJustEnd = false;
+        clearSubtaskCompositionReset();
+    }
+
+    /**
+     * @param {CompositionEvent} event
+     */
+    function handleSubtaskCompositionEnd(event) {
+        isSubtaskComposing = false;
+        didSubtaskCompositionJustEnd = true;
+        newSubtaskText = /** @type {HTMLInputElement} */ (event.currentTarget).value;
+        clearSubtaskCompositionReset();
+        subtaskCompositionResetTimer = setTimeout(() => {
+            didSubtaskCompositionJustEnd = false;
+            subtaskCompositionResetTimer = null;
+        }, 0);
+    }
+
+    function clearSubtaskCompositionReset() {
+        if (!subtaskCompositionResetTimer) return;
+        clearTimeout(subtaskCompositionResetTimer);
+        subtaskCompositionResetTimer = null;
+    }
+
     /**
      * @param {KeyboardEvent} event
      */
     function handleSubtaskKeydown(event) {
-        if (event.key === 'Enter') {
-            handleAddSubtask(event);
+        if (event.key !== 'Enter') {
+            return;
         }
+
+        event.stopPropagation();
+        if (shouldIgnoreImeSubmit(event, {
+            isComposing: isSubtaskComposing,
+            justEnded: didSubtaskCompositionJustEnd
+        })) {
+            return;
+        }
+
+        handleAddSubtask(event);
     }
 
     /**
@@ -301,6 +343,8 @@
                 bind:value={newSubtaskText}
                 placeholder="+ 체크리스트 추가..."
                 onclick={(event) => event.stopPropagation()}
+                oncompositionstart={handleSubtaskCompositionStart}
+                oncompositionend={handleSubtaskCompositionEnd}
                 onkeydown={handleSubtaskKeydown} />
             <button class="btn btn-ghost" onclick={handleAddSubtask}>+</button>
         </div>

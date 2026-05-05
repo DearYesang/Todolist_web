@@ -4,6 +4,7 @@
     import { buildTaskCreateDraft, createLocalTaskFromDraft } from '$lib/client/task-create.js';
     import { enqueueOfflineMutation } from '$lib/client/offline-write-queue.js';
     import { categories, tasks } from '$lib/client/task-store.js';
+    import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
     import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
 
     let isFormOpen = $state(false);
@@ -16,6 +17,10 @@
     let parentId = $state('');
     let isSubmitting = $state(false);
     let formError = $state('');
+    let isTaskTextComposing = $state(false);
+    let didTaskTextCompositionJustEnd = $state(false);
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let taskTextCompositionResetTimer = null;
 
     const defaults = getDefaultDateRange();
     let startDate = $state(defaults.startDate);
@@ -33,6 +38,9 @@
         isSubmitting = false;
         formError = '';
         isFormOpen = false;
+        didTaskTextCompositionJustEnd = false;
+        isTaskTextComposing = false;
+        clearTaskTextCompositionReset();
     }
 
     /**
@@ -95,10 +103,45 @@
      * @param {KeyboardEvent} event
      */
     function handleTaskInputKeydown(event) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            void addTask();
+        if (event.key !== 'Enter') {
+            return;
         }
+
+        if (shouldIgnoreImeSubmit(event, {
+            isComposing: isTaskTextComposing,
+            justEnded: didTaskTextCompositionJustEnd
+        })) {
+            return;
+        }
+
+        event.preventDefault();
+        void addTask();
+    }
+
+    function handleTaskTextCompositionStart() {
+        isTaskTextComposing = true;
+        didTaskTextCompositionJustEnd = false;
+        clearTaskTextCompositionReset();
+    }
+
+    /**
+     * @param {CompositionEvent} event
+     */
+    function handleTaskTextCompositionEnd(event) {
+        isTaskTextComposing = false;
+        didTaskTextCompositionJustEnd = true;
+        newTaskText = /** @type {HTMLInputElement} */ (event.currentTarget).value;
+        clearTaskTextCompositionReset();
+        taskTextCompositionResetTimer = setTimeout(() => {
+            didTaskTextCompositionJustEnd = false;
+            taskTextCompositionResetTimer = null;
+        }, 0);
+    }
+
+    function clearTaskTextCompositionReset() {
+        if (!taskTextCompositionResetTimer) return;
+        clearTimeout(taskTextCompositionResetTimer);
+        taskTextCompositionResetTimer = null;
     }
 </script>
 
@@ -118,6 +161,8 @@
                         type="text"
                         bind:value={newTaskText}
                         placeholder="무엇을 해야 하나요?"
+                        oncompositionstart={handleTaskTextCompositionStart}
+                        oncompositionend={handleTaskTextCompositionEnd}
                         onkeydown={handleTaskInputKeydown} />
                 </div>
 
