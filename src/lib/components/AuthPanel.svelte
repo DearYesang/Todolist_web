@@ -11,7 +11,7 @@
         listUserPasskeys,
         updateUserPasskeyName
     } from '$lib/client/passkey-management-api.js';
-    import { clearOfflineWriteQueue } from '$lib/client/offline-write-queue.js';
+    import { clearOfflineWriteQueue, getOfflineQueueSize } from '$lib/client/offline-write-queue.js';
     import { clearLocalTaskCache } from '$lib/client/task-store.js';
 
     const session = authClient.useSession();
@@ -175,6 +175,10 @@
 
         authMessage = '';
         authError = '';
+        if (clearLocalDataOnSignOut && !confirmLocalDataClear()) {
+            authMessage = '로그아웃을 취소했습니다. 먼저 Sync로 오프라인 변경을 동기화해 주세요.';
+            return;
+        }
         isWorking = true;
 
         try {
@@ -197,6 +201,21 @@
         } finally {
             isWorking = false;
         }
+    }
+
+    function confirmLocalDataClear() {
+        const pendingChanges = getOfflineQueueSize();
+        if (pendingChanges < 1) {
+            return true;
+        }
+
+        if (typeof window === 'undefined') {
+            return false;
+        }
+
+        return window.confirm(
+            `아직 동기화되지 않은 오프라인 변경 ${pendingChanges}건이 있습니다. 로그아웃하면서 이 기기 캐시를 삭제할까요?`
+        );
     }
 
     async function generateRecoveryCodes() {

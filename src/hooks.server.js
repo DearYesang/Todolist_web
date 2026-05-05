@@ -82,6 +82,37 @@ function getTrustedOrigins(url) {
 function withSecurityHeaders(response, event) {
 	const headers = response.headers;
 	const production = process.env.NODE_ENV === 'production';
+	if (!headers.has('content-security-policy')) {
+		headers.set('content-security-policy', createFallbackContentSecurityPolicy(production));
+	}
+
+	headers.set('x-content-type-options', 'nosniff');
+	headers.set('x-frame-options', 'DENY');
+	headers.set('referrer-policy', 'no-referrer');
+	headers.set('permissions-policy', [
+		'accelerometer=()',
+		'camera=()',
+		'geolocation=()',
+		'gyroscope=()',
+		'magnetometer=()',
+		'microphone=()',
+		'payment=()',
+		'usb=()'
+	].join(', '));
+	headers.set('cross-origin-opener-policy', 'same-origin');
+	if (production && event.url.protocol === 'https:') {
+		headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
+	}
+
+	return response;
+}
+
+/**
+ * SvelteKit owns page CSP so it can add the inline bootstrap hash. This fallback
+ * covers JSON/API responses that do not pass through the page renderer.
+ * @param {boolean} production
+ */
+function createFallbackContentSecurityPolicy(production) {
 	const scriptSrc = production
 		? "script-src 'self'"
 		: "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
@@ -107,24 +138,5 @@ function withSecurityHeaders(response, event) {
 	if (production) {
 		cspDirectives.push('upgrade-insecure-requests');
 	}
-	headers.set('content-security-policy', cspDirectives.join('; '));
-	headers.set('x-content-type-options', 'nosniff');
-	headers.set('x-frame-options', 'DENY');
-	headers.set('referrer-policy', 'no-referrer');
-	headers.set('permissions-policy', [
-		'accelerometer=()',
-		'camera=()',
-		'geolocation=()',
-		'gyroscope=()',
-		'magnetometer=()',
-		'microphone=()',
-		'payment=()',
-		'usb=()'
-	].join(', '));
-	headers.set('cross-origin-opener-policy', 'same-origin');
-	if (production && event.url.protocol === 'https:') {
-		headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
-	}
-
-	return response;
+	return cspDirectives.join('; ');
 }
