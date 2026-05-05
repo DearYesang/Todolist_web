@@ -4,6 +4,7 @@ import { planTaskImport } from './import-planner.js';
 import { mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
 import {
 	assertValidTaskDateRange,
+	parseBoardPreferencesInput,
 	parseChecklistItemIdParam,
 	parseCreateTaskInput,
 	parseCreateChecklistItemInput,
@@ -61,6 +62,38 @@ export async function listTasksForBoard(boardId) {
  */
 export async function ensurePersonalBoardForUser(userId) {
 	return getOrCreatePersonalBoardForUser(getDb(), userId);
+}
+
+/**
+ * @param {string} userId
+ */
+export async function getBoardPreferencesForUser(userId) {
+	const board = await getOrCreatePersonalBoardForUser(getDb(), userId);
+	return mapBoardPreferences(board);
+}
+
+/**
+ * @param {string} userId
+ * @param {unknown} payload
+ */
+export async function updateBoardPreferencesForUser(userId, payload) {
+	const input = parseBoardPreferencesInput(payload);
+	const db = getDb();
+	const board = await getOrCreatePersonalBoardForUser(db, userId);
+	const [updated] = await db
+		.update(schema.boards)
+		.set({
+			defaultView: input.defaultView,
+			updatedAt: new Date()
+		})
+		.where(eq(schema.boards.id, board.id))
+		.returning();
+
+	if (!updated) {
+		throw new TaskWriteError('Board preferences could not be updated.', 500);
+	}
+
+	return mapBoardPreferences(updated);
 }
 
 /**
@@ -237,6 +270,15 @@ function createImportChecklistValues(plans, now) {
 			updatedAt: now
 		}))
 	);
+}
+
+/**
+ * @param {typeof schema.boards.$inferSelect} board
+ */
+function mapBoardPreferences(board) {
+	return {
+		defaultView: board.defaultView
+	};
 }
 
 /**

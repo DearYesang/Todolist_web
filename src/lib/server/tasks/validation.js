@@ -3,6 +3,7 @@ import { normalizeDateRange } from '$lib/shared/task-domain.js';
 const TASK_STATUSES = new Set(['todo', 'doing', 'done']);
 const TASK_PRIORITIES = new Set(['high', 'medium', 'low']);
 const TASK_URGENCIES = new Set(['urgent', 'normal']);
+const APP_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_TITLE_LENGTH = 300;
 const MAX_CATEGORY_LENGTH = 80;
@@ -144,6 +145,20 @@ export function parseDeleteTaskInput(payload) {
 		expectedVersion: hasField(source, 'expectedVersion') || hasField(source, 'version')
 			? parseExpectedVersion(source.expectedVersion ?? source.version)
 			: null
+	};
+}
+
+/**
+ * @param {unknown} payload
+ */
+export function parseBoardPreferencesInput(payload) {
+	const source = /** @type {Record<string, unknown> | null} */ (payload);
+	if (!source || typeof source !== 'object' || Array.isArray(source)) {
+		throw new TaskWriteError('Board preferences payload must be an object.');
+	}
+
+	return {
+		defaultView: parseRequiredEnum(source.defaultView, APP_VIEWS, 'defaultView')
 	};
 }
 

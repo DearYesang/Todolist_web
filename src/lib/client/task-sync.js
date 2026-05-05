@@ -1,6 +1,7 @@
-import { listServerTasks } from './task-api.js';
+import { getBoardPreferences, listServerTasks } from './task-api.js';
 import { flushOfflineWriteQueue } from './offline-write-queue.js';
 import {
+	applyServerDefaultView,
 	applyServerTaskSnapshot,
 	mergeTasks,
 	removeTasksByIds,
@@ -39,6 +40,10 @@ export async function syncServerTasks(fetcher = globalThis.fetch) {
 	const result = await listServerTasks(fetcher);
 	if (result.ok) {
 		applyServerTaskSnapshot(result.tasks);
+		const preferences = await getBoardPreferences(fetcher);
+		if (preferences.ok) {
+			applyServerDefaultView(preferences.defaultView);
+		}
 	}
 
 	return { ...result, offlineConflicts: flushed.conflicts };

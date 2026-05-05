@@ -1,0 +1,2 @@
+ALTER TABLE "boards" DROP CONSTRAINT "boards_default_view_check";--> statement-breakpoint
+ALTER TABLE "boards" ADD CONSTRAINT "boards_default_view_check" CHECK ("boards"."default_view" in ('kanban', 'gantt', 'matrix'));

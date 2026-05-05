@@ -27,6 +27,7 @@ export * from '../shared/task-domain.js';
 
 const STORAGE_KEY = 'kanbanTasks';
 const VIEW_STORAGE_KEY = 'todokanbanCurrentView';
+const PENDING_VIEW_STORAGE_KEY = 'todokanbanPendingDefaultView';
 const DEFAULT_STORAGE_OWNER = 'anonymous';
 const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 
@@ -125,6 +126,55 @@ function normalizeStorageOwner(ownerId) {
 /** @type {import('svelte/store').Writable<AppView>} */
 export const currentView = writable(readInitialView());
 
+/**
+ * @param {unknown} value
+ */
+export function setCurrentView(value) {
+    if (isAppView(value)) {
+        currentView.set(value);
+    }
+}
+
+/**
+ * @param {unknown} value
+ */
+export function applyServerDefaultView(value) {
+    setCurrentView(value);
+}
+
+/**
+ * @param {unknown} value
+ */
+export function markPendingDefaultView(value) {
+    if (!isAppView(value)) return;
+
+    try {
+        const storage = getStorage();
+        storage?.setItem(PENDING_VIEW_STORAGE_KEY, value);
+    } catch (error) {
+        console.error('Failed to persist pending default view', error);
+    }
+}
+
+/** @returns {AppView | null} */
+export function readPendingDefaultView() {
+    try {
+        const storage = getStorage();
+        const stored = storage?.getItem(PENDING_VIEW_STORAGE_KEY);
+        return isAppView(stored) ? stored : null;
+    } catch {
+        return null;
+    }
+}
+
+export function clearPendingDefaultView() {
+    try {
+        getStorage()?.removeItem(PENDING_VIEW_STORAGE_KEY);
+    } catch (error) {
+        console.error('Failed to clear pending default view', error);
+    }
+}
+
 currentView.subscribe((value) => {
     try {
         const storage = getStorage();
@@ -151,7 +201,7 @@ function readInitialView() {
  * @param {unknown} value
  * @returns {value is AppView}
  */
-function isAppView(value) {
+export function isAppView(value) {
     return typeof value === 'string' && VALID_VIEWS.has(value);
 }
 

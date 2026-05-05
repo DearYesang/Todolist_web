@@ -2,6 +2,7 @@ import { normalizeTask, normalizeTaskList } from '../shared/task-domain.js';
 import { extractBackupTasks } from '../shared/task-backup.js';
 
 const FALLBACK_STATUSES = new Set([401, 409, 503]);
+const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 
 /**
  * @typedef {{
@@ -56,6 +57,16 @@ const FALLBACK_STATUSES = new Set([401, 409, 503]);
  *   status: number;
  *   message: string;
  * }} ImportServerTasksResult
+ *
+ * @typedef {{
+ *   ok: true;
+ *   defaultView: 'kanban' | 'gantt' | 'matrix';
+ * } | {
+ *   ok: false;
+ *   fallback: boolean;
+ *   status: number;
+ *   message: string;
+ * }} BoardPreferencesResult
  */
 
 /**
@@ -179,6 +190,79 @@ export async function importServerTasks(payload, options = {}, fetcher = globalT
 		};
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
+	}
+}
+
+/**
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<BoardPreferencesResult>}
+ */
+export async function getBoardPreferences(fetcher = globalThis.fetch) {
+	if (typeof fetcher !== 'function') {
+		return createFallbackResult('Board preferences API is not available.');
+	}
+
+	try {
+		const response = await fetcher('/api/board/preferences', {
+			headers: {
+				accept: 'application/json'
+			}
+		});
+		const body = await readJsonBody(response);
+
+		if (response.ok && isBoardPreferencesResponse(body)) {
+			return {
+				ok: true,
+				defaultView: body.defaultView
+			};
+		}
+
+		return {
+			ok: false,
+			fallback: FALLBACK_STATUSES.has(response.status),
+			status: response.status,
+			message: readErrorMessage(body) ?? `Board preferences request failed with status ${response.status}.`
+		};
+	} catch {
+		return createFallbackResult('Board preferences request could not be completed.');
+	}
+}
+
+/**
+ * @param {{ defaultView: 'kanban' | 'gantt' | 'matrix' }} preferences
+ * @param {typeof fetch} [fetcher]
+ * @returns {Promise<BoardPreferencesResult>}
+ */
+export async function updateBoardPreferences(preferences, fetcher = globalThis.fetch) {
+	if (typeof fetcher !== 'function') {
+		return createFallbackResult('Board preferences API is not available.');
+	}
+
+	try {
+		const response = await fetcher('/api/board/preferences', {
+			method: 'PATCH',
+			headers: {
+				'content-type': 'application/json'
+			},
+			body: JSON.stringify(preferences)
+		});
+		const body = await readJsonBody(response);
+
+		if (response.ok && isBoardPreferencesResponse(body)) {
+			return {
+				ok: true,
+				defaultView: body.defaultView
+			};
+		}
+
+		return {
+			ok: false,
+			fallback: FALLBACK_STATUSES.has(response.status),
+			status: response.status,
+			message: readErrorMessage(body) ?? `Board preferences request failed with status ${response.status}.`
+		};
+	} catch {
+		return createFallbackResult('Board preferences request could not be completed.');
 	}
 }
 
@@ -419,6 +503,15 @@ function isTaskResponse(body) {
  */
 function isTasksResponse(body) {
 	return Boolean(body && typeof body === 'object' && 'tasks' in body && Array.isArray(body.tasks));
+}
+
+/**
+ * @param {unknown} body
+ * @returns {body is { defaultView: 'kanban' | 'gantt' | 'matrix' }}
+ */
+function isBoardPreferencesResponse(body) {
+	const defaultView = /** @type {{ defaultView?: unknown } | null} */ (body)?.defaultView;
+	return typeof defaultView === 'string' && VALID_VIEWS.has(defaultView);
 }
 
 /**
