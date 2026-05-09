@@ -158,6 +158,12 @@ See [implementation status](docs/IMPLEMENTATION_STATUS.md) for the current plan-
 See [Vercel + Neon deployment plan](docs/VERCEL_NEON_DEPLOYMENT.md) for the personal production setup.
 See [deployment checklist](docs/DEPLOYMENT_CHECKLIST.md) before promoting this branch.
 
+## License
+
+Copyright 2026 DearYesang
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+
 ## Security Notes
 
 - Secrets must live in `.env` files and stay out of git.
