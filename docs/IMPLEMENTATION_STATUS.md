@@ -1,13 +1,13 @@
 # Implementation Status
 
-Last updated: 2026-05-06
+Last updated: 2026-05-09
 
 This document compares the current implementation against the working plan for the personal Vercel + Neon deployment.
 
 ## Production Snapshot
 
-- Latest production merge: `d075fba chore(deps-dev): bump the npm-development group with 4 updates`.
-- Latest strict health smoke: `https://todokanban-alpha.vercel.app/api/health?strict=true` returned `ok: true` on 2026-05-06.
+- Latest production merge: `86305f6 Add Apache 2.0 license`.
+- Latest strict health smoke: `https://todokanban-alpha.vercel.app/api/health?strict=true` returned `ok: true` on 2026-05-09.
 - Calendar direction: `.ics` is the active product path. The whole-board `.ics` link was manually confirmed, and Google/Microsoft provider sync is deferred behind existing route/service scaffolding.
 
 ## Plan vs State
@@ -16,7 +16,7 @@ This document compares the current implementation against the working plan for t
 | --- | --- | --- | --- |
 | Backend stack | Neon Postgres + Drizzle + Better Auth + SvelteKit API layer. Keep Rust out unless a worker becomes necessary. | Implemented with SvelteKit API routes, Drizzle schema/migrations, Better Auth passkey, Neon-ready config, health checks, and manual migration flow. | Rust remains intentionally deferred. Add it only for heavy background jobs such as calendar workers, recurring expansion, bulk validation, or notification scheduling. |
 | Auth and passkeys | Personal allowlist, passkey-first login, recovery path, device-friendly naming. | Email-code onboarding, allowlisted registration emails, passkey login, recovery codes, passkey list/rename/delete, and host/RP health checks are implemented. | Apple passkey picker may keep old cached names. Custom email domain should replace Resend sandbox sender if both allowed emails need independent delivery. |
-| Task core | Kanban with hierarchy, checklist, filters, import/export, server sync, and ergonomic schedule input. | Kanban, task hierarchy, checklist, filters, JSON import/export, server CRUD, checklist CRUD, cascade delete, optimistic writes, offline queue, and a reusable visual date-range picker for task creation/detail editing are implemented. Partial task response merge now preserves parent links during checklist sync. Task update/delete conflicts now offer apply-local or keep-server actions. | Checklist/import conflicts are still conservative and report-first. |
+| Task core | Kanban with hierarchy, checklist, filters, import/export, server sync, category management, and ergonomic schedule input. | Kanban, task hierarchy, checklist, filters, category rename/merge/delete, category counts/colors, rule-based category suggestions while adding/editing tasks, JSON import/export, server CRUD, checklist CRUD, cascade delete, optimistic writes, offline queue, and a reusable visual date-range picker for task creation/detail editing are implemented. Partial task response merge now preserves parent links during checklist sync. Task update/delete conflicts now offer apply-local or keep-server actions. | Checklist/import conflicts are still conservative and report-first. LLM-based category automation remains deferred until the manual taxonomy feels stable. |
 | Views | Kanban and Gantt first; add planning views as needed. | Kanban, Gantt centered on today, Gantt task-list checklist previews with completion toggles, and Eisenhower matrix are implemented. Matrix hides completed tasks by default with an opt-in toggle. The last selected view is persisted per account in `boards.default_view`; `localStorage` remains the offline fallback. | Verify cross-device default view behavior on physical devices. Watch whether Gantt checklist toggles need an undo affordance after daily use. |
 | Calendar | Keep `.ics` as the primary calendar path; defer provider sync unless it becomes necessary. | The visible UI now has one top-level `전체 일정 동기화` control backed by revocable `.ics` secret links with clearer warning text and a 30-day default expiry. Per-task `일정 추가` downloads single-task `.ics` files. Authenticated `/api/calendar.ics` remains available. The whole-board `.ics` link has been manually confirmed. Google/Microsoft OAuth provider scaffolding, cron, and sync logs still exist in code but are hidden from the primary UI. | Validate the `.ics` flow on every target device/calendar app. Google OAuth remains deferred because `.ics` works and the provider flow is blocked by Google OAuth access control. Re-enable provider sync only if `.ics` is not enough. |
 | Offline/PWA | App should install on Mac/Windows/iPhone/iPad and remain usable after a prior login while offline. | Manifest, maskable/Apple icons, service worker shell cache, iOS safe areas, touch CSS, refresh control, offline auth scope, user-scoped local cache, retryable offline queue, offline import queue, conflict export/actions, logout-time local cache cleanup, iPhone/iPad viewport E2E coverage, Xcode Simulator locked-screen smoke for iPhone 14 Pro and iPad Pro 12.9, compact mobile header actions, touch-oriented add/detail sheets, Gantt readability polish, and iPad tablet CSS tuning are implemented. | Physical real-device visual smoke is still needed on iPhone 14 Pro, iPad Pro 12.9, Mac, and Windows. Native wrappers are deferred until browser/PWA limits become real blockers. |
@@ -51,7 +51,7 @@ Browser / PWA
 
 ## Recommended Next Order
 
-1. Real-device smoke: Mac, Windows, iPhone 14 Pro, iPad Pro 12.9. Cover nested task + checklist sync, Gantt checklist toggles, matrix completed toggle, offline reload, refresh, installed PWA icon refresh, and cross-device default view persistence.
+1. Real-device smoke: Mac, Windows, iPhone 14 Pro, iPad Pro 12.9. Cover nested task + checklist sync, category rename/merge/delete, Gantt checklist toggles, matrix completed toggle, offline reload, refresh, installed PWA icon refresh, and cross-device default view persistence.
 2. Broaden the `.ics` calendar smoke beyond the already-confirmed link: subscribe from the target calendar apps, download a single-task `.ics`, and confirm full date ranges on Mac, Windows, iPhone, and iPad.
 3. Keep checklist/import conflicts report-first unless real conflicts make the extra complexity worthwhile.
 4. Revisit Google provider sync, cron logs, webhooks, and recurring events only if `.ics` becomes too limited.

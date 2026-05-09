@@ -95,6 +95,32 @@ test('opens the task form date picker and Gantt checklist preview', async ({ pag
 	await expect(page.getByRole('button', { name: /일정 추가/ }).first()).toBeVisible();
 });
 
+test('suggests categories and manages category names offline', async ({ page }) => {
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	await page.getByRole('button', { name: /새 작업 추가/ }).click();
+	await page.getByLabel('작업명').fill('네트워크 개념 공부');
+	await page.getByRole('button', { name: /CS 공부/ }).click();
+	await expect(page.getByLabel('카테고리')).toHaveValue('CS 공부');
+	await page.getByRole('button', { name: /작업 추가/ }).click();
+
+	await expect(page.getByText('네트워크 개념 공부')).toBeVisible();
+	await page.getByRole('button', { name: '관리' }).click();
+	await expect(page.getByRole('dialog', { name: '카테고리 관리' })).toBeVisible();
+
+	const categoryRow = page.locator('.category-manager-row', { hasText: 'CS 공부' });
+	await expect(categoryRow).toContainText('1 진행');
+	await categoryRow.getByRole('button', { name: '이름 변경' }).click();
+	await page.locator('.category-rename-input').fill('공부');
+	await page.getByRole('button', { name: '저장' }).click();
+
+	await expect(page.locator('.category-manager-row', { hasText: '공부' })).toBeVisible();
+	await page.getByRole('dialog', { name: '카테고리 관리' }).getByRole('button', { name: '✕' }).click();
+	await expect(page.getByRole('dialog', { name: '카테고리 관리' })).toBeHidden();
+	await expect(page.locator('.category-tag', { hasText: '공부' }).first()).toBeVisible();
+});
+
 test('keeps iPad-width Kanban columns side by side', async ({ page }) => {
 	await page.setViewportSize({ width: 1024, height: 1366 });
 	await seedOfflineBoard(page);

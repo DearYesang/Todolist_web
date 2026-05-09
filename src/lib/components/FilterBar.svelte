@@ -1,12 +1,15 @@
 <script>
     import {
-        categories,
+        categorySummaries,
         filters,
         setCategoryFilter,
         setPriorityFilter,
         setUrgencyFilter
     } from '$lib/client/task-store.js';
     import { getCategoryColor } from '$lib/shared/task-domain.js';
+    import CategoryManager from './CategoryManager.svelte';
+
+    let isCategoryManagerOpen = $state(false);
 
     /** @type {{ value: import('$lib/shared/task-domain.js').PriorityFilter; label: string }[]} */
     const priorityOptions = [
@@ -50,6 +53,9 @@
 
     <div class="filter-divider"></div>
     <span class="filter-label">카테고리</span>
+    <button class="filter-chip manage-categories-chip" onclick={() => isCategoryManagerOpen = true}>
+        관리
+    </button>
     <button
         class="filter-chip"
         class:active={$filters.category === 'all'}
@@ -57,14 +63,19 @@
         전체
     </button>
 
-    {#each $categories as category}
-        {@const color = getCategoryColor(category)}
+    {#each $categorySummaries as category}
+        {@const color = getCategoryColor(category.name)}
         <button
             class="filter-chip category-chip"
-            class:active={$filters.category === category}
-            onclick={() => setCategoryFilter(category)}
-            style={$filters.category === category ? `background:${color.bg}; color:${color.fg}; border-color:${color.border};` : ''}>
-            {category}
+            class:active={$filters.category === category.name}
+            onclick={() => setCategoryFilter(category.name)}
+            style={$filters.category === category.name ? `background:${color.bg}; color:${color.fg}; border-color:${color.border};` : ''}>
+            <span>{category.name}</span>
+            <small>{category.active}</small>
         </button>
     {/each}
 </div>
+
+{#if isCategoryManagerOpen}
+    <CategoryManager onclose={() => isCategoryManagerOpen = false} />
+{/if}

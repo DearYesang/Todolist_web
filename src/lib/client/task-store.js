@@ -22,6 +22,7 @@ import {
     toggleSubtaskInList,
     updateTaskInList
 } from '../shared/task-domain.js';
+import { normalizeCategoryName } from '../shared/category-suggestions.js';
 
 export * from '../shared/task-domain.js';
 
@@ -225,8 +226,27 @@ export function isAppView(value) {
 export const filters = writable({ ...DEFAULT_FILTERS });
 
 export const categories = derived(tasks, ($tasks) =>
-    [...new Set($tasks.map((task) => task.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'))
+    [...new Set($tasks.map((task) => normalizeCategoryName(task.category)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'))
 );
+
+export const categorySummaries = derived(tasks, ($tasks) => {
+    /** @type {Map<string, { name: string; total: number; active: number; done: number }>} */
+    const summaryByName = new Map();
+    for (const task of $tasks) {
+        const name = normalizeCategoryName(task.category);
+        if (!name) continue;
+        const summary = summaryByName.get(name) ?? { name, total: 0, active: 0, done: 0 };
+        summary.total += 1;
+        if (task.status === 'done') {
+            summary.done += 1;
+        } else {
+            summary.active += 1;
+        }
+        summaryByName.set(name, summary);
+    }
+
+    return [...summaryByName.values()].sort((left, right) => left.name.localeCompare(right.name, 'ko'));
+});
 
 /**
  * @param {import('../shared/task-domain.js').PriorityFilter} value
@@ -251,6 +271,59 @@ export function setCategoryFilter(value) {
 
 export function resetFilters() {
     filters.set({ ...DEFAULT_FILTERS });
+}
+
+/**
+ * @param {string} sourceCategory
+ * @param {string} targetCategory
+ */
+export function renameCategory(sourceCategory, targetCategory) {
+    return rewriteCategory(sourceCategory, targetCategory);
+}
+
+/**
+ * @param {string} sourceCategory
+ * @param {string} targetCategory
+ */
+export function mergeCategory(sourceCategory, targetCategory) {
+    return rewriteCategory(sourceCategory, targetCategory);
+}
+
+/** @param {string} category */
+export function clearCategory(category) {
+    return rewriteCategory(category, '');
+}
+
+/**
+ * @param {string} sourceCategory
+ * @param {string} targetCategory
+ */
+function rewriteCategory(sourceCategory, targetCategory) {
+    const source = normalizeCategoryName(sourceCategory);
+    const target = normalizeCategoryName(targetCategory);
+    if (!source || source === target) {
+        return 0;
+    }
+
+    /** @type {import('../shared/task-domain.js').Task[]} */
+    let changedTasks = [];
+    tasks.update((current) => {
+        const next = current.map((task) => {
+            if (normalizeCategoryName(task.category) !== source) {
+                return task;
+            }
+
+            const nextTask = { ...task, category: target };
+            changedTasks.push(nextTask);
+            return nextTask;
+        });
+
+        return normalizeTaskList(next);
+    });
+
+    filters.update((current) => current.category === source ? { ...current, category: target || 'all' } : current);
+    changedTasks.forEach((task) => syncTaskSnapshot(task));
+    return changedTasks.length;
 }
 
 /**
