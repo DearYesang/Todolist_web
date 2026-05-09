@@ -1,16 +1,24 @@
 <script>
-    import { deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
+    import { categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import { getCategoryColor } from '$lib/shared/task-domain.js';
     import { fade, fly } from 'svelte/transition';
+    import CategoryInput from './CategoryInput.svelte';
     import DateRangePicker from './DateRangePicker.svelte';
 
     let { taskId, onclose } = $props();
+    let categoryDraft = $state('');
 
     const task = $derived($tasks.find((candidate) => candidate.id === taskId) || null);
     const parentTask = $derived(task?.parentId ? $tasks.find((candidate) => candidate.id === task.parentId) || null : null);
     const childCount = $derived(task ? $tasks.filter((candidate) => candidate.parentId === task.id).length : 0);
     const categoryColor = $derived(task ? getCategoryColor(task.category) : null);
+
+    $effect(() => {
+        if (task && categoryDraft !== task.category) {
+            categoryDraft = task.category;
+        }
+    });
 
     /**
      * @param {'text' | 'startDate' | 'endDate' | 'priority' | 'urgency' | 'category' | 'status'} field
@@ -41,6 +49,14 @@
      */
     function updateDateRange(range) {
         updateTask(taskId, range);
+    }
+
+    /**
+     * @param {string} nextCategory
+     */
+    function updateCategory(nextCategory) {
+        categoryDraft = nextCategory;
+        updateField('category', nextCategory);
     }
 
     /**
@@ -160,12 +176,14 @@
                 <div class="form-grid">
                     <div class="form-section">
                         <label for="modal-category">카테고리</label>
-                        <input
+                        <CategoryInput
                             id="modal-category"
-                            type="text"
-                            value={task.category}
+                            bind:value={categoryDraft}
+                            categories={$categories}
+                            parentCategory={parentTask?.category ?? ''}
+                            taskText={task.text}
                             placeholder="예: 개발, 기획"
-                            oninput={(event) => updateField('category', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
+                            onchange={updateCategory} />
                     </div>
 
                     <div class="form-section">

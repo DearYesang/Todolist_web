@@ -6,6 +6,7 @@
     import { categories, tasks } from '$lib/client/task-store.js';
     import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
     import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
+    import CategoryInput from './CategoryInput.svelte';
     import DateRangePicker from './DateRangePicker.svelte';
 
     let isFormOpen = $state(false);
@@ -26,6 +27,13 @@
     const defaults = getDefaultDateRange();
     let startDate = $state(defaults.startDate);
     let endDate = $state(defaults.endDate);
+    const selectedParent = $derived(parentId ? $tasks.find((task) => task.id === parentId) ?? null : null);
+
+    $effect(() => {
+        if (!category && selectedParent?.category) {
+            category = selectedParent.category;
+        }
+    });
 
     function resetForm() {
         const range = getDefaultDateRange();
@@ -186,18 +194,12 @@
 
                 <div class="form-row">
                     <label class="form-label" for="category">카테고리</label>
-                    <input
+                    <CategoryInput
                         id="category"
-                        class="form-input"
-                        type="text"
                         bind:value={category}
-                        placeholder="예: 개발, 디자인, 마케팅"
-                        list="category-list" />
-                    <datalist id="category-list">
-                        {#each $categories as categoryOption}
-                            <option value={categoryOption}></option>
-                        {/each}
-                    </datalist>
+                        categories={$categories}
+                        parentCategory={selectedParent?.category ?? ''}
+                        taskText={newTaskText} />
                 </div>
             </div>
 
