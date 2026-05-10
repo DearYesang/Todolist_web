@@ -405,7 +405,7 @@
             {:else}
                 {#each ganttData.displayList as item (item.task.id)}
                     {@const coords = getCoords(item.task)}
-                    {@const color = getCategoryColor(item.task.category)}
+                    {@const color = getCategoryColor(item.task.category, item.task.categoryMeta?.color)}
                     <div class="gantt-row" style={`--gantt-row-height:${getRowHeight(item.task)}px;`}>
                         <div
                             class="gantt-bar-wrapper"

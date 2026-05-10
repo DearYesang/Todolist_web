@@ -1,12 +1,27 @@
 import { normalizeTask, normalizeTaskList } from '$lib/shared/task-domain.js';
+import { mapCategoryRowToClientCategory } from '$lib/server/categories/category-service.js';
 
 /**
  * @typedef {typeof import('$lib/server/db/schema.js').tasks.$inferSelect} TaskRow
+ * @typedef {typeof import('$lib/server/db/schema.js').categories.$inferSelect} CategoryRow
  * @typedef {typeof import('$lib/server/db/schema.js').checklistItems.$inferSelect} ChecklistItemRow
+ * @typedef {TaskRow & { categoryMeta?: import('$lib/shared/task-domain.js').TaskCategoryMeta | null }} TaskRowWithCategoryMeta
  */
 
 /**
- * @param {TaskRow[]} taskRows
+ * @param {TaskRow} taskRow
+ * @param {CategoryRow | null} categoryRow
+ * @returns {TaskRowWithCategoryMeta}
+ */
+export function attachCategoryMetaToTaskRow(taskRow, categoryRow) {
+	return {
+		...taskRow,
+		categoryMeta: categoryRow ? mapCategoryRowToClientCategory(categoryRow) : null
+	};
+}
+
+/**
+ * @param {TaskRowWithCategoryMeta[]} taskRows
  * @param {ChecklistItemRow[]} checklistRows
  * @returns {import('$lib/shared/task-domain.js').Task[]}
  */
@@ -17,7 +32,7 @@ export function mapTaskRowsToClientTasks(taskRows, checklistRows) {
 }
 
 /**
- * @param {TaskRow} taskRow
+ * @param {TaskRowWithCategoryMeta} taskRow
  * @param {ChecklistItemRow[]} checklistRows
  * @returns {import('$lib/shared/task-domain.js').Task}
  */
@@ -26,10 +41,11 @@ export function mapTaskRowToClientTask(taskRow, checklistRows = []) {
 }
 
 /**
- * @param {TaskRow} task
+ * @param {TaskRowWithCategoryMeta} task
  * @param {import('$lib/shared/task-domain.js').Subtask[]} subtasks
  */
 function mapTaskRowToRawTask(task, subtasks) {
+	const categoryMeta = task.categoryMeta ?? null;
 	return {
 		id: task.id,
 		text: task.title,
@@ -38,7 +54,9 @@ function mapTaskRowToRawTask(task, subtasks) {
 		endDate: task.endDate,
 		priority: task.priority,
 		urgency: task.urgency,
-		category: task.category,
+		category: categoryMeta?.name ?? task.category,
+		categoryId: task.categoryId ?? categoryMeta?.id ?? null,
+		categoryMeta,
 		parentId: task.parentTaskId,
 		subtasks,
 		collapsed: false,

@@ -35,6 +35,7 @@ export function parseCreateTaskInput(payload) {
 	const priority = parseEnum(source.priority, TASK_PRIORITIES, 'priority', 'medium');
 	const urgency = parseEnum(source.urgency, TASK_URGENCIES, 'urgency', 'normal');
 	const category = parseOptionalString(source.category, MAX_CATEGORY_LENGTH);
+	const categoryId = parseOptionalUuid(source.categoryId, 'categoryId');
 	const { startDate, endDate } = parseDateRange(source.startDate, source.endDate);
 	const parentId = parseOptionalUuid(source.parentId, 'parentId');
 
@@ -44,6 +45,7 @@ export function parseCreateTaskInput(payload) {
 		priority,
 		urgency,
 		category,
+		categoryId,
 		startDate,
 		endDate,
 		parentId
@@ -99,6 +101,11 @@ export function parseUpdateTaskInput(payload) {
 
 	if (hasField(source, 'category')) {
 		patch.category = parseOptionalString(source.category, MAX_CATEGORY_LENGTH);
+		hasTaskField = true;
+	}
+
+	if (hasField(source, 'categoryId')) {
+		patch.categoryId = parseOptionalUuid(source.categoryId, 'categoryId');
 		hasTaskField = true;
 	}
 

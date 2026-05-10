@@ -1,7 +1,12 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
+import {
+	findOrCreateCategoryRow,
+	getCategoryRowForBoard,
+	normalizeCategoryKey
+} from '$lib/server/categories/category-service.js';
 import { planTaskImport } from './import-planner.js';
-import { mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
+import { attachCategoryMetaToTaskRow, mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
 import {
 	assertValidTaskDateRange,
 	parseBoardPreferencesInput,
@@ -38,12 +43,17 @@ export async function listTasksForUser(userId) {
  */
 export async function listTasksForBoard(boardId) {
 	const db = getDb();
-	const taskRows = await db
-		.select()
+	const taskResults = await db
+		.select({
+			task: schema.tasks,
+			category: schema.categories
+		})
 		.from(schema.tasks)
+		.leftJoin(schema.categories, eq(schema.tasks.categoryId, schema.categories.id))
 		.where(and(eq(schema.tasks.boardId, boardId), isNull(schema.tasks.deletedAt)))
 		.orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
 
+	const taskRows = taskResults.map((row) => attachCategoryMetaToTaskRow(row.task, row.category));
 	if (taskRows.length === 0) {
 		return [];
 	}
@@ -104,6 +114,7 @@ export async function createTaskForUser(userId, payload) {
 	const db = getDb();
 	const input = parseCreateTaskInput(payload);
 	const board = await getOrCreatePersonalBoardForUser(db, userId);
+	const category = await resolveCategoryForTaskCreate(db, board.id, userId, input);
 	let status = input.status;
 	if (input.parentId) {
 		const parent = await getWritableParentTask(db, board.id, input.parentId);
@@ -123,7 +134,8 @@ export async function createTaskForUser(userId, payload) {
 			status,
 			priority: input.priority,
 			urgency: input.urgency,
-			category: input.category,
+			category: category?.name ?? '',
+			categoryId: category?.id ?? null,
 			startDate: input.startDate,
 			endDate: input.endDate,
 			position: createPositionValue(now),
@@ -140,7 +152,7 @@ export async function createTaskForUser(userId, payload) {
 		throw new TaskWriteError('Task could not be created.', 500);
 	}
 
-	return mapTaskRowToClientTask(created, []);
+	return mapTaskRowToClientTask(attachCategoryMetaToTaskRow(created, category), []);
 }
 
 /**
@@ -156,7 +168,8 @@ export async function importTasksForUser(userId, payload) {
 	const db = getDb();
 	const board = await getOrCreatePersonalBoardForUser(db, userId);
 	const now = new Date();
-	const taskValues = createImportTaskValues(plans, board.id, userId, now);
+	const categoriesByKey = await ensureCategoriesForImportPlans(db, board.id, userId, plans);
+	const taskValues = createImportTaskValues(plans, board.id, userId, now, categoriesByKey);
 	const checklistValues = createImportChecklistValues(plans, now);
 	const [createdTaskRows, createdChecklistRows = []] = await db.batch([
 		db
@@ -169,7 +182,7 @@ export async function importTasksForUser(userId, payload) {
 	]);
 
 	return {
-		tasks: mapTaskRowsToClientTasks(createdTaskRows, createdChecklistRows),
+		tasks: mapTaskRowsToClientTasks(attachImportCategoryRows(createdTaskRows, categoriesByKey), createdChecklistRows),
 		summary
 	};
 }
@@ -204,7 +217,8 @@ export async function replaceTasksForUser(userId, payload) {
 		};
 	}
 
-	const taskValues = createImportTaskValues(plans, board.id, userId, now);
+	const categoriesByKey = await ensureCategoriesForImportPlans(db, board.id, userId, plans);
+	const taskValues = createImportTaskValues(plans, board.id, userId, now, categoriesByKey);
 	const checklistValues = createImportChecklistValues(plans, now);
 	const [retiredRows, createdTaskRows, createdChecklistRows = []] = await db.batch([
 		retireExistingTasks,
@@ -218,7 +232,7 @@ export async function replaceTasksForUser(userId, payload) {
 	]);
 
 	return {
-		tasks: mapTaskRowsToClientTasks(createdTaskRows, createdChecklistRows),
+		tasks: mapTaskRowsToClientTasks(attachImportCategoryRows(createdTaskRows, categoriesByKey), createdChecklistRows),
 		summary: {
 			...summary,
 			replacedTasks: retiredRows.length
@@ -227,31 +241,71 @@ export async function replaceTasksForUser(userId, payload) {
 }
 
 /**
+ * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {string} boardId
+ * @param {string} userId
+ * @param {ReturnType<typeof planTaskImport>['plans']} plans
+ * @returns {Promise<Map<string, typeof schema.categories.$inferSelect>>}
+ */
+async function ensureCategoriesForImportPlans(db, boardId, userId, plans) {
+	/** @type {Map<string, typeof schema.categories.$inferSelect>} */
+	const categoriesByKey = new Map();
+	const categoryNames = [...new Set(plans
+		.map((plan) => plan.task.category)
+		.filter((category) => category.trim())
+		.map((category) => normalizeCategoryKey(category)))];
+
+	for (const key of categoryNames) {
+		const sourceName = plans.find((plan) => normalizeCategoryKey(plan.task.category) === key)?.task.category ?? key;
+		const category = await findOrCreateCategoryRow(db, { boardId, userId, name: sourceName });
+		if (category) {
+			categoriesByKey.set(key, category);
+		}
+	}
+
+	return categoriesByKey;
+}
+
+/**
+ * @param {(typeof schema.tasks.$inferSelect)[]} taskRows
+ * @param {Map<string, typeof schema.categories.$inferSelect>} categoriesByKey
+ */
+function attachImportCategoryRows(taskRows, categoriesByKey) {
+	const categoriesById = new Map([...categoriesByKey.values()].map((category) => [category.id, category]));
+	return taskRows.map((task) => attachCategoryMetaToTaskRow(task, task.categoryId ? categoriesById.get(task.categoryId) ?? null : null));
+}
+
+/**
  * @param {ReturnType<typeof planTaskImport>['plans']} plans
  * @param {string} boardId
  * @param {string} userId
  * @param {Date} now
+ * @param {Map<string, typeof schema.categories.$inferSelect>} categoriesByKey
  */
-function createImportTaskValues(plans, boardId, userId, now) {
-	return plans.map((plan, index) => ({
-		id: plan.id,
-		boardId,
-		parentTaskId: plan.parentTaskId,
-		title: plan.task.text.trim(),
-		status: plan.task.status,
-		priority: plan.task.priority,
-		urgency: plan.task.urgency,
-		category: plan.task.category,
-		startDate: plan.task.startDate,
-		endDate: plan.task.endDate,
-		position: createPositionValue(now, index),
-		version: 1,
-		createdBy: userId,
-		createdAt: new Date(plan.task.createdAt),
-		updatedAt: now,
-		completedAt: plan.task.status === 'done' ? now : null,
-		deletedAt: null
-	}));
+function createImportTaskValues(plans, boardId, userId, now, categoriesByKey) {
+	return plans.map((plan, index) => {
+		const category = categoriesByKey.get(normalizeCategoryKey(plan.task.category));
+		return {
+			id: plan.id,
+			boardId,
+			parentTaskId: plan.parentTaskId,
+			title: plan.task.text.trim(),
+			status: plan.task.status,
+			priority: plan.task.priority,
+			urgency: plan.task.urgency,
+			category: category?.name ?? '',
+			categoryId: category?.id ?? null,
+			startDate: plan.task.startDate,
+			endDate: plan.task.endDate,
+			position: createPositionValue(now, index),
+			version: 1,
+			createdBy: userId,
+			createdAt: new Date(plan.task.createdAt),
+			updatedAt: now,
+			completedAt: plan.task.status === 'done' ? now : null,
+			deletedAt: null
+		};
+	});
 }
 
 /**
@@ -282,6 +336,55 @@ function mapBoardPreferences(board) {
 }
 
 /**
+ * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {string} boardId
+ * @param {string} userId
+ * @param {ReturnType<typeof parseCreateTaskInput>} input
+ */
+async function resolveCategoryForTaskCreate(db, boardId, userId, input) {
+	if (input.categoryId) {
+		const category = await getCategoryRowForBoard(db, boardId, input.categoryId);
+		if (!category) {
+			throw new TaskWriteError('Category was not found on this board.');
+		}
+		return category;
+	}
+
+	return findOrCreateCategoryRow(db, {
+		boardId,
+		userId,
+		name: input.category
+	});
+}
+
+/**
+ * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {string} boardId
+ * @param {string} userId
+ * @param {ReturnType<typeof parseUpdateTaskInput>} input
+ */
+async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
+	if (hasField(input, 'categoryId')) {
+		if (typeof input.categoryId !== 'string') {
+			return { id: null, name: '' };
+		}
+
+		const category = await getCategoryRowForBoard(db, boardId, input.categoryId);
+		if (!category) {
+			throw new TaskWriteError('Category was not found on this board.');
+		}
+		return category;
+	}
+
+	const category = await findOrCreateCategoryRow(db, {
+		boardId,
+		userId,
+		name: typeof input.category === 'string' ? input.category : ''
+	});
+	return category ?? { id: null, name: '' };
+}
+
+/**
  * @param {string} userId
  * @param {unknown} taskId
  * @param {unknown} payload
@@ -297,9 +400,14 @@ export async function updateTaskForUser(userId, taskId, payload) {
 	const expectedVersion = typeof input.expectedVersion === 'number' ? input.expectedVersion : null;
 
 	const hasParentPatch = hasField(input, 'parentId');
+	const hasCategoryIdPatch = hasField(input, 'categoryId');
+	const hasCategoryNamePatch = hasField(input, 'category');
 	const nextStartDate = typeof input.startDate === 'string' ? input.startDate : existing.startDate;
 	const nextEndDate = typeof input.endDate === 'string' ? input.endDate : existing.endDate;
 	assertValidTaskDateRange(nextStartDate, nextEndDate);
+	const nextCategory = hasCategoryIdPatch || hasCategoryNamePatch
+		? await resolveCategoryForTaskPatch(db, existing.boardId, userId, input)
+		: { id: existing.categoryId, name: existing.category };
 
 	let nextStatus = typeof input.status === 'string' ? input.status : existing.status;
 	let nextParentTaskId = hasParentPatch
@@ -327,7 +435,8 @@ export async function updateTaskForUser(userId, taskId, payload) {
 			status: nextStatus,
 			priority: typeof input.priority === 'string' ? input.priority : existing.priority,
 			urgency: typeof input.urgency === 'string' ? input.urgency : existing.urgency,
-			category: typeof input.category === 'string' ? input.category : existing.category,
+			category: nextCategory.name,
+			categoryId: nextCategory.id,
 			startDate: nextStartDate,
 			endDate: nextEndDate,
 			parentTaskId: nextParentTaskId,
@@ -351,7 +460,8 @@ export async function updateTaskForUser(userId, taskId, payload) {
 	}
 
 	const checklistRows = await getChecklistRowsForTask(db, updated.id);
-	return mapTaskRowToClientTask(updated, checklistRows);
+	const categoryRow = updated.categoryId ? await getCategoryRowForBoard(db, updated.boardId, updated.categoryId, { includeArchived: true }) : null;
+	return mapTaskRowToClientTask(attachCategoryMetaToTaskRow(updated, categoryRow), checklistRows);
 }
 
 /**

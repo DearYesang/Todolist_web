@@ -71,6 +71,13 @@
       "when": 1777971871347,
       "tag": "0009_melted_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778408789757,
+      "tag": "0010_black_molten_man",
+      "breakpoints": true
     }
   ]
 }

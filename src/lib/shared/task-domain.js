@@ -13,6 +13,15 @@
  *
  * @typedef {{
  *   id: string;
+ *   name: string;
+ *   color: string | null;
+ *   sortOrder: number;
+ *   hiddenAt: string | null;
+ *   archivedAt: string | null;
+ * }} TaskCategoryMeta
+ *
+ * @typedef {{
+ *   id: string;
  *   text: string;
  *   status: TaskStatus;
  *   startDate: string;
@@ -20,6 +29,8 @@
  *   priority: TaskPriority;
  *   urgency: TaskUrgency;
  *   category: string;
+ *   categoryId?: string | null;
+ *   categoryMeta?: TaskCategoryMeta | null;
  *   parentId: string | null;
  *   subtasks: Subtask[];
  *   collapsed: boolean;
@@ -31,6 +42,7 @@
  *   priority: PriorityFilter;
  *   urgency: UrgencyFilter;
  *   category: string;
+ *   categoryId: string;
  * }} TaskFilters
  */
 
@@ -42,7 +54,8 @@ const MAX_TASK_SPAN_DAYS = 3650;
 export const DEFAULT_FILTERS = Object.freeze({
     priority: 'all',
     urgency: 'all',
-    category: 'all'
+    category: 'all',
+    categoryId: 'all'
 });
 
 export const STATUS_LABELS = {
@@ -239,6 +252,9 @@ export function normalizeTask(raw) {
     const source = /** @type {Record<string, unknown> | null | undefined} */ (raw);
     const subtasksRaw = Array.isArray(source?.subtasks) ? source.subtasks : [];
     const { startDate, endDate } = normalizeDateRange(source?.startDate, source?.endDate);
+    const categoryMeta = normalizeCategoryMeta(source?.categoryMeta);
+    const rawCategory = typeof source?.category === 'string' ? source.category.trim() : '';
+    const category = categoryMeta?.name ?? rawCategory;
     const version = parseTaskVersion(source?.version);
     const priority = isTaskPriority(source?.priority)
         ? source.priority
@@ -258,13 +274,44 @@ export function normalizeTask(raw) {
         endDate,
         priority,
         urgency,
-        category: typeof source?.category === 'string' ? source.category.trim() : '',
+        category,
+        categoryId: parseNullableId(source?.categoryId) ?? categoryMeta?.id ?? null,
+        categoryMeta,
         parentId: typeof source?.parentId === 'string' && source.parentId ? source.parentId : null,
         subtasks: normalizeSubtasks(subtasksRaw),
         collapsed: Boolean(source?.collapsed),
         createdAt: typeof source?.createdAt === 'number' && Number.isFinite(source.createdAt) ? source.createdAt : Date.now(),
         ...(version === null ? {} : { version })
     };
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {TaskCategoryMeta | null}
+ */
+function normalizeCategoryMeta(raw) {
+    const source = /** @type {Record<string, unknown> | null | undefined} */ (raw);
+    const id = parseNullableId(source?.id);
+    const name = typeof source?.name === 'string' ? source.name.trim() : '';
+    if (!id || !name) {
+        return null;
+    }
+
+    return {
+        id,
+        name,
+        color: typeof source?.color === 'string' && source.color.trim() ? source.color.trim() : null,
+        sortOrder: typeof source?.sortOrder === 'number' && Number.isFinite(source.sortOrder) ? source.sortOrder : 0,
+        hiddenAt: typeof source?.hiddenAt === 'string' && source.hiddenAt ? source.hiddenAt : null,
+        archivedAt: typeof source?.archivedAt === 'string' && source.archivedAt ? source.archivedAt : null
+    };
+}
+
+/**
+ * @param {unknown} value
+ */
+function parseNullableId(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 /**
@@ -355,8 +402,17 @@ export function normalizeTaskList(rawTasks) {
 
 /**
  * @param {string} category
+ * @param {string | null | undefined} [customColor]
  */
-export function getCategoryColor(category) {
+export function getCategoryColor(category, customColor = null) {
+    if (isHexColor(customColor)) {
+        return {
+            bg: hexToRgba(customColor, 0.15),
+            fg: customColor,
+            border: customColor
+        };
+    }
+
     if (!category) {
         return { bg: 'rgba(110, 118, 129, 0.1)', fg: '#8b949e', border: '#30363d' };
     }
@@ -370,12 +426,33 @@ export function getCategoryColor(category) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is string}
+ */
+function isHexColor(value) {
+    return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+/**
+ * @param {string} hex
+ * @param {number} alpha
+ */
+function hexToRgba(hex, alpha) {
+    const value = hex.replace('#', '');
+    const red = Number.parseInt(value.slice(0, 2), 16);
+    const green = Number.parseInt(value.slice(2, 4), 16);
+    const blue = Number.parseInt(value.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+/**
  * @param {Task} task
  * @param {TaskFilters} activeFilters
  */
 export function matchesFilters(task, activeFilters) {
     if (activeFilters.priority !== 'all' && task.priority !== activeFilters.priority) return false;
     if (activeFilters.urgency !== 'all' && task.urgency !== activeFilters.urgency) return false;
+    if (activeFilters.categoryId && activeFilters.categoryId !== 'all') return task.categoryId === activeFilters.categoryId;
     if (activeFilters.category !== 'all' && task.category !== activeFilters.category) return false;
     return true;
 }

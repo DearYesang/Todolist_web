@@ -1,10 +1,10 @@
 <script>
     import {
-        categorySummaries,
         filters,
         setCategoryFilter,
         setPriorityFilter,
-        setUrgencyFilter
+        setUrgencyFilter,
+        visibleCategorySummaries
     } from '$lib/client/task-store.js';
     import { getCategoryColor } from '$lib/shared/task-domain.js';
     import CategoryManager from './CategoryManager.svelte';
@@ -63,13 +63,13 @@
         전체
     </button>
 
-    {#each $categorySummaries as category}
-        {@const color = getCategoryColor(category.name)}
+    {#each $visibleCategorySummaries as category}
+        {@const color = getCategoryColor(category.name, category.color)}
         <button
             class="filter-chip category-chip"
-            class:active={$filters.category === category.name}
-            onclick={() => setCategoryFilter(category.name)}
-            style={$filters.category === category.name ? `background:${color.bg}; color:${color.fg}; border-color:${color.border};` : ''}>
+            class:active={category.id ? $filters.categoryId === category.id : $filters.category === category.name}
+            onclick={() => setCategoryFilter(category.id ?? category.name, category.name)}
+            style={(category.id ? $filters.categoryId === category.id : $filters.category === category.name) ? `background:${color.bg}; color:${color.fg}; border-color:${color.border};` : ''}>
             <span>{category.name}</span>
             <small>{category.active}</small>
         </button>

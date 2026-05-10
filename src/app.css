@@ -1372,6 +1372,26 @@ select {
     border-radius: 999px;
 }
 
+.category-color-input {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.category-color-input::-webkit-color-swatch-wrapper {
+    padding: 3px;
+}
+
+.category-color-input::-webkit-color-swatch {
+    border: 0;
+    border-radius: 999px;
+}
+
 .category-manager-name {
     display: grid;
     gap: 2px;

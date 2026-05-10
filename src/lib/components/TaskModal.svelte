@@ -12,7 +12,7 @@
     const task = $derived($tasks.find((candidate) => candidate.id === taskId) || null);
     const parentTask = $derived(task?.parentId ? $tasks.find((candidate) => candidate.id === task.parentId) || null : null);
     const childCount = $derived(task ? $tasks.filter((candidate) => candidate.parentId === task.id).length : 0);
-    const categoryColor = $derived(task ? getCategoryColor(task.category) : null);
+    const categoryColor = $derived(task ? getCategoryColor(task.category, task.categoryMeta?.color) : null);
 
     $effect(() => {
         if (task && categoryDraft !== task.category) {
