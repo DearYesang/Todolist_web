@@ -63,6 +63,25 @@ unique (workspace_id, name)
 
 Authenticated clients persist the selected Kanban/Gantt/Eisenhower view to `boards.default_view`, while `localStorage` remains the offline and logged-out fallback.
 
+### categories
+
+```txt
+id uuid primary key
+board_id uuid not null references boards(id) on delete cascade
+user_id text not null references user(id) on delete cascade
+name text not null
+normalized_name text not null
+color text
+sort_order integer not null default 0
+hidden_at timestamptz
+archived_at timestamptz
+created_at timestamptz not null default now()
+updated_at timestamptz not null default now()
+unique (board_id, normalized_name)
+```
+
+Categories are first-class board rows. `name` is the display value, `normalized_name` is the merge/uniqueness key, `color` is an optional `#RRGGBB` value, `sort_order` controls UI ordering, and `hidden_at`/`archived_at` let the app hide a category without deleting task history.
+
 ### tasks
 
 ```txt
@@ -74,6 +93,7 @@ status text not null check (status in ('todo', 'doing', 'done'))
 priority text not null check (priority in ('high', 'medium', 'low'))
 urgency text not null check (urgency in ('urgent', 'normal'))
 category text not null default ''
+category_id uuid references categories(id) on delete set null
 start_date date not null
 end_date date not null
 position numeric(20, 10) not null default 0
@@ -87,6 +107,8 @@ check (parent_task_id is null or parent_task_id <> id)
 ```
 
 Cycle prevention should start in the service layer. Add a Postgres trigger later if collaborative editing makes defense in depth necessary.
+
+`tasks.category_id` is the canonical server relation. `tasks.category` remains as a denormalized compatibility/display field so old JSON exports stay readable and imports can still recover category names.
 
 ### checklist_items
 
@@ -187,10 +209,15 @@ workspace_members(user_id)
 workspaces(owner_user_id, name) unique
 boards(workspace_id)
 boards(workspace_id, name) unique
+categories(user_id)
+categories(board_id, sort_order)
+categories(board_id, archived_at)
+categories(board_id, normalized_name) unique
 tasks(board_id, status, position)
 tasks(board_id, start_date, end_date)
 tasks(parent_task_id)
 tasks(board_id, category)
+tasks(board_id, category_id)
 tasks(board_id, deleted_at)
 checklist_items(task_id, position)
 calendar_connections(workspace_id, provider)
@@ -225,6 +252,7 @@ For now, keep exporting the current JSON shape. That keeps user backups portable
 - Personal `Personal` workspace and `Inbox` board provisioning for first authenticated task creation.
 - Authenticated task list/create/update/soft-delete cascade.
 - Authenticated checklist create/update/delete.
+- Authenticated category list/create/rename/merge/delete/color/sort/hide with task backfill through `tasks.category_id`.
 - Partial task response merge policy that preserves valid parent links during checklist sync.
 - Authenticated read-only `/api/calendar.ics` download backed by server tasks.
 - Revocable token-based `/api/calendar/subscriptions/[token].ics` feed backed by token hashes.

@@ -56,7 +56,7 @@
         const parent = allTasks.find((candidate) => candidate.id === task.parentId) || null;
         return parent && parent.status !== task.status ? parent : null;
     });
-    const categoryColor = $derived(getCategoryColor(task.category));
+    const categoryColor = $derived(getCategoryColor(task.category, task.categoryMeta?.color));
     const completedSubtasks = $derived(task.subtasks.filter((subtask) => subtask.done).length);
     const subtaskProgress = $derived(task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100));
 

@@ -180,6 +180,32 @@ export const boards = pgTable(
 	]
 );
 
+export const categories = pgTable(
+	'categories',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		boardId: uuid('board_id')
+			.notNull()
+			.references(() => boards.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		normalizedName: text('normalized_name').notNull(),
+		color: text('color'),
+		sortOrder: integer('sort_order').notNull().default(0),
+		hiddenAt: timestamp('hidden_at', { withTimezone: true }),
+		archivedAt: timestamp('archived_at', { withTimezone: true }),
+		...timestamps()
+	},
+	(table) => [
+		index('categories_user_id_idx').on(table.userId),
+		index('categories_board_sort_order_idx').on(table.boardId, table.sortOrder),
+		index('categories_board_archived_at_idx').on(table.boardId, table.archivedAt),
+		uniqueIndex('categories_board_normalized_name_uidx').on(table.boardId, table.normalizedName)
+	]
+);
+
 export const tasks = pgTable(
 	'tasks',
 	{
@@ -193,6 +219,7 @@ export const tasks = pgTable(
 		priority: text('priority').notNull(),
 		urgency: text('urgency').notNull(),
 		category: text('category').notNull().default(''),
+		categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
 		startDate: date('start_date').notNull(),
 		endDate: date('end_date').notNull(),
 		position: numeric('position', { precision: 20, scale: 10 }).notNull().default('0'),
@@ -208,6 +235,7 @@ export const tasks = pgTable(
 		index('tasks_board_date_range_idx').on(table.boardId, table.startDate, table.endDate),
 		index('tasks_parent_task_id_idx').on(table.parentTaskId),
 		index('tasks_board_category_idx').on(table.boardId, table.category),
+		index('tasks_board_category_id_idx').on(table.boardId, table.categoryId),
 		index('tasks_board_deleted_at_idx').on(table.boardId, table.deletedAt),
 		foreignKey({
 			columns: [table.parentTaskId],

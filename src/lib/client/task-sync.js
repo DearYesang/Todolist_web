@@ -1,6 +1,8 @@
 import { getBoardPreferences, listServerTasks } from './task-api.js';
+import { listServerCategories } from './category-api.js';
 import { flushOfflineWriteQueue } from './offline-write-queue.js';
 import {
+	applyServerCategoryCatalog,
 	applyServerDefaultView,
 	applyServerTaskSnapshot,
 	mergeTasks,
@@ -40,6 +42,10 @@ export async function syncServerTasks(fetcher = globalThis.fetch) {
 	const result = await listServerTasks(fetcher);
 	if (result.ok) {
 		applyServerTaskSnapshot(result.tasks);
+		const categories = await listServerCategories(fetcher);
+		if (categories.ok) {
+			applyServerCategoryCatalog(categories.categories);
+		}
 		const preferences = await getBoardPreferences(fetcher);
 		if (preferences.ok) {
 			applyServerDefaultView(preferences.defaultView);

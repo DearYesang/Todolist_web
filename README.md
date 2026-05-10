@@ -11,7 +11,7 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 - Task hierarchy: 상위/하위 작업, 접기/펼치기, cascade delete
 - Checklist: 작업별 체크리스트, 진행률, URL 링크 표시
 - Date range picker: 작업 추가와 상세 수정에서 월간 캘린더로 시작일/마감일 선택
-- Filters and categories: 중요도, 시급성, 카테고리 필터, 카테고리 이름 변경/병합/삭제, 작업 입력 중 규칙 기반 카테고리 추천
+- Filters and categories: 중요도, 시급성, 카테고리 필터, DB-backed 카테고리 이름 변경/병합/삭제, 색상/정렬/숨김, 작업 입력 중 규칙 기반 카테고리 추천
 - Backup: `kanban_backup_YYYY-MM-DD.json` 내보내기/불러오기
 - Calendar integration: 전체 일정 동기화용 `.ics` 링크, 작업별 all-day `.ics` 다운로드, 로그인 세션용 `/api/calendar.ics` 제공
 - Responsive PWA UI: iPhone-sized screens use compact header actions and touch-oriented add/detail sheets; iPad-sized screens keep a small-desktop layout
@@ -111,12 +111,23 @@ The current local backup format is an array of tasks. Import also accepts wrappe
   priority: 'high' | 'medium' | 'low',
   urgency: 'urgent' | 'normal',
   category: string,
+  categoryId: string | null,
+  categoryMeta: {
+    id: string,
+    name: string,
+    color: string | null,
+    sortOrder: number,
+    hiddenAt: string | null,
+    archivedAt: string | null
+  } | null,
   parentId: string | null,
   subtasks: [{ id: string, text: string, done: boolean }],
   collapsed: boolean,
   createdAt: number
 }
 ```
+
+Server sync stores categories as first-class rows in `categories` and links tasks through `tasks.category_id`. The legacy `category` text field is intentionally kept in task payloads and backups so old JSON exports remain importable and manually readable.
 
 Imported data is normalized before it reaches the app store:
 
@@ -132,6 +143,7 @@ The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persis
 ## Current Limits
 
 - Email verification delivery uses Resend or `EMAIL_DELIVERY_WEBHOOK_URL` in production; preview codes are local-development only and are blocked by production config checks.
+- Category entity v2 adds a database migration for `categories` and `tasks.category_id`; run the committed Drizzle migration before promoting this branch to production.
 - JSON import/export supports authenticated append and replace import/export. Replace import runs through Neon HTTP `batch()` so existing-task retirement and new inserts are all-or-nothing.
 - Google/Microsoft calendar provider sync routes remain available for later, but the visible calendar workflow is currently `.ics`-first: whole-board sync links and per-task `.ics` downloads. Provider webhooks and recurring events are still future work.
 - Offline writes and offline JSON imports are queued per user and retried. `409` conflicts are detected, dropped from retry, surfaced with reviewable conflict details, and can be exported as JSON. Task update/delete conflicts can be replayed locally or dismissed in favor of the server; checklist/import conflict merge remains intentionally conservative.
