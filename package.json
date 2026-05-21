@@ -23,7 +23,7 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@sveltejs/adapter-vercel": "^6.3.3",
-    "@sveltejs/kit": "^2.59.1",
+    "@sveltejs/kit": "^2.60.1",
     "@types/node": "^25.6.0",
     "drizzle-kit": "^0.31.10",
     "svelte": "^5.55.5",
