@@ -394,6 +394,45 @@ describe('offline write queue conflict behavior', () => {
 		}));
 	});
 
+	it('keeps the checked state of an offline create whose follow-up patch was throttled', async () => {
+		const taskId = '55555555-5555-4555-8555-555555555555';
+		const serverItemId = '66666666-6666-4666-8666-666666666666';
+		const createdTask = normalizeTask({
+			id: taskId,
+			text: 'Task',
+			subtasks: [{ id: serverItemId, text: 'Checked offline', done: false }]
+		});
+
+		enqueueOfflineMutation({
+			type: 'checklist.create',
+			taskId,
+			localItemId: 'local-checklist',
+			text: 'Checked offline',
+			done: true
+		});
+
+		const fetcher = vi.fn()
+			.mockResolvedValueOnce(new Response(JSON.stringify({ task: createdTask }), {
+				status: 201,
+				headers: { 'content-type': 'application/json' }
+			}))
+			.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Too many task changes.' }), {
+				status: 429,
+				headers: { 'content-type': 'application/json', 'retry-after': '30' }
+			}));
+
+		const result = await flushOfflineWriteQueue(fetcher);
+
+		// The item landed, but the checked state must stay queued for retry.
+		expect(result).toMatchObject({ flushed: 1, remaining: 1, blocked: false });
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			type: 'checklist.patch',
+			taskId,
+			itemId: serverItemId,
+			patch: { done: true }
+		});
+	});
+
 	it('drops a pending checklist create when the local item is deleted before sync', () => {
 		const taskId = '77777777-7777-4777-8777-777777777777';
 		const localItemId = 'local-checklist';
