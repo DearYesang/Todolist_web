@@ -1039,6 +1039,20 @@ function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null) 
 }
 
 /**
+ * Test-only: clears all per-task sync bookkeeping so a test that leaves an
+ * unsettled request behind cannot wedge every later test in the same file.
+ * Already-started ops keep running but detach from fresh state.
+ */
+export function resetTaskSyncStateForTests() {
+    taskSyncChains.clear();
+    queuedSnapshotSyncs.clear();
+    resolvedChecklistItemIds.clear();
+    chainedChecklistItemsByTask.clear();
+    latestServerVersions.clear();
+    pendingChainOpDescriptors.clear();
+}
+
+/**
  * Moves every queued-but-unstarted chain op into the durable offline queue.
  * Call on pagehide and before programmatic reloads: in-flight requests may
  * still land, but nothing queued behind them is lost with the page.

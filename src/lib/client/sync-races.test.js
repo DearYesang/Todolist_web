@@ -10,6 +10,7 @@ import {
 	mergeTasks,
 	renameSubtask,
 	replaceTasks,
+	resetTaskSyncStateForTests,
 	setTaskStorageOwner,
 	tasks,
 	updateTask,
@@ -78,7 +79,13 @@ describe('sync race conditions', () => {
 	});
 
 	afterEach(async () => {
-		await waitForPendingTaskSyncs();
+		// A failing test can leave an unsettled request in a chain; cap the
+		// wait and force-reset so one failure cannot wedge the whole file.
+		await Promise.race([
+			waitForPendingTaskSyncs(),
+			new Promise((resolve) => setTimeout(resolve, 500))
+		]);
+		resetTaskSyncStateForTests();
 		replaceTasks([]);
 		setTaskStorageOwner(null);
 		setOfflineQueueOwner(null);
@@ -207,6 +214,14 @@ describe('sync race conditions', () => {
 		mergeTasks([{ id: SERVER_TASK_ID, text: 'Ghost', version: 2 }], { insertMissing: false });
 
 		expect(get(tasks)).toEqual([]);
+	});
+
+	it('preserves local collapse state when merging server responses', () => {
+		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'One', version: 3, collapsed: true })]);
+
+		mergeTasks([{ id: SERVER_TASK_ID, text: 'Two', version: 4, collapsed: false }]);
+
+		expect(get(tasks)[0]).toMatchObject({ text: 'Two', version: 4, collapsed: true });
 	});
 
 	it('blocks a second overlapping flush instead of double-executing creates', async () => {
