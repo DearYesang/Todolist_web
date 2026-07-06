@@ -13,7 +13,7 @@ import {
     updateServerCategory
 } from './category-api.js';
 import { isServerTaskId } from './task-create.js';
-import { enqueueOfflineMutation } from './offline-write-queue.js';
+import { enqueueOfflineMutation, loadOfflineQueue } from './offline-write-queue.js';
 import {
     addSubtaskToList,
     assignParentInList,
@@ -1188,11 +1188,16 @@ function scheduleTaskSnapshotSync(taskId) {
             return null;
         }
 
+        const knownVersion = latestServerVersions.get(taskId);
         return {
             type: 'task.patch',
             taskId,
             localParentId: getLocalParentId(current),
-            patch: toServerTaskPatch(current)
+            patch: toServerTaskPatch(
+                typeof knownVersion === 'number' && (typeof current.version !== 'number' || knownVersion > current.version)
+                    ? { ...current, version: knownVersion }
+                    : current
+            )
         };
     });
 }
@@ -1395,12 +1400,7 @@ function syncChecklistPatch(taskId, subtaskId, patch) {
             itemId,
             patch
         });
-    }, () => ({
-        type: 'checklist.patch',
-        taskId,
-        itemId: resolvedChecklistItemIds.get(subtaskId) ?? subtaskId,
-        patch
-    }));
+    }, () => buildChecklistDrainMutation(taskId, subtaskId, patch));
 }
 
 /**
@@ -1443,11 +1443,60 @@ function syncChecklistDelete(taskId, subtaskId) {
             taskId,
             itemId
         });
-    }, () => ({
-        type: 'checklist.delete',
+    }, () => buildChecklistDrainMutation(taskId, subtaskId, null));
+}
+
+/**
+ * Drain builder for a chained checklist edit. When the item's create is still
+ * in flight at page unload, a patch/delete drained under the local id would be
+ * silently discarded by the queue's coalescing (no pending create to merge
+ * into). Re-create the item with its final local state instead — worst case a
+ * visible duplicate if the aborted POST also landed, which beats a silent drop.
+ * @param {string} taskId
+ * @param {string} subtaskId
+ * @param {{ text?: string; done?: boolean } | null} patch null means delete
+ * @returns {import('./offline-write-queue.js').OfflineMutationInput | null}
+ */
+function buildChecklistDrainMutation(taskId, subtaskId, patch) {
+    const itemId = isServerTaskId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
+    if (itemId) {
+        return patch
+            ? { type: 'checklist.patch', taskId, itemId, patch }
+            : { type: 'checklist.delete', taskId, itemId };
+    }
+
+    const hasQueuedCreate = loadOfflineQueue().some((mutation) =>
+        mutation.type === 'checklist.create'
+        && mutation.taskId === taskId
+        && mutation.localItemId === subtaskId
+    );
+    if (hasQueuedCreate) {
+        // Coalesces into (patch) or cancels out (delete) the queued create.
+        return patch
+            ? { type: 'checklist.patch', taskId, itemId: subtaskId, patch }
+            : { type: 'checklist.delete', taskId, itemId: subtaskId };
+    }
+
+    if (!patch) {
+        // The create never reached the queue or (likely) the server; there is
+        // nothing durable to delete.
+        return null;
+    }
+
+    const item = get(tasks)
+        .find((task) => task.id === taskId)?.subtasks
+        .find((subtask) => subtask.id === subtaskId);
+    if (!item) {
+        return null;
+    }
+
+    return {
+        type: 'checklist.create',
         taskId,
-        itemId: resolvedChecklistItemIds.get(subtaskId) ?? subtaskId
-    }));
+        localItemId: subtaskId,
+        text: item.text,
+        ...(item.done ? { done: true } : {})
+    };
 }
 
 /**

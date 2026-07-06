@@ -4,6 +4,7 @@ import { normalizeTask } from '../shared/task-domain.js';
 import {
 	addSubtask,
 	applyServerTaskSnapshot,
+	deleteSubtask,
 	deleteTaskCascade,
 	drainPendingTaskSyncsToOfflineQueue,
 	handleExternalTaskStorageEvent,
@@ -521,6 +522,94 @@ describe('sync race conditions', () => {
 		await waitForPendingTaskSyncs();
 		// The drained op must not fire its own request after the page survives.
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('drains an edit to a checklist item whose create is in flight as a re-create with final state', async () => {
+		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
+		const deferred = createDeferred();
+		Object.defineProperty(globalThis, 'fetch', {
+			configurable: true,
+			value: vi.fn(() => deferred.promise)
+		});
+
+		addSubtask(SERVER_TASK_ID, 'First');
+		await settleMicrotasks();
+		const localItemId = get(tasks)[0]?.subtasks[0]?.id;
+		// Rename and complete the item while its create POST is still in flight.
+		renameSubtask(SERVER_TASK_ID, /** @type {string} */ (localItemId), 'Renamed');
+
+		drainPendingTaskSyncsToOfflineQueue();
+
+		// A checklist.patch under the local id would be silently coalesced away;
+		// the drain must persist the edit as a create carrying the final state.
+		expect(loadOfflineQueue()).toHaveLength(1);
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			type: 'checklist.create',
+			taskId: SERVER_TASK_ID,
+			localItemId,
+			text: 'Renamed'
+		});
+
+		deferred.resolve(jsonResponse({
+			task: {
+				id: SERVER_TASK_ID,
+				text: 'Task',
+				version: 2,
+				subtasks: [{ id: '22222222-2222-4222-8222-222222222222', text: 'First', done: false }]
+			}
+		}, 201));
+		await waitForPendingTaskSyncs();
+	});
+
+	it('coalesces a drained rename into a drained create instead of duplicating the item', async () => {
+		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'One', version: 1 })]);
+		const deferred = createDeferred();
+		Object.defineProperty(globalThis, 'fetch', {
+			configurable: true,
+			value: vi.fn(() => deferred.promise)
+		});
+
+		// Occupy the chain so the checklist ops stay queued-but-unstarted.
+		updateTask(SERVER_TASK_ID, { text: 'Two' });
+		await settleMicrotasks();
+		addSubtask(SERVER_TASK_ID, 'First');
+		const localItemId = get(tasks)[0]?.subtasks[0]?.id;
+		renameSubtask(SERVER_TASK_ID, /** @type {string} */ (localItemId), 'Renamed');
+
+		drainPendingTaskSyncsToOfflineQueue();
+
+		const queue = loadOfflineQueue();
+		expect(queue.filter((mutation) => mutation.type === 'checklist.create')).toHaveLength(1);
+		expect(queue.find((mutation) => mutation.type === 'checklist.create')).toMatchObject({
+			localItemId,
+			text: 'Renamed'
+		});
+
+		deferred.resolve(jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Two', version: 2 } }));
+		await waitForPendingTaskSyncs();
+	});
+
+	it('drains a delete of a never-created checklist item as a no-op', async () => {
+		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
+		const deferred = createDeferred();
+		Object.defineProperty(globalThis, 'fetch', {
+			configurable: true,
+			value: vi.fn(() => deferred.promise)
+		});
+
+		addSubtask(SERVER_TASK_ID, 'Ephemeral');
+		await settleMicrotasks();
+		const localItemId = get(tasks)[0]?.subtasks[0]?.id;
+		deleteSubtask(SERVER_TASK_ID, /** @type {string} */ (localItemId));
+
+		drainPendingTaskSyncsToOfflineQueue();
+
+		expect(loadOfflineQueue()).toEqual([]);
+
+		deferred.resolve(jsonResponse({
+			task: { id: SERVER_TASK_ID, text: 'Task', version: 2, subtasks: [] }
+		}, 201));
+		await waitForPendingTaskSyncs();
 	});
 
 	it('reports blocked without executing when the flush lock is held (fallback path)', async () => {
