@@ -22,9 +22,11 @@
         markPendingDefaultView,
         readPendingDefaultView,
         replaceTasks,
+        drainPendingTaskSyncsToOfflineQueue,
         resetFilters,
         setCurrentView,
         setTaskStorageOwner,
+        setupCrossTabTaskSync,
         tasks,
         updateTask
     } from '$lib/client/task-store.js';
@@ -85,16 +87,27 @@
 
     onMount(() => {
         isOnline = navigator.onLine;
-        if (!navigator.onLine && cachedAuthScope?.id) {
+        // Scope storage to the cached owner immediately: mutations made before
+        // the session resolves must not be stamped with the anonymous owner,
+        // or they become invisible once the user scope applies.
+        if (cachedAuthScope?.id) {
             applyStorageScope(cachedAuthScope.id);
         }
+
+        const teardownCrossTabSync = setupCrossTabTaskSync(window);
 
         let reloadedForServiceWorkerUpdate = false;
         const handleServiceWorkerUpdate = () => {
             if (reloadedForServiceWorkerUpdate) return;
             reloadedForServiceWorkerUpdate = true;
+            // Queued-but-unsent writes must survive this programmatic reload.
+            drainPendingTaskSyncsToOfflineQueue();
             window.location.reload();
         };
+        const handlePageHide = () => {
+            drainPendingTaskSyncsToOfflineQueue();
+        };
+        window.addEventListener('pagehide', handlePageHide);
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.ready
@@ -116,6 +129,8 @@
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
         return () => {
+            teardownCrossTabSync();
+            window.removeEventListener('pagehide', handlePageHide);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
             navigator.serviceWorker?.removeEventListener('controllerchange', handleServiceWorkerUpdate);
