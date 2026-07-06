@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
+import { enforceImportRateLimit } from '$lib/server/tasks/rate-limit-guard.js';
 import { importTasksForUser, replaceTasksForUser } from '$lib/server/tasks/repository.js';
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 
@@ -10,6 +11,11 @@ export async function POST({ request, url }) {
 	const authResult = await requireAuthUser(request);
 	if (!authResult.ok) {
 		return authResult.response;
+	}
+
+	const limited = await enforceImportRateLimit(authResult.user.id);
+	if (limited) {
+		return limited;
 	}
 
 	let payload;
