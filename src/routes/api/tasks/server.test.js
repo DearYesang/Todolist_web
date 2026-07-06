@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuthUser } from '$lib/server/auth/session.js';
+import { enforceTaskWriteRateLimit } from '$lib/server/tasks/rate-limit-guard.js';
 import { createTaskForUser, listTasksForUser } from '$lib/server/tasks/repository.js';
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 import { normalizeTask } from '$lib/shared/task-domain.js';
@@ -7,6 +8,10 @@ import { GET, POST } from './+server.js';
 
 vi.mock('$lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
+}));
+
+vi.mock('$lib/server/tasks/rate-limit-guard.js', () => ({
+	enforceTaskWriteRateLimit: vi.fn()
 }));
 
 vi.mock('$lib/server/tasks/repository.js', () => ({
@@ -22,6 +27,7 @@ describe('/api/tasks route', () => {
 			user: { id: 'user-id' },
 			session: { id: 'session-id' }
 		});
+		vi.mocked(enforceTaskWriteRateLimit).mockResolvedValue(null);
 	});
 
 	it('returns 401 when the request is unauthenticated', async () => {
@@ -73,5 +79,23 @@ describe('/api/tasks route', () => {
 
 		expect(conflict.status).toBe(409);
 		expect(body.message).toBe('Conflict.');
+	});
+
+	it('returns the rate-limit response before touching the repository', async () => {
+		vi.mocked(enforceTaskWriteRateLimit).mockResolvedValue(
+			Response.json({ message: 'Too many task changes.' }, { status: 429, headers: { 'retry-after': '30' } })
+		);
+
+		const response = await POST(/** @type {any} */ ({
+			request: new Request('https://todo.example.com/api/tasks', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ text: 'Task' })
+			})
+		}));
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get('retry-after')).toBe('30');
+		expect(createTaskForUser).not.toHaveBeenCalled();
 	});
 });
