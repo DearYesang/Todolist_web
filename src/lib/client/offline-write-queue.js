@@ -11,8 +11,10 @@ import { isServerTaskId } from './task-create.js';
 
 const OFFLINE_QUEUE_KEY = 'kanbanOfflineWriteQueue';
 const DEFAULT_QUEUE_OWNER = 'anonymous';
+const FLUSH_LOCK_NAME = 'todokanban:offline-write-queue-flush';
 
 let queueOwnerId = DEFAULT_QUEUE_OWNER;
+let fallbackFlushInFlight = false;
 
 /**
  * @typedef {{
@@ -117,11 +119,60 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 		return createFlushResult(loadOfflineQueue(), true);
 	}
 
+	return withFlushLock(() => executeFlush(fetcher));
+}
+
+/**
+ * Overlapping flushes (a second tab, or online + session handlers firing
+ * together) re-execute the same queued creates and produce duplicate server
+ * tasks. Only one flush may run per origin; contenders report blocked.
+ * @param {() => Promise<OfflineFlushResult>} operation
+ * @returns {Promise<OfflineFlushResult>}
+ */
+function withFlushLock(operation) {
+	const locks = /** @type {{ request?: Function } | undefined} */ (globalThis.navigator?.locks);
+	if (locks && typeof locks.request === 'function') {
+		return locks.request(
+			FLUSH_LOCK_NAME,
+			{ ifAvailable: true },
+			/** @param {unknown} lock */
+			(lock) => lock ? operation() : createFlushResult(loadOfflineQueue(), true)
+		);
+	}
+
+	if (fallbackFlushInFlight) {
+		return Promise.resolve(createFlushResult(loadOfflineQueue(), true));
+	}
+
+	fallbackFlushInFlight = true;
+	return Promise.resolve()
+		.then(operation)
+		.finally(() => {
+			fallbackFlushInFlight = false;
+		});
+}
+
+/**
+ * @param {typeof fetch} fetcher
+ * @returns {Promise<OfflineFlushResult>}
+ */
+async function executeFlush(fetcher) {
 	const queue = loadOfflineQueue();
 	if (queue.length === 0) {
 		return createFlushResult([], false);
 	}
 
+	/** @type {Map<string, string>} */
+	const originalById = new Map(queue.map((mutation) => [mutation.id, JSON.stringify(mutation)]));
+	/** @type {Set<string>} */
+	const processedIds = new Set();
+	/**
+	 * Server versions observed from responses in this flush. Later queued
+	 * mutations for the same task would otherwise 409 on versions our own
+	 * earlier mutations already bumped.
+	 * @type {Map<string, number>}
+	 */
+	const latestVersions = new Map();
 	/** @type {OfflineMutation[]} */
 	const remaining = [];
 	/** @type {import('../shared/task-domain.js').Task[]} */
@@ -139,8 +190,22 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 
 	for (let index = 0; index < queue.length; index += 1) {
 		const mutation = queue[index];
-		const executableMutation = resolveOfflineMutationReferences(mutation, localTaskIds);
+		const executableMutation = withRefreshedExpectedVersion(
+			resolveOfflineMutationReferences(mutation, localTaskIds),
+			latestVersions
+		);
 		if (!executableMutation) {
+			// Creates precede their dependents in queue order, so an unresolved
+			// local reference with no pending create left in the queue can never
+			// resolve. Blocking on it forever would also disable the post-flush
+			// server snapshot for good — surface it as a conflict instead.
+			if (isPermanentlyOrphaned(mutation, queue, processedIds)) {
+				conflicts.push(mutation);
+				flushed += 1;
+				processedIds.add(mutation.id);
+				continue;
+			}
+
 			blocked = true;
 			remaining.push({ ...mutation, attempts: mutation.attempts + 1 });
 			remaining.push(...queue.slice(index + 1));
@@ -150,21 +215,22 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 		const result = await executeOfflineMutation(executableMutation, fetcher);
 		if (result.ok) {
 			flushed += 1;
+			processedIds.add(mutation.id);
 			if ('pendingDoneItemId' in result && typeof result.pendingDoneItemId === 'string' && 'taskId' in executableMutation) {
 				// A checked offline create landed its item but not the checked
-				// state; keep a retryable follow-up patch for the next flush.
-				remaining.push({
-					id: createMutationId(),
+				// state; queue a retryable follow-up patch for the next flush.
+				// Mid-flush enqueues survive the post-flush reconciliation.
+				enqueueOfflineMutation({
 					type: 'checklist.patch',
 					taskId: executableMutation.taskId,
 					itemId: result.pendingDoneItemId,
-					patch: { done: true },
-					ownerUserId: mutation.ownerUserId,
-					createdAt: Date.now(),
-					attempts: 0
+					patch: { done: true }
 				});
 			}
 			if ('task' in result) {
+				if (typeof result.task.version === 'number') {
+					latestVersions.set(result.task.id, result.task.version);
+				}
 				if (mutation.type === 'task.create') {
 					localTaskIds.set(mutation.localTaskId, result.task.id);
 					updateQueuedLocalParentReferences(queue, index + 1, mutation.localTaskId, result.task.id);
@@ -194,18 +260,137 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 			conflicts.push(mutation);
 		}
 		flushed += 1;
+		processedIds.add(mutation.id);
 	}
 
-	saveOfflineQueue(remaining);
+	const finalQueue = reconcileQueueAfterFlush(remaining, processedIds, originalById, localTaskIds);
+	saveOfflineQueue(finalQueue);
 	return {
 		flushed,
-		remaining: remaining.length,
+		remaining: finalQueue.length,
 		blocked,
 		syncedTasks,
 		createdTasks,
 		completedImports,
 		conflicts
 	};
+}
+
+/**
+ * Saving the precomputed remainder would erase mutations enqueued while the
+ * flush was running. Rebuild the queue from current storage instead: drop what
+ * this flush executed, keep everything else in storage order, and re-apply the
+ * local-to-server id mapping so late arrivals referencing completed creates
+ * stay resolvable.
+ * @param {OfflineMutation[]} remaining
+ * @param {Set<string>} processedIds
+ * @param {Map<string, string>} originalById
+ * @param {Map<string, string>} localTaskIds
+ * @returns {OfflineMutation[]}
+ */
+function reconcileQueueAfterFlush(remaining, processedIds, originalById, localTaskIds) {
+	const storageNow = loadOfflineQueue();
+	const remainingById = new Map(remaining.map((mutation) => [mutation.id, mutation]));
+	/** @type {OfflineMutation[]} */
+	const finalQueue = [];
+
+	for (const mutation of storageNow) {
+		if (processedIds.has(mutation.id)) {
+			if (originalById.get(mutation.id) !== JSON.stringify(mutation)) {
+				console.warn('Dropped an offline edit that raced its own completed sync.', mutation.type, mutation.id);
+			}
+			continue;
+		}
+
+		const retained = remainingById.get(mutation.id);
+		const merged = retained
+			? { ...mutation, attempts: Math.max(mutation.attempts, retained.attempts) }
+			: mutation;
+		finalQueue.push(remapMutationLocalIds(merged, localTaskIds));
+	}
+
+	return finalQueue;
+}
+
+/**
+ * @param {OfflineMutation} mutation
+ * @param {Map<string, string>} localTaskIds
+ * @returns {OfflineMutation}
+ */
+function remapMutationLocalIds(mutation, localTaskIds) {
+	let next = mutation;
+	if ('taskId' in next && !isServerTaskId(next.taskId)) {
+		const serverTaskId = localTaskIds.get(next.taskId);
+		if (serverTaskId) {
+			next = { ...next, taskId: serverTaskId };
+		}
+	}
+
+	if (next.type === 'task.create' && next.localParentId) {
+		const payload = getPayloadObject(next.payload);
+		const serverParentId = localTaskIds.get(next.localParentId);
+		if (payload && serverParentId && !isServerTaskId(payload.parentId)) {
+			next = { ...next, payload: { ...payload, parentId: serverParentId } };
+		}
+	}
+
+	return next;
+}
+
+/**
+ * @param {OfflineMutation} mutation
+ * @param {OfflineMutation[]} queue
+ * @param {Set<string>} processedIds
+ */
+function isPermanentlyOrphaned(mutation, queue, processedIds) {
+	/** @type {string | null} */
+	let unresolvedLocalId = null;
+	if ('taskId' in mutation && !isServerTaskId(mutation.taskId)) {
+		unresolvedLocalId = mutation.taskId;
+	} else if (mutation.type === 'task.create') {
+		// Resolution failed on the parent reference or a corrupt payload.
+		if (!getPayloadObject(mutation.payload)) {
+			return true;
+		}
+		unresolvedLocalId = mutation.localParentId ?? null;
+	}
+
+	if (!unresolvedLocalId) {
+		return true;
+	}
+
+	return !queue.some((item) =>
+		item.type === 'task.create'
+		&& item.localTaskId === unresolvedLocalId
+		&& !processedIds.has(item.id)
+	);
+}
+
+/**
+ * @param {OfflineMutation | null} mutation
+ * @param {Map<string, number>} latestVersions
+ * @returns {OfflineMutation | null}
+ */
+function withRefreshedExpectedVersion(mutation, latestVersions) {
+	if (!mutation) {
+		return mutation;
+	}
+
+	if (mutation.type === 'task.patch') {
+		const knownVersion = latestVersions.get(mutation.taskId);
+		return typeof knownVersion === 'number'
+			? { ...mutation, patch: { ...mutation.patch, expectedVersion: knownVersion } }
+			: mutation;
+	}
+
+	if (mutation.type === 'task.delete') {
+		const knownVersion = latestVersions.get(mutation.taskId);
+		return typeof knownVersion === 'number'
+			? { ...mutation, expectedVersion: knownVersion }
+			: mutation;
+	}
+
+	return mutation;
 }
 
 /**
@@ -251,6 +436,7 @@ function coalesceQueue(queue, mutation) {
 	if (mutation.type === 'checklist.create' && !isServerTaskId(mutation.taskId)) {
 		const pendingTaskCreate = queue.find((item) => item.type === 'task.create' && item.localTaskId === mutation.taskId);
 		if (!pendingTaskCreate) {
+			console.warn('Discarded a checklist create for a local task with no pending create.', mutation.taskId);
 			return queue;
 		}
 	}
@@ -273,6 +459,7 @@ function coalesceQueue(queue, mutation) {
 		}
 
 		if (!isServerTaskId(mutation.itemId)) {
+			console.warn('Discarded a checklist edit whose local item has no pending create.', mutation.itemId);
 			return queue;
 		}
 
