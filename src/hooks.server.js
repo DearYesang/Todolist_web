@@ -137,7 +137,10 @@ function createFallbackContentSecurityPolicy(production) {
 		"worker-src 'self'",
 		"form-action 'self'"
 	];
-	if (production) {
+	// E2E_ALLOW_HTTP mirrors the svelte.config.js CSP exception: WebKit applies
+	// upgrade-insecure-requests to loopback origins, breaking the HTTP preview
+	// the Playwright suite runs against. Never set on real deploys.
+	if (production && process.env.E2E_ALLOW_HTTP !== '1') {
 		cspDirectives.push('upgrade-insecure-requests');
 	}
 	return cspDirectives.join('; ');

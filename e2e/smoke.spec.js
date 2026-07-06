@@ -76,6 +76,11 @@ test('opens the task form date picker and Gantt checklist preview', async ({ pag
 	await expect(page.locator('.add-form .date-picker-popover')).toBeVisible();
 	await expect(page.locator('.add-form .date-picker-day.boundary').first()).toBeVisible();
 
+	// Close the picker and the add sheet: on phone-width layouts the open
+	// sheet overlays the view content and intercepts the clicks below.
+	await page.locator('.add-form .date-picker-popover').getByRole('button', { name: '완료' }).click();
+	await page.getByRole('button', { name: /닫기/ }).click();
+
 	await page.getByRole('button', { name: /간트 뷰/ }).click();
 	await page.locator('.gantt-sidebar-title', { hasText: 'E2E cached task' }).click();
 	await expect(page.locator('.gantt-checklist-preview', { hasText: 'E2E checklist one' })).toBeVisible();

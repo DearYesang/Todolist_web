@@ -1,6 +1,10 @@
 import adapter from '@sveltejs/adapter-vercel';
 
 const development = process.env.npm_lifecycle_event === 'dev';
+// WebKit enforces upgrade-insecure-requests even on loopback origins, which
+// breaks the plain-HTTP preview server the E2E suite runs against. Only the
+// Playwright webServer sets this; real deploys never do.
+const allowHttpPreview = process.env.E2E_ALLOW_HTTP === '1';
 
 /** @type {import('@sveltejs/kit').CspDirectives} */
 const cspDirectives = {
@@ -16,7 +20,7 @@ const cspDirectives = {
 	'manifest-src': ['self'],
 	'worker-src': ['self'],
 	'form-action': ['self'],
-	...(development ? {} : { 'upgrade-insecure-requests': true })
+	...(development || allowHttpPreview ? {} : { 'upgrade-insecure-requests': true })
 };
 
 /** @type {import('@sveltejs/kit').Config} */
