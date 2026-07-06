@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
+import { enforceTaskWriteRateLimit } from '$lib/server/tasks/rate-limit-guard.js';
 import { createChecklistItemForUser } from '$lib/server/tasks/repository.js';
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 
@@ -8,6 +9,11 @@ export async function POST({ params, request }) {
 	const authResult = await requireAuthUser(request);
 	if (!authResult.ok) {
 		return authResult.response;
+	}
+
+	const limited = await enforceTaskWriteRateLimit(authResult.user.id);
+	if (limited) {
+		return limited;
 	}
 
 	let payload;

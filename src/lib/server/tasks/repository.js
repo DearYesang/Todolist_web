@@ -430,20 +430,14 @@ export async function updateTaskForUser(userId, taskId, payload) {
 	const now = new Date();
 	const [updated] = await db
 		.update(schema.tasks)
-		.set({
-			title: typeof input.title === 'string' ? input.title : existing.title,
-			status: nextStatus,
-			priority: typeof input.priority === 'string' ? input.priority : existing.priority,
-			urgency: typeof input.urgency === 'string' ? input.urgency : existing.urgency,
-			category: nextCategory.name,
-			categoryId: nextCategory.id,
-			startDate: nextStartDate,
-			endDate: nextEndDate,
-			parentTaskId: nextParentTaskId,
-			updatedAt: now,
-			version: sql`${schema.tasks.version} + 1`,
-			completedAt: nextStatus === 'done' ? existing.completedAt ?? now : null
-		})
+		.set(buildTaskPatchSet(input, existing, {
+			nextStatus,
+			nextParentTaskId,
+			nextCategory,
+			nextStartDate,
+			nextEndDate,
+			now
+		}))
 		.where(and(
 			eq(schema.tasks.id, existing.id),
 			eq(schema.tasks.boardId, existing.boardId),
@@ -456,12 +450,66 @@ export async function updateTaskForUser(userId, taskId, payload) {
 		if (expectedVersion !== null) {
 			throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
 		}
-		throw new TaskWriteError('Task could not be updated.', 500);
+		// The task passed the authz read moments ago, so an unversioned update
+		// matching nothing means it was deleted concurrently — a benign race.
+		throw new TaskWriteError('Task was not found.', 404);
 	}
 
 	const checklistRows = await getChecklistRowsForTask(db, updated.id);
 	const categoryRow = updated.categoryId ? await getCategoryRowForBoard(db, updated.boardId, updated.categoryId, { includeArchived: true }) : null;
 	return mapTaskRowToClientTask(attachCategoryMetaToTaskRow(updated, categoryRow), checklistRows);
+}
+
+/**
+ * Writing only the columns the patch actually names keeps two concurrent
+ * unversioned PATCHes to different fields from overwriting each other with
+ * values read before the other request committed (lost update).
+ * @param {ReturnType<typeof parseUpdateTaskInput>} input
+ * @param {typeof schema.tasks.$inferSelect} existing
+ * @param {{
+ *   nextStatus: string;
+ *   nextParentTaskId: string | null;
+ *   nextCategory: { id: string | null; name: string };
+ *   nextStartDate: string;
+ *   nextEndDate: string;
+ *   now: Date;
+ * }} computed
+ */
+export function buildTaskPatchSet(input, existing, computed) {
+	/** @type {Record<string, unknown>} */
+	const set = {
+		updatedAt: computed.now,
+		version: sql`${schema.tasks.version} + 1`
+	};
+
+	if (hasField(input, 'title')) {
+		set.title = input.title;
+	}
+	if (hasField(input, 'startDate')) {
+		set.startDate = computed.nextStartDate;
+	}
+	if (hasField(input, 'endDate')) {
+		set.endDate = computed.nextEndDate;
+	}
+	if (hasField(input, 'priority')) {
+		set.priority = input.priority;
+	}
+	if (hasField(input, 'urgency')) {
+		set.urgency = input.urgency;
+	}
+	if (hasField(input, 'category') || hasField(input, 'categoryId')) {
+		set.category = computed.nextCategory.name;
+		set.categoryId = computed.nextCategory.id;
+	}
+	if (hasField(input, 'parentId') || computed.nextParentTaskId !== existing.parentTaskId) {
+		set.parentTaskId = computed.nextParentTaskId;
+	}
+	if (hasField(input, 'status') || computed.nextStatus !== existing.status) {
+		set.status = computed.nextStatus;
+		set.completedAt = computed.nextStatus === 'done' ? existing.completedAt ?? computed.now : null;
+	}
+
+	return set;
 }
 
 /**
@@ -478,42 +526,59 @@ export async function deleteTaskCascadeForUser(userId, taskId, payload = undefin
 		throw new TaskWriteError('Task was not found.', 404);
 	}
 
-	const boardTaskRows = await db
-		.select({
-			id: schema.tasks.id,
-			parentTaskId: schema.tasks.parentTaskId
-		})
-		.from(schema.tasks)
-		.where(and(eq(schema.tasks.boardId, task.boardId), isNull(schema.tasks.deletedAt)));
-	const taskIds = [...collectDescendantTaskIds(boardTaskRows, id)];
 	const now = new Date();
-
-	const deletedRows = await db
-		.update(schema.tasks)
-		.set({
-			deletedAt: now,
-			updatedAt: now,
-			version: sql`${schema.tasks.version} + 1`
-		})
-		.where(and(
-			eq(schema.tasks.boardId, task.boardId),
-			inArray(schema.tasks.id, taskIds),
-			isNull(schema.tasks.deletedAt),
-			...(input.expectedVersion === null
-				? []
-				: [sql`exists (
-					select 1 from ${schema.tasks} as root
-					where root.id = ${task.id}
-						and root.version = ${input.expectedVersion}
-						and root.deleted_at is null
-				)`])
-		))
-		.returning({ id: schema.tasks.id });
-	if (input.expectedVersion !== null && deletedRows.length === 0) {
+	const result = await db.execute(buildCascadeDeleteStatement(task, now, input.expectedVersion));
+	const deletedCount = result.rows.length;
+	if (input.expectedVersion !== null && deletedCount === 0) {
 		throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
 	}
 
-	return deletedRows.length;
+	return deletedCount;
+}
+
+/**
+ * A single recursive-CTE statement walks and soft-deletes the subtree
+ * atomically, so children created or re-parented between a separate read and
+ * write can no longer escape the cascade. The path array guards against
+ * parent cycles in corrupt data. Exported for SQL-render regression tests.
+ * @param {{ id: string; boardId: string }} task
+ * @param {Date} now
+ * @param {number | null} expectedVersion
+ */
+export function buildCascadeDeleteStatement(task, now, expectedVersion) {
+	const versionGuard = expectedVersion === null
+		? sql`true`
+		: sql`exists (
+			select 1 from ${schema.tasks} as root
+			where root.id = ${task.id}
+				and root.version = ${expectedVersion}
+				and root.deleted_at is null
+		)`;
+
+	return sql`
+		with recursive descendants (id, path) as (
+			select ${schema.tasks.id}, array[${schema.tasks.id}]
+			from ${schema.tasks}
+			where ${schema.tasks.id} = ${task.id}
+				and ${schema.tasks.boardId} = ${task.boardId}
+				and ${schema.tasks.deletedAt} is null
+			union all
+			select child.id, descendants.path || child.id
+			from ${schema.tasks} as child
+			inner join descendants on child.parent_task_id = descendants.id
+			where child.board_id = ${task.boardId}
+				and child.deleted_at is null
+				and not child.id = any(descendants.path)
+		)
+		update ${schema.tasks}
+		set deleted_at = ${now},
+			updated_at = ${now},
+			version = ${schema.tasks.version} + 1
+		where ${schema.tasks.id} in (select descendants.id from descendants)
+			and ${schema.tasks.deletedAt} is null
+			and ${versionGuard}
+		returning ${schema.tasks.id}
+	`;
 }
 
 /**
@@ -531,24 +596,28 @@ export async function createChecklistItemForUser(userId, taskId, payload) {
 	}
 
 	const now = new Date();
-	const [created] = await db
-		.insert(schema.checklistItems)
-		.values({
-			taskId: task.id,
-			text: input.text,
-			done: false,
-			position: createPositionValue(now),
-			createdAt: now,
-			updatedAt: now
-		})
-		.returning();
+	// Batched statements run in one transaction, so the version bump can no
+	// longer be lost after the item write succeeds.
+	const [createdRows, bumpedRows] = await db.batch([
+		db
+			.insert(schema.checklistItems)
+			.values({
+				taskId: task.id,
+				text: input.text,
+				done: false,
+				position: createPositionValue(now),
+				createdAt: now,
+				updatedAt: now
+			})
+			.returning(),
+		buildTaskVersionBump(db, task.id, now)
+	]);
 
-	if (!created) {
+	if (createdRows.length === 0) {
 		throw new TaskWriteError('Checklist item could not be created.', 500);
 	}
 
-	const updatedTask = await bumpTaskVersion(db, task.id, now);
-	return mapTaskRowToClientTask(updatedTask ?? task, await getChecklistRowsForTask(db, task.id));
+	return mapTaskRowToClientTask(bumpedRows[0] ?? task, await getChecklistRowsForTask(db, task.id));
 }
 
 /**
@@ -579,22 +648,28 @@ export async function updateChecklistItemForUser(userId, taskId, itemId, payload
 		throw new TaskWriteError('Task was not found.', 404);
 	}
 
-	const [updated] = await db
-		.update(schema.checklistItems)
-		.set({
-			...(typeof input.text === 'string' ? { text: input.text } : {}),
-			...(typeof input.done === 'boolean' ? { done: input.done } : {}),
-			updatedAt: new Date()
-		})
-		.where(and(eq(schema.checklistItems.id, checklistItemId), eq(schema.checklistItems.taskId, task.id)))
-		.returning();
+	const now = new Date();
+	// The bump runs first inside the batch transaction, gated on the item
+	// existing, so a missing item changes nothing and both writes commit
+	// together when it does exist.
+	const [bumpedRows, updatedRows] = await db.batch([
+		buildTaskVersionBump(db, task.id, now, { requireChecklistItemId: checklistItemId }),
+		db
+			.update(schema.checklistItems)
+			.set({
+				...(typeof input.text === 'string' ? { text: input.text } : {}),
+				...(typeof input.done === 'boolean' ? { done: input.done } : {}),
+				updatedAt: now
+			})
+			.where(and(eq(schema.checklistItems.id, checklistItemId), eq(schema.checklistItems.taskId, task.id)))
+			.returning()
+	]);
 
-	if (!updated) {
+	if (updatedRows.length === 0) {
 		throw new TaskWriteError('Checklist item was not found.', 404);
 	}
 
-	const updatedTask = await bumpTaskVersion(db, task.id, new Date());
-	return mapTaskRowToClientTask(updatedTask ?? task, await getChecklistRowsForTask(db, task.id));
+	return mapTaskRowToClientTask(bumpedRows[0] ?? task, await getChecklistRowsForTask(db, task.id));
 }
 
 /**
@@ -611,35 +686,52 @@ export async function deleteChecklistItemForUser(userId, taskId, itemId) {
 		throw new TaskWriteError('Task was not found.', 404);
 	}
 
-	const [deleted] = await db
-		.delete(schema.checklistItems)
-		.where(and(eq(schema.checklistItems.id, checklistItemId), eq(schema.checklistItems.taskId, task.id)))
-		.returning({ id: schema.checklistItems.id });
+	const now = new Date();
+	const [bumpedRows, deletedRows] = await db.batch([
+		buildTaskVersionBump(db, task.id, now, { requireChecklistItemId: checklistItemId }),
+		db
+			.delete(schema.checklistItems)
+			.where(and(eq(schema.checklistItems.id, checklistItemId), eq(schema.checklistItems.taskId, task.id)))
+			.returning({ id: schema.checklistItems.id })
+	]);
 
-	if (!deleted) {
+	if (deletedRows.length === 0) {
 		throw new TaskWriteError('Checklist item was not found.', 404);
 	}
 
-	const updatedTask = await bumpTaskVersion(db, task.id, new Date());
-	return mapTaskRowToClientTask(updatedTask ?? task, await getChecklistRowsForTask(db, task.id));
+	return mapTaskRowToClientTask(bumpedRows[0] ?? task, await getChecklistRowsForTask(db, task.id));
 }
 
 /**
+ * Version-bump statement for use inside a db.batch transaction. When
+ * requireChecklistItemId is set, the bump is gated on that item existing at
+ * statement time — place it BEFORE the item mutation in the batch so a
+ * missing item leaves the version untouched instead of spuriously bumping.
+ * Exported for SQL-render regression tests.
  * @param {ReturnType<typeof getDb>} db
  * @param {string} taskId
  * @param {Date} now
+ * @param {{ requireChecklistItemId?: string }} [options]
  */
-async function bumpTaskVersion(db, taskId, now) {
-	const [updated] = await db
+export function buildTaskVersionBump(db, taskId, now, options = {}) {
+	return db
 		.update(schema.tasks)
 		.set({
 			updatedAt: now,
 			version: sql`${schema.tasks.version} + 1`
 		})
-		.where(and(eq(schema.tasks.id, taskId), isNull(schema.tasks.deletedAt)))
+		.where(and(
+			eq(schema.tasks.id, taskId),
+			isNull(schema.tasks.deletedAt),
+			...(options.requireChecklistItemId
+				? [sql`exists (
+					select 1 from ${schema.checklistItems}
+					where ${schema.checklistItems.id} = ${options.requireChecklistItemId}
+						and ${schema.checklistItems.taskId} = ${taskId}
+				)`]
+				: [])
+		))
 		.returning();
-
-	return updated ?? null;
 }
 
 /**
@@ -898,27 +990,6 @@ async function canAssignParentTask(db, boardId, taskId, parentId) {
 	}
 
 	return true;
-}
-
-/**
- * @param {{ id: string; parentTaskId: string | null }[]} taskRows
- * @param {string} taskId
- */
-function collectDescendantTaskIds(taskRows, taskId) {
-	const ids = new Set([taskId]);
-	let foundNewChild = true;
-
-	while (foundNewChild) {
-		foundNewChild = false;
-		taskRows.forEach((task) => {
-			if (task.parentTaskId && ids.has(task.parentTaskId) && !ids.has(task.id)) {
-				ids.add(task.id);
-				foundNewChild = true;
-			}
-		});
-	}
-
-	return ids;
 }
 
 /**

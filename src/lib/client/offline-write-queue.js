@@ -216,6 +216,17 @@ async function executeFlush(fetcher) {
 		if (result.ok) {
 			flushed += 1;
 			processedIds.add(mutation.id);
+			if ('pendingDoneItemId' in result && typeof result.pendingDoneItemId === 'string' && 'taskId' in executableMutation) {
+				// A checked offline create landed its item but not the checked
+				// state; queue a retryable follow-up patch for the next flush.
+				// Mid-flush enqueues survive the post-flush reconciliation.
+				enqueueOfflineMutation({
+					type: 'checklist.patch',
+					taskId: executableMutation.taskId,
+					itemId: result.pendingDoneItemId,
+					patch: { done: true }
+				});
+			}
 			if ('task' in result) {
 				if (typeof result.task.version === 'number') {
 					latestVersions.set(result.task.id, result.task.version);
@@ -641,7 +652,18 @@ async function executeChecklistCreateMutation(mutation, fetcher) {
 	}
 
 	const updateResult = await updateServerChecklistItem(mutation.taskId, createdItem.id, { done: true }, fetcher);
-	return updateResult.ok ? updateResult : createResult;
+	if (updateResult.ok) {
+		return updateResult;
+	}
+
+	// The item exists but its checked state did not land. When the failure is
+	// retryable (e.g. the create consumed the last rate-limit token), hand the
+	// flush a follow-up patch to queue so the done state survives.
+	if (shouldKeepForRetry(updateResult)) {
+		return { ...createResult, pendingDoneItemId: createdItem.id };
+	}
+
+	return createResult;
 }
 
 /**

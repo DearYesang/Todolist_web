@@ -1,7 +1,9 @@
 import { normalizeTask, normalizeTaskList } from '../shared/task-domain.js';
 import { extractBackupTasks } from '../shared/task-backup.js';
 
-const FALLBACK_STATUSES = new Set([401, 409, 503]);
+// 429 must stay retryable: a throttled offline-queue flush keeps its
+// mutations queued for the next sync instead of dropping them.
+const FALLBACK_STATUSES = new Set([401, 409, 429, 503]);
 const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 
 /**
