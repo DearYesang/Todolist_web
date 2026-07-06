@@ -1,13 +1,14 @@
 import {
 	assertRateLimit,
 	createRateLimitHeaders,
-	createRateLimitKey,
 	RateLimitError
 } from '$lib/server/security/rate-limit.js';
 
-// Generous for a personal board (an offline-queue flush replays mutations
-// sequentially, far below this), but a hard stop for a leaked session or a
-// runaway client loop hammering Neon writes.
+// Keyed on the user id alone (no client IP) so the budget is a true per-user
+// hard stop: a leaked session replayed through rotating egress IPs shares one
+// bucket. Generous enough that an offline-queue flush that trips it merely
+// blocks and resumes on the next sync window (the client treats 429 as
+// retryable), but a hard ceiling on Neon write amplification.
 const TASK_WRITE_LIMIT = {
 	limit: 300,
 	windowMs: 60_000,
@@ -23,37 +24,30 @@ const IMPORT_LIMIT = {
 };
 
 /**
- * @typedef {import('@sveltejs/kit').RequestEvent | { request: Request; getClientAddress?: () => string }} RateLimitEvent
- */
-
-/**
- * @param {RateLimitEvent} event
  * @param {string} userId
  * @returns {Promise<Response | null>} a 429 response when over budget
  */
-export function enforceTaskWriteRateLimit(event, userId) {
-	return enforceLimit(event, 'task-write', userId, TASK_WRITE_LIMIT);
+export function enforceTaskWriteRateLimit(userId) {
+	return enforceLimit('task-write', userId, TASK_WRITE_LIMIT);
 }
 
 /**
- * @param {RateLimitEvent} event
  * @param {string} userId
  * @returns {Promise<Response | null>} a 429 response when over budget
  */
-export function enforceImportRateLimit(event, userId) {
-	return enforceLimit(event, 'task-import', userId, IMPORT_LIMIT);
+export function enforceImportRateLimit(userId) {
+	return enforceLimit('task-import', userId, IMPORT_LIMIT);
 }
 
 /**
- * @param {RateLimitEvent} event
  * @param {string} scope
  * @param {string} userId
  * @param {{ limit: number; windowMs: number; message?: string }} options
  * @returns {Promise<Response | null>}
  */
-async function enforceLimit(event, scope, userId, options) {
+async function enforceLimit(scope, userId, options) {
 	try {
-		await assertRateLimit(createRateLimitKey(event, scope, userId), options);
+		await assertRateLimit(`${scope}:user:${userId}`, options);
 		return null;
 	} catch (error) {
 		if (error instanceof RateLimitError) {

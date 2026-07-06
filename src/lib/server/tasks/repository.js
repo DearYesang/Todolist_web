@@ -527,19 +527,35 @@ export async function deleteTaskCascadeForUser(userId, taskId, payload = undefin
 	}
 
 	const now = new Date();
-	// A single recursive-CTE statement walks and soft-deletes the subtree
-	// atomically, so children created or re-parented between a separate read
-	// and write can no longer escape the cascade. The path array guards
-	// against parent cycles in corrupt data.
-	const versionGuard = input.expectedVersion === null
+	const result = await db.execute(buildCascadeDeleteStatement(task, now, input.expectedVersion));
+	const deletedCount = result.rows.length;
+	if (input.expectedVersion !== null && deletedCount === 0) {
+		throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
+	}
+
+	return deletedCount;
+}
+
+/**
+ * A single recursive-CTE statement walks and soft-deletes the subtree
+ * atomically, so children created or re-parented between a separate read and
+ * write can no longer escape the cascade. The path array guards against
+ * parent cycles in corrupt data. Exported for SQL-render regression tests.
+ * @param {{ id: string; boardId: string }} task
+ * @param {Date} now
+ * @param {number | null} expectedVersion
+ */
+export function buildCascadeDeleteStatement(task, now, expectedVersion) {
+	const versionGuard = expectedVersion === null
 		? sql`true`
 		: sql`exists (
 			select 1 from ${schema.tasks} as root
 			where root.id = ${task.id}
-				and root.version = ${input.expectedVersion}
+				and root.version = ${expectedVersion}
 				and root.deleted_at is null
 		)`;
-	const result = await db.execute(sql`
+
+	return sql`
 		with recursive descendants (id, path) as (
 			select ${schema.tasks.id}, array[${schema.tasks.id}]
 			from ${schema.tasks}
@@ -562,13 +578,7 @@ export async function deleteTaskCascadeForUser(userId, taskId, payload = undefin
 			and ${schema.tasks.deletedAt} is null
 			and ${versionGuard}
 		returning ${schema.tasks.id}
-	`);
-	const deletedCount = result.rows.length;
-	if (input.expectedVersion !== null && deletedCount === 0) {
-		throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
-	}
-
-	return deletedCount;
+	`;
 }
 
 /**
@@ -697,12 +707,13 @@ export async function deleteChecklistItemForUser(userId, taskId, itemId) {
  * requireChecklistItemId is set, the bump is gated on that item existing at
  * statement time — place it BEFORE the item mutation in the batch so a
  * missing item leaves the version untouched instead of spuriously bumping.
+ * Exported for SQL-render regression tests.
  * @param {ReturnType<typeof getDb>} db
  * @param {string} taskId
  * @param {Date} now
  * @param {{ requireChecklistItemId?: string }} [options]
  */
-function buildTaskVersionBump(db, taskId, now, options = {}) {
+export function buildTaskVersionBump(db, taskId, now, options = {}) {
 	return db
 		.update(schema.tasks)
 		.set({

@@ -5,14 +5,13 @@ import { createChecklistItemForUser } from '$lib/server/tasks/repository.js';
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 
 /** @type {import('./$types').RequestHandler} */
-export async function POST(event) {
-	const { params, request } = event;
+export async function POST({ params, request }) {
 	const authResult = await requireAuthUser(request);
 	if (!authResult.ok) {
 		return authResult.response;
 	}
 
-	const limited = await enforceTaskWriteRateLimit(event, authResult.user.id);
+	const limited = await enforceTaskWriteRateLimit(authResult.user.id);
 	if (limited) {
 		return limited;
 	}

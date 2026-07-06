@@ -5,14 +5,13 @@ import { deleteChecklistItemForUser, updateChecklistItemForUser } from '$lib/ser
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 
 /** @type {import('./$types').RequestHandler} */
-export async function PATCH(event) {
-	const { params, request } = event;
+export async function PATCH({ params, request }) {
 	const authResult = await requireAuthUser(request);
 	if (!authResult.ok) {
 		return authResult.response;
 	}
 
-	const limited = await enforceTaskWriteRateLimit(event, authResult.user.id);
+	const limited = await enforceTaskWriteRateLimit(authResult.user.id);
 	if (limited) {
 		return limited;
 	}
@@ -37,14 +36,13 @@ export async function PATCH(event) {
 }
 
 /** @type {import('./$types').RequestHandler} */
-export async function DELETE(event) {
-	const { params, request } = event;
+export async function DELETE({ params, request }) {
 	const authResult = await requireAuthUser(request);
 	if (!authResult.ok) {
 		return authResult.response;
 	}
 
-	const limited = await enforceTaskWriteRateLimit(event, authResult.user.id);
+	const limited = await enforceTaskWriteRateLimit(authResult.user.id);
 	if (limited) {
 		return limited;
 	}

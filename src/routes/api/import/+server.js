@@ -7,14 +7,13 @@ import { TaskWriteError } from '$lib/server/tasks/validation.js';
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
 /** @type {import('./$types').RequestHandler} */
-export async function POST(event) {
-	const { request, url } = event;
+export async function POST({ request, url }) {
 	const authResult = await requireAuthUser(request);
 	if (!authResult.ok) {
 		return authResult.response;
 	}
 
-	const limited = await enforceImportRateLimit(event, authResult.user.id);
+	const limited = await enforceImportRateLimit(authResult.user.id);
 	if (limited) {
 		return limited;
 	}

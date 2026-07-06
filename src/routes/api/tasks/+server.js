@@ -16,14 +16,13 @@ export async function GET({ request }) {
 }
 
 /** @type {import('./$types').RequestHandler} */
-export async function POST(event) {
-	const { request } = event;
+export async function POST({ request }) {
 	const authResult = await requireAuthUser(request);
 	if (!authResult.ok) {
 		return authResult.response;
 	}
 
-	const limited = await enforceTaskWriteRateLimit(event, authResult.user.id);
+	const limited = await enforceTaskWriteRateLimit(authResult.user.id);
 	if (limited) {
 		return limited;
 	}

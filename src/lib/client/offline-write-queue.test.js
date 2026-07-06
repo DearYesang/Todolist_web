@@ -98,6 +98,32 @@ describe('offline write queue conflict behavior', () => {
 		expect(loadOfflineQueue()[0].attempts).toBe(1);
 	});
 
+	it('keeps rate-limited mutations queued for a later sync instead of dropping them', async () => {
+		enqueueOfflineMutation({
+			type: 'task.patch',
+			taskId: '99999999-9999-4999-8999-999999999999',
+			patch: { text: 'Throttled write' }
+		});
+
+		const result = await flushOfflineWriteQueue(async () => new Response(JSON.stringify({
+			message: 'Too many task changes.'
+		}), {
+			status: 429,
+			headers: { 'content-type': 'application/json', 'retry-after': '30' }
+		}));
+
+		expect(result).toMatchObject({
+			flushed: 0,
+			remaining: 1,
+			blocked: true
+		});
+		expect(result.conflicts).toEqual([]);
+		expect(loadOfflineQueue()[0]).toMatchObject({
+			type: 'task.patch',
+			taskId: '99999999-9999-4999-8999-999999999999'
+		});
+	});
+
 	it('keeps queued mutations scoped to the active user', () => {
 		setOfflineQueueOwner('user-a');
 		enqueueOfflineMutation({
