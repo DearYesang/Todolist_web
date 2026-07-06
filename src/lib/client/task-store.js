@@ -1,4 +1,4 @@
-import { derived, writable } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 import {
     createServerChecklistItem,
     deleteServerChecklistItem,
@@ -77,9 +77,13 @@ function loadInitialTasks() {
 export const tasks = writable(loadInitialTasks());
 
 let isInitialTaskEmission = true;
+let isApplyingExternalTaskUpdate = false;
 tasks.subscribe((value) => {
     if (isInitialTaskEmission) {
         isInitialTaskEmission = false;
+        return;
+    }
+    if (isApplyingExternalTaskUpdate) {
         return;
     }
 
@@ -127,6 +131,77 @@ export function clearLocalTaskCache() {
 
 function getTaskStorageKey() {
     return `${STORAGE_KEY}:${taskStorageOwner}`;
+}
+
+/**
+ * Applies another tab's persisted task list so concurrent tabs converge on the
+ * same cache instead of clobbering each other on their next write.
+ * @param {{ key: string | null; newValue: string | null }} event
+ */
+export function handleExternalTaskStorageEvent(event) {
+    if (!event || event.key !== getTaskStorageKey()) {
+        return;
+    }
+
+    try {
+        const parsed = event.newValue ? JSON.parse(event.newValue) : [];
+        if (!Array.isArray(parsed)) {
+            return;
+        }
+
+        const external = normalizeTaskList(parsed);
+        isApplyingExternalTaskUpdate = true;
+        try {
+            tasks.update((current) => {
+                const currentById = new Map(current.map((task) => [task.id, task]));
+                const externalIds = new Set(external.map((task) => task.id));
+                // The other tab's cache may predate this tab's latest writes:
+                // keep tasks with pending sync work and local-only tasks whose
+                // creates still sit in this tab's offline queue.
+                const merged = external.map((task) => {
+                    const existing = currentById.get(task.id);
+                    if (!existing) {
+                        return task;
+                    }
+                    if (hasPendingTaskSync(task.id)) {
+                        return existing;
+                    }
+                    return typeof existing.version === 'number'
+                        && typeof task.version === 'number'
+                        && task.version < existing.version
+                        ? existing
+                        : task;
+                });
+                const keptFromCurrent = current.filter((task) =>
+                    !externalIds.has(task.id)
+                    && (!isServerTaskId(task.id) || hasPendingTaskSync(task.id))
+                );
+
+                return normalizeTaskList([...merged, ...keptFromCurrent]);
+            });
+        } finally {
+            isApplyingExternalTaskUpdate = false;
+        }
+    } catch (error) {
+        console.error('Failed to apply cross-tab task update', error);
+    }
+}
+
+/**
+ * @param {{ addEventListener?: Function; removeEventListener?: Function }} [target]
+ * @returns {() => void}
+ */
+export function setupCrossTabTaskSync(target = /** @type {any} */ (globalThis)) {
+    const addEventListener = target?.addEventListener;
+    const removeEventListener = target?.removeEventListener;
+    if (typeof addEventListener !== 'function' || typeof removeEventListener !== 'function') {
+        return () => {};
+    }
+
+    /** @param {StorageEvent} event */
+    const listener = (event) => handleExternalTaskStorageEvent(event);
+    addEventListener.call(target, 'storage', listener);
+    return () => removeEventListener.call(target, 'storage', listener);
 }
 
 /**
@@ -632,13 +707,32 @@ export function replaceTasks(nextTasks) {
 
 /**
  * @param {unknown[]} nextTasks
+ * @param {{ insertMissing?: boolean }} [options]
+ *   insertMissing: false keeps responses for locally deleted tasks from resurrecting them.
  */
-export function mergeTasks(nextTasks) {
+export function mergeTasks(nextTasks, options = {}) {
+    const { insertMissing = true } = options;
     const incoming = nextTasks.map((task) => normalizeTask(task));
     tasks.update((current) => {
         const merged = new Map(current.map((task) => [task.id, task]));
         incoming.forEach((task) => {
-            merged.set(task.id, task);
+            const existing = merged.get(task.id);
+            if (!existing) {
+                if (insertMissing) {
+                    merged.set(task.id, task);
+                }
+                return;
+            }
+
+            if (
+                typeof existing.version === 'number'
+                && typeof task.version === 'number'
+                && task.version < existing.version
+            ) {
+                return;
+            }
+
+            merged.set(task.id, { ...task, collapsed: existing.collapsed });
         });
 
         return normalizeTaskList([...merged.values()]);
@@ -656,21 +750,56 @@ export function removeTasksByIds(taskIds) {
 }
 
 /**
+ * A task with in-flight or queued chain ops has local state newer than any
+ * snapshot or sibling-tab cache; replacing it wholesale would make the queued
+ * op (which rebuilds its patch from the store at send time) push the reverted
+ * values back to the server.
+ * @param {string} taskId
+ */
+function hasPendingTaskSync(taskId) {
+    return taskSyncChains.has(taskId) || queuedSnapshotSyncs.has(taskId);
+}
+
+/**
  * @param {unknown[]} serverTasks
  */
 export function applyServerTaskSnapshot(serverTasks) {
     const incoming = normalizeTaskList(serverTasks).filter((task) => isServerTaskId(task.id));
     tasks.update((current) => {
-        const collapsedById = new Map(current.map((task) => [task.id, task.collapsed]));
+        const currentById = new Map(current.map((task) => [task.id, task]));
         const pendingLocalTasks = current.filter((task) => !isServerTaskId(task.id));
-        const authoritativeTasks = incoming.map((task) =>
-            collapsedById.has(task.id)
-                ? { ...task, collapsed: Boolean(collapsedById.get(task.id)) }
-                : task
+        const incomingIds = new Set(incoming.map((task) => task.id));
+        const authoritativeTasks = incoming.map((task) => {
+            const existing = currentById.get(task.id);
+            if (!existing) {
+                return task;
+            }
+
+            if (hasPendingTaskSync(task.id)) {
+                rememberServerVersion(task);
+                return typeof task.version === 'number'
+                    && (typeof existing.version !== 'number' || task.version > existing.version)
+                    ? { ...existing, version: task.version }
+                    : existing;
+            }
+
+            return { ...task, collapsed: existing.collapsed };
+        });
+        const busyTasksMissingFromSnapshot = current.filter((task) =>
+            isServerTaskId(task.id) && !incomingIds.has(task.id) && hasPendingTaskSync(task.id)
         );
 
-        return normalizeTaskList([...pendingLocalTasks, ...authoritativeTasks]);
+        return normalizeTaskList([...pendingLocalTasks, ...authoritativeTasks, ...busyTasksMissingFromSnapshot]);
     });
+}
+
+/**
+ * Applies per-task server responses from a queue flush with the same
+ * busy-chain protection as chained responses.
+ * @param {import('../shared/task-domain.js').Task[]} serverTasks
+ */
+export function applyServerTaskResults(serverTasks) {
+    serverTasks.forEach((serverTask) => applyServerTaskResult(normalizeTask(serverTask)));
 }
 
 /**
@@ -832,6 +961,158 @@ export function deleteSubtask(taskId, subtaskId) {
 }
 
 /**
+ * Server writes for one task run strictly one at a time. Rapid edits used to
+ * fire concurrent PATCHes whose stale expectedVersion produced spurious 409
+ * conflicts that dropped the user's own changes.
+ * @type {Map<string, Promise<void>>}
+ */
+const taskSyncChains = new Map();
+
+/**
+ * Tasks with a queued-but-unstarted snapshot sync. A queued sync reads the
+ * store when it runs, so scheduling a second one would only duplicate work.
+ * @type {Set<string>}
+ */
+const queuedSnapshotSyncs = new Set();
+
+/**
+ * Local checklist item ids resolved to server ids by an in-flight create,
+ * so chained follow-up edits can target the server item.
+ * @type {Map<string, string>}
+ */
+const resolvedChecklistItemIds = new Map();
+
+/**
+ * Local checklist item ids created per task, so their resolved-id mappings can
+ * be pruned once the task's chain drains (the store holds server ids by then).
+ * @type {Map<string, Set<string>>}
+ */
+const chainedChecklistItemsByTask = new Map();
+
+/**
+ * Latest server version observed per task across chained responses. Needed by
+ * delete ops whose task is already gone from the store.
+ * @type {Map<string, number>}
+ */
+const latestServerVersions = new Map();
+
+/**
+ * Queued-but-unstarted chain ops exist only in memory. Each entry can rebuild
+ * itself as an offline mutation so a page unload does not silently discard it.
+ * @type {Map<{ drained: boolean }, () => import('./offline-write-queue.js').OfflineMutationInput | null>}
+ */
+const pendingChainOpDescriptors = new Map();
+
+/**
+ * @param {string} taskId
+ * @param {() => Promise<void>} operation
+ * @param {(() => import('./offline-write-queue.js').OfflineMutationInput | null) | null} [buildDrainMutation]
+ */
+function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null) {
+    const token = { drained: false };
+    if (buildDrainMutation) {
+        pendingChainOpDescriptors.set(token, buildDrainMutation);
+    }
+
+    const previous = taskSyncChains.get(taskId) ?? Promise.resolve();
+    const next = previous
+        .then(() => {
+            pendingChainOpDescriptors.delete(token);
+            return token.drained ? undefined : operation();
+        })
+        .catch((error) => {
+            console.error('Failed to run task sync operation', error);
+        });
+    taskSyncChains.set(taskId, next);
+    void next.finally(() => {
+        if (taskSyncChains.get(taskId) === next) {
+            taskSyncChains.delete(taskId);
+            latestServerVersions.delete(taskId);
+            const chainedItems = chainedChecklistItemsByTask.get(taskId);
+            if (chainedItems) {
+                chainedItems.forEach((itemId) => resolvedChecklistItemIds.delete(itemId));
+                chainedChecklistItemsByTask.delete(taskId);
+            }
+        }
+    });
+    return next;
+}
+
+/**
+ * Moves every queued-but-unstarted chain op into the durable offline queue.
+ * Call on pagehide and before programmatic reloads: in-flight requests may
+ * still land, but nothing queued behind them is lost with the page.
+ */
+export function drainPendingTaskSyncsToOfflineQueue() {
+    const descriptors = [...pendingChainOpDescriptors.entries()];
+    pendingChainOpDescriptors.clear();
+    for (const [token, buildDrainMutation] of descriptors) {
+        token.drained = true;
+        const mutation = buildDrainMutation();
+        if (mutation) {
+            enqueueOfflineMutation(mutation);
+        }
+    }
+}
+
+/**
+ * Resolves once every queued per-task server write has settled. Server
+ * snapshots applied before this point could revert in-flight optimistic state.
+ */
+export async function waitForPendingTaskSyncs() {
+    while (taskSyncChains.size > 0) {
+        await Promise.allSettled([...taskSyncChains.values()]);
+    }
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task} serverTask
+ */
+function rememberServerVersion(serverTask) {
+    if (typeof serverTask.version !== 'number') {
+        return;
+    }
+
+    const known = latestServerVersions.get(serverTask.id);
+    if (known === undefined || serverTask.version > known) {
+        latestServerVersions.set(serverTask.id, serverTask.version);
+    }
+}
+
+/**
+ * Merges a per-task server response. While a newer local edit is still queued,
+ * only the version advances (plus any resolved checklist item ids, so a reload
+ * cannot strand items under local ids) and optimistic fields stay untouched.
+ * @param {import('../shared/task-domain.js').Task} serverTask
+ */
+function applyServerTaskResult(serverTask) {
+    rememberServerVersion(serverTask);
+    if (!queuedSnapshotSyncs.has(serverTask.id)) {
+        mergeTasks([serverTask], { insertMissing: false });
+        return;
+    }
+
+    tasks.update((current) => current.map((task) => {
+        if (task.id !== serverTask.id) {
+            return task;
+        }
+
+        const next = typeof serverTask.version === 'number'
+            && (typeof task.version !== 'number' || serverTask.version > task.version)
+            ? { ...task, version: serverTask.version }
+            : task;
+        const subtasks = next.subtasks.map((item) => {
+            const resolvedId = resolvedChecklistItemIds.get(item.id);
+            return resolvedId ? { ...item, id: resolvedId } : item;
+        });
+
+        return subtasks.some((item, index) => item !== next.subtasks[index])
+            ? { ...next, subtasks }
+            : next;
+    }));
+}
+
+/**
  * @param {import('../shared/task-domain.js').Task | null} task
  */
 function syncTaskSnapshot(task) {
@@ -839,27 +1120,67 @@ function syncTaskSnapshot(task) {
         return;
     }
 
-    const patch = toServerTaskPatch(task);
-    const mutation = {
-        type: 'task.patch',
-        taskId: task.id,
-        localParentId: getLocalParentId(task),
-        patch
-    };
-
     if (!isServerTaskId(task.id)) {
-        enqueueOfflineMutation(/** @type {import('./offline-write-queue.js').OfflineMutationInput} */ (mutation));
-        return;
-    }
-
-    void updateServerTask(task.id, patch).then((result) =>
-        syncReturnedTask(result, /** @type {import('./offline-write-queue.js').OfflineMutationInput} */ ({
+        enqueueOfflineMutation({
             type: 'task.patch',
             taskId: task.id,
             localParentId: getLocalParentId(task),
+            patch: toServerTaskPatch(task)
+        });
+        return;
+    }
+
+    scheduleTaskSnapshotSync(task.id);
+}
+
+/**
+ * @param {string} taskId
+ */
+function scheduleTaskSnapshotSync(taskId) {
+    if (queuedSnapshotSyncs.has(taskId)) {
+        return;
+    }
+
+    queuedSnapshotSyncs.add(taskId);
+    enqueueTaskSyncOperation(taskId, async () => {
+        queuedSnapshotSyncs.delete(taskId);
+        const current = get(tasks).find((item) => item.id === taskId);
+        if (!current) {
+            return;
+        }
+
+        const knownVersion = latestServerVersions.get(taskId);
+        const patch = toServerTaskPatch(
+            typeof knownVersion === 'number' && (typeof current.version !== 'number' || knownVersion > current.version)
+                ? { ...current, version: knownVersion }
+                : current
+        );
+        const result = await updateServerTask(taskId, patch);
+        if (result.ok) {
+            applyServerTaskResult(result.task);
+            return;
+        }
+
+        reportSyncFailure(result, {
+            type: 'task.patch',
+            taskId,
+            localParentId: getLocalParentId(current),
             patch
-        }))
-    );
+        });
+    }, () => {
+        queuedSnapshotSyncs.delete(taskId);
+        const current = get(tasks).find((item) => item.id === taskId);
+        if (!current) {
+            return null;
+        }
+
+        return {
+            type: 'task.patch',
+            taskId,
+            localParentId: getLocalParentId(current),
+            patch: toServerTaskPatch(current)
+        };
+    });
 }
 
 /**
@@ -871,56 +1192,54 @@ function syncTaskDelete(taskId, task = null) {
         return;
     }
 
-    const expectedVersion = typeof task?.version === 'number' ? task.version : undefined;
+    const capturedVersion = typeof task?.version === 'number' ? task.version : undefined;
     if (!isServerTaskId(taskId)) {
         enqueueOfflineMutation({
             type: 'task.delete',
             taskId,
-            ...(expectedVersion === undefined ? {} : { expectedVersion })
+            ...(capturedVersion === undefined ? {} : { expectedVersion: capturedVersion })
         });
         return;
     }
 
-    void deleteServerTask(taskId, expectedVersion === undefined ? {} : { expectedVersion }).then((result) =>
-        reportSyncFailure(result, {
+    enqueueTaskSyncOperation(taskId, async () => {
+        const expectedVersion = latestServerVersions.get(taskId) ?? capturedVersion;
+        const result = await deleteServerTask(taskId, expectedVersion === undefined ? {} : { expectedVersion });
+        if (!result.ok) {
+            reportSyncFailure(result, {
+                type: 'task.delete',
+                taskId,
+                ...(expectedVersion === undefined ? {} : { expectedVersion })
+            });
+        }
+    }, () => {
+        const expectedVersion = latestServerVersions.get(taskId) ?? capturedVersion;
+        return {
             type: 'task.delete',
             taskId,
             ...(expectedVersion === undefined ? {} : { expectedVersion })
-        })
-    );
+        };
+    });
 }
 
 /**
  * @param {import('../shared/task-domain.js').Task[]} taskList
  */
 async function syncClearDoneTasks(taskList) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
     const doneIds = new Set(taskList.filter((task) => task.status === 'done').map((task) => task.id));
     if (doneIds.size === 0) {
         return;
     }
 
-    const topLevelDoneTasks = taskList.filter((task) =>
-        task.status === 'done'
-        && shouldSyncServerTask(task.id)
-        && !hasDoneAncestor(taskList, task, doneIds)
-    );
-    const topLevelLocalDoneTasks = taskList.filter((task) =>
-        task.status === 'done'
-        && !isServerTaskId(task.id)
-        && !hasDoneAncestor(taskList, task, doneIds)
-    );
+    for (const task of taskList) {
+        if (task.status !== 'done' || hasDoneAncestor(taskList, task, doneIds)) {
+            continue;
+        }
 
-    for (const task of topLevelDoneTasks) {
-        const expectedVersion = typeof task.version === 'number' ? task.version : undefined;
-        const result = await deleteServerTask(task.id, expectedVersion === undefined ? {} : { expectedVersion });
-        reportSyncFailure(result, {
-            type: 'task.delete',
-            taskId: task.id,
-            ...(expectedVersion === undefined ? {} : { expectedVersion })
-        });
-    }
-
-    for (const task of topLevelLocalDoneTasks) {
         syncTaskDelete(task.id, task);
     }
 }
@@ -964,14 +1283,58 @@ function syncChecklistCreate(taskId, subtaskId, text) {
         return;
     }
 
-    void createServerChecklistItem(taskId, text).then((result) =>
-        syncReturnedTask(result, {
+    const chainedItems = chainedChecklistItemsByTask.get(taskId) ?? new Set();
+    chainedItems.add(subtaskId);
+    chainedChecklistItemsByTask.set(taskId, chainedItems);
+    enqueueTaskSyncOperation(taskId, async () => {
+        const knownItemIds = new Set(
+            (get(tasks).find((task) => task.id === taskId)?.subtasks ?? [])
+                .map((subtask) => subtask.id)
+                .filter((id) => isServerTaskId(id))
+        );
+        const result = await createServerChecklistItem(taskId, text);
+        if (result.ok) {
+            const createdItem = findNewChecklistItem(result.task, knownItemIds, text);
+            if (createdItem) {
+                resolvedChecklistItemIds.set(subtaskId, createdItem.id);
+            }
+            applyServerTaskResult(result.task);
+            return;
+        }
+
+        reportSyncFailure(result, {
             type: 'checklist.create',
             taskId,
             localItemId: subtaskId,
             text
-        })
-    );
+        });
+    }, () => ({
+        type: 'checklist.create',
+        taskId,
+        localItemId: subtaskId,
+        text
+    }));
+}
+
+/**
+ * @param {import('../shared/task-domain.js').Task} serverTask
+ * @param {Set<string>} knownItemIds
+ * @param {string} text
+ */
+function findNewChecklistItem(serverTask, knownItemIds, text) {
+    const freshItems = serverTask.subtasks.filter((item) => isServerTaskId(item.id) && !knownItemIds.has(item.id));
+    return [...freshItems].reverse().find((item) => item.text === text) ?? freshItems[freshItems.length - 1] ?? null;
+}
+
+/**
+ * A follow-up edit to a checklist item whose create is still in flight joins
+ * the same per-task chain and resolves the server item id when it runs.
+ * @param {string} taskId
+ * @param {string} subtaskId
+ */
+function shouldChainLocalChecklistEdit(taskId, subtaskId) {
+    return !isServerTaskId(subtaskId)
+        && (resolvedChecklistItemIds.has(subtaskId) || taskSyncChains.has(taskId));
 }
 
 /**
@@ -984,7 +1347,7 @@ function syncChecklistPatch(taskId, subtaskId, patch) {
         return;
     }
 
-    if (!isServerTaskId(taskId) || !isServerTaskId(subtaskId)) {
+    if (!isServerTaskId(taskId) || (!isServerTaskId(subtaskId) && !shouldChainLocalChecklistEdit(taskId, subtaskId))) {
         enqueueOfflineMutation({
             type: 'checklist.patch',
             taskId,
@@ -994,14 +1357,36 @@ function syncChecklistPatch(taskId, subtaskId, patch) {
         return;
     }
 
-    void updateServerChecklistItem(taskId, subtaskId, patch).then((result) =>
-        syncReturnedTask(result, {
+    enqueueTaskSyncOperation(taskId, async () => {
+        const itemId = isServerTaskId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
+        if (!itemId) {
+            enqueueOfflineMutation({
+                type: 'checklist.patch',
+                taskId,
+                itemId: subtaskId,
+                patch
+            });
+            return;
+        }
+
+        const result = await updateServerChecklistItem(taskId, itemId, patch);
+        if (result.ok) {
+            applyServerTaskResult(result.task);
+            return;
+        }
+
+        reportSyncFailure(result, {
             type: 'checklist.patch',
             taskId,
-            itemId: subtaskId,
+            itemId,
             patch
-        })
-    );
+        });
+    }, () => ({
+        type: 'checklist.patch',
+        taskId,
+        itemId: resolvedChecklistItemIds.get(subtaskId) ?? subtaskId,
+        patch
+    }));
 }
 
 /**
@@ -1013,7 +1398,7 @@ function syncChecklistDelete(taskId, subtaskId) {
         return;
     }
 
-    if (!isServerTaskId(taskId) || !isServerTaskId(subtaskId)) {
+    if (!isServerTaskId(taskId) || (!isServerTaskId(subtaskId) && !shouldChainLocalChecklistEdit(taskId, subtaskId))) {
         enqueueOfflineMutation({
             type: 'checklist.delete',
             taskId,
@@ -1022,20 +1407,33 @@ function syncChecklistDelete(taskId, subtaskId) {
         return;
     }
 
-    void deleteServerChecklistItem(taskId, subtaskId).then((result) =>
-        syncReturnedTask(result, {
+    enqueueTaskSyncOperation(taskId, async () => {
+        const itemId = isServerTaskId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
+        if (!itemId) {
+            enqueueOfflineMutation({
+                type: 'checklist.delete',
+                taskId,
+                itemId: subtaskId
+            });
+            return;
+        }
+
+        const result = await deleteServerChecklistItem(taskId, itemId);
+        if (result.ok) {
+            applyServerTaskResult(result.task);
+            return;
+        }
+
+        reportSyncFailure(result, {
             type: 'checklist.delete',
             taskId,
-            itemId: subtaskId
-        })
-    );
-}
-
-/**
- * @param {string} taskId
- */
-function shouldSyncServerTask(taskId) {
-    return typeof window !== 'undefined' && isServerTaskId(taskId);
+            itemId
+        });
+    }, () => ({
+        type: 'checklist.delete',
+        taskId,
+        itemId: resolvedChecklistItemIds.get(subtaskId) ?? subtaskId
+    }));
 }
 
 /**
@@ -1076,17 +1474,4 @@ function reportSyncFailure(result, mutation) {
     if (!result.ok && result.fallback && mutation) {
         enqueueOfflineMutation(mutation);
     }
-}
-
-/**
- * @param {{ ok: true; task: import('../shared/task-domain.js').Task } | { ok: false; fallback: boolean; message: string }} result
- * @param {import('./offline-write-queue.js').OfflineMutationInput} [mutation]
- */
-function syncReturnedTask(result, mutation) {
-    if (result.ok) {
-        mergeTasks([result.task]);
-        return;
-    }
-
-    reportSyncFailure(result, mutation);
 }
