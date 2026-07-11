@@ -1544,6 +1544,14 @@ select {
     border-color: var(--accent);
 }
 
+/* The custom ✕ replaces the native search-cancel affordance; without this,
+   Blink/WebKit render both, stacked in the same padding zone. */
+.filter-search-input::-webkit-search-cancel-button,
+.filter-search-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
 .filter-search-input::placeholder {
     color: var(--text-secondary);
 }
