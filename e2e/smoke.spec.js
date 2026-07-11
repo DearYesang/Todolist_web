@@ -227,6 +227,19 @@ test('keeps nested checklist tasks attached on iPhone-sized offline reloads', as
 	await expect(reloadedChild.getByText('Offline checklist note')).toBeVisible();
 });
 
+test('narrows every view with the search box and highlights overdue work', async ({ page }) => {
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	await page.getByLabel('작업 검색').fill('Urgent');
+
+	await expect(page.getByText('Urgent important')).toBeVisible();
+	await expect(page.getByText('E2E cached task')).toBeHidden();
+
+	await page.getByRole('button', { name: '검색 지우기' }).click();
+	await expect(page.getByText('E2E cached task')).toBeVisible();
+});
+
 test('keeps the matrix view framed on iPad Pro width', async ({ page }) => {
 	await page.setViewportSize({ width: 1024, height: 1366 });
 	await seedOfflineBoard(page);

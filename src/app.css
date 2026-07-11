@@ -1511,6 +1511,65 @@ select {
     color: var(--text);
 }
 
+.date-tag.overdue {
+    border-color: var(--priority-high);
+    background: var(--priority-high-bg);
+    color: var(--priority-high);
+}
+
+.date-tag.due-today {
+    border-color: #d29922;
+    background: rgba(210, 153, 34, 0.12);
+    color: #d29922;
+}
+
+.filter-search {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.filter-search-input {
+    padding: 7px 30px 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    min-width: 180px;
+    transition: all var(--transition);
+}
+
+.filter-search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* The custom ✕ replaces the native search-cancel affordance; without this,
+   Blink/WebKit render both, stacked in the same padding zone. */
+.filter-search-input::-webkit-search-cancel-button,
+.filter-search-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.filter-search-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.filter-search-clear {
+    position: absolute;
+    right: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.filter-search-clear:hover {
+    color: var(--text);
+}
+
 .children-info {
     margin-bottom: 10px;
     padding: 5px 8px;
