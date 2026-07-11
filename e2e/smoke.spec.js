@@ -279,6 +279,13 @@ test('drags a Kanban card to another column with pointer input', async ({ page }
 
 	await expect(page.locator('#col-doing').getByText('E2E cached task')).toBeVisible();
 	await expect(page.locator('#col-todo').getByText('E2E cached task')).toBeHidden();
+	// Positive control for the write path: the move is persisted, not just
+	// rendered.
+	const persistedStatus = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
+			.find((task) => task.id === 'local-e2e-task')?.status
+	);
+	expect(persistedStatus).toBe('doing');
 });
 
 test('keeps a dropped child in its own column attached to its parent', async ({ page }) => {
@@ -306,6 +313,15 @@ test('keeps a dropped child in its own column attached to its parent', async ({ 
 			.find((task) => task.id === 'local-child-task')?.parentId
 	);
 	expect(parentId).toBe('local-parent-task');
+	// A same-column drop must queue no sync write. Note: for cache-seeded
+	// local tasks the queue also stays empty because coalescing drops
+	// orphan patches, so the component's same-column guard itself is only
+	// fully observable with server tasks — its residual value (avoiding
+	// redundant PATCH/version churn) is documented rather than pinned here.
+	const queuedWrites = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanOfflineWriteQueue:e2e-user') ?? '[]')
+	);
+	expect(queuedWrites).toEqual([]);
 });
 
 test('moves a task between Eisenhower quadrants with pointer input', async ({ page }) => {
