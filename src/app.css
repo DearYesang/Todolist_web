@@ -1212,6 +1212,16 @@ select {
     opacity: 0.92;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
     transform: scale(1.02) rotate(1.5deg);
+    /* The card's own 'transition: all' would make the clone trail the pointer. */
+    transition: none;
+}
+
+/* Cards suppress selection for the drag long-press, but text fields inside
+   them must keep native caret/selection gestures. */
+.task-card input,
+.task-card textarea {
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 .task-card:hover {

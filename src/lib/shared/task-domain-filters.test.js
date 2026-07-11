@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FILTERS, getTaskDueStatus, matchesFilters, normalizeTask } from './task-domain.js';
+import { DEFAULT_FILTERS, getTaskDueStatus, matchesFilters, normalizeTask, resolveEisenhowerMove } from './task-domain.js';
 
 function createTask(overrides = {}) {
 	return normalizeTask({
@@ -59,5 +59,27 @@ describe('due status', () => {
 	it('defaults to the local calendar date', () => {
 		// Sanity only: a task ending far in the future is never overdue.
 		expect(getTaskDueStatus(createTask({ endDate: '2099-01-01' }))).toBe(null);
+	});
+});
+
+describe('eisenhower move policy', () => {
+	it('is a no-op when the task is dropped into its own quadrant', () => {
+		const task = createTask({ priority: 'medium', urgency: 'urgent' });
+
+		expect(resolveEisenhowerMove(task, { importance: 'less-important', urgency: 'urgent' })).toBe(null);
+	});
+
+	it('promotes to high when dropped into an important quadrant', () => {
+		const task = createTask({ priority: 'low', urgency: 'normal' });
+
+		expect(resolveEisenhowerMove(task, { importance: 'important', urgency: 'urgent' }))
+			.toEqual({ priority: 'high', urgency: 'urgent' });
+	});
+
+	it('only demotes high on the way out; medium and low survive unchanged', () => {
+		expect(resolveEisenhowerMove(createTask({ priority: 'high', urgency: 'urgent' }), { importance: 'less-important', urgency: 'urgent' }))
+			.toEqual({ priority: 'medium', urgency: 'urgent' });
+		expect(resolveEisenhowerMove(createTask({ priority: 'low', urgency: 'urgent' }), { importance: 'less-important', urgency: 'normal' }))
+			.toEqual({ priority: 'low', urgency: 'normal' });
 	});
 });

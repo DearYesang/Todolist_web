@@ -31,6 +31,7 @@ export const DND_ZONE_ATTRIBUTE = 'data-dnd-zone';
  *   clientX: number;
  *   clientY: number;
  *   pointerType?: string;
+ *   pointerId?: number;
  *   button?: number;
  *   preventDefault?: () => void;
  * }} PointerLike
@@ -65,6 +66,7 @@ export function createPointerDndController(options) {
 	 *   id: string;
 	 *   node: unknown;
 	 *   isTouch: boolean;
+	 *   pointerId: number | undefined;
 	 *   originX: number;
 	 *   originY: number;
 	 *   cancelTimer: () => void;
@@ -74,13 +76,37 @@ export function createPointerDndController(options) {
 	 *   id: string;
 	 *   node: unknown;
 	 *   isTouch: boolean;
+	 *   pointerId: number | undefined;
 	 *   hoveredZone: string | null;
 	 *   lastEvent: PointerLike;
 	 *   teardown: (() => void)[];
 	 * }}
 	 */
 	let state = { phase: 'idle' };
-	let suppressNextClick = false;
+
+	/**
+	 * The gesture belongs to the pointer that started it: a second finger (or
+	 * a resting palm) must not move the ghost or complete the drop.
+	 * @param {PointerLike} event
+	 */
+	function ownsEvent(event) {
+		if (state.phase === 'idle') return false;
+		return state.pointerId === undefined
+			|| event.pointerId === undefined
+			|| event.pointerId === state.pointerId;
+	}
+
+	/**
+	 * Registered at gesture start (iOS Safari decides scroll-vs-listener from
+	 * the FIRST touchmove, so waiting until activation is too late) but only
+	 * blocks once the drag actually owns the gesture.
+	 * @param {{ cancelable?: boolean; preventDefault?: () => void }} event
+	 */
+	function guardedTouchMove(event) {
+		if (state.phase === 'active' && event.cancelable !== false) {
+			event.preventDefault?.();
+		}
+	}
 
 	function emit() {
 		notify({
@@ -107,6 +133,7 @@ export function createPointerDndController(options) {
 			id,
 			node,
 			isTouch,
+			pointerId: event.pointerId,
 			originX: event.clientX,
 			originY: event.clientY,
 			cancelTimer: () => {},
@@ -119,6 +146,7 @@ export function createPointerDndController(options) {
 		teardown.push(listen('pointercancel', handleCancel));
 
 		if (isTouch) {
+			teardown.push(listen('touchmove', guardedTouchMove, { passive: false }));
 			// Long-press: give native panning the first claim on the gesture.
 			pending.cancelTimer = setTimer(() => {
 				if (state.phase === 'pending' && state === pending) {
@@ -134,20 +162,20 @@ export function createPointerDndController(options) {
 			return;
 		}
 
-		const { id, node, isTouch, teardown } = state;
+		const { id, node, isTouch, pointerId, teardown } = state;
 		state = {
 			phase: 'active',
 			id,
 			node,
 			isTouch,
+			pointerId,
 			hoveredZone: null,
 			lastEvent: event,
 			teardown
 		};
 
-		// Once the drag owns the gesture, stop native scrolling and the iOS
-		// long-press callout. touchmove must be non-passive to preventDefault.
-		teardown.push(listen('touchmove', preventDefaultHandler, { passive: false }));
+		// Suppress the long-press context menu once the drag owns the gesture;
+		// scroll blocking is handled by guardedTouchMove from gesture start.
 		teardown.push(listen('contextmenu', preventDefaultHandler));
 		teardown.push(listen('keydown', handleKeyDown));
 
@@ -158,6 +186,10 @@ export function createPointerDndController(options) {
 
 	/** @param {PointerLike} event */
 	function handlePointerMove(event) {
+		if (!ownsEvent(event)) {
+			return;
+		}
+
 		if (state.phase === 'pending') {
 			const distance = Math.hypot(event.clientX - state.originX, event.clientY - state.originY);
 			if (state.isTouch) {
@@ -200,6 +232,10 @@ export function createPointerDndController(options) {
 
 	/** @param {PointerLike} event */
 	function handleRelease(event) {
+		if (!ownsEvent(event)) {
+			return;
+		}
+
 		if (state.phase === 'pending') {
 			reset();
 			return;
@@ -211,14 +247,45 @@ export function createPointerDndController(options) {
 
 		const { id } = state;
 		const zone = resolveZone(event.clientX, event.clientY) ?? state.hoveredZone;
-		suppressNextClick = true;
+		trapPostDragClick();
 		reset();
 		if (zone) {
 			options.onDrop(id, zone);
 		}
 	}
 
-	function handleCancel() {
+	/**
+	 * The browser fires a click right after pointerup — on whatever element
+	 * sits under the drop point (often not the source card). Swallow exactly
+	 * that one click via a capture listener that self-expires immediately, so
+	 * the task modal does not open under the drop and the NEXT legitimate
+	 * click is untouched even when no post-drag click fires at all.
+	 */
+	function trapPostDragClick() {
+		/** @type {() => void} */
+		let removeTrap = () => {};
+		/** @type {() => void} */
+		let cancelExpiry = () => {};
+		const disarm = () => {
+			removeTrap();
+			cancelExpiry();
+		};
+		removeTrap = listen('click', (/** @type {PointerLike & { stopPropagation?: () => void }} */ event) => {
+			event.preventDefault?.();
+			event.stopPropagation?.();
+			disarm();
+		}, { capture: true });
+		// Input events dispatch before timer callbacks, so a zero-delay timer
+		// expires the trap only after any post-drag click has already fired.
+		cancelExpiry = setTimer(disarm, 0);
+	}
+
+	/** @param {PointerLike} event */
+	function handleCancel(event) {
+		if (!ownsEvent(event)) {
+			return;
+		}
+
 		reset();
 	}
 
@@ -256,19 +323,18 @@ export function createPointerDndController(options) {
 	function draggable(node, id) {
 		let currentId = id;
 		/** @param {PointerEvent} event */
-		const onPointerDown = (event) => beginPending(node, currentId, event);
-		/** @param {MouseEvent} event */
-		const onClick = (event) => {
-			// The click fired at the end of a completed drag must not open the
-			// task modal underneath the drop point.
-			if (suppressNextClick) {
-				suppressNextClick = false;
-				event.preventDefault();
-				event.stopPropagation();
+		const onPointerDown = (event) => {
+			// Presses on interactive controls (checklist input, move buttons…)
+			// belong to those controls: a long-press to place a caret must not
+			// start dragging the card. .card-text has role=button and stays a
+			// drag surface, so the selector stays to real form controls.
+			const target = typeof Element !== 'undefined' && event.target instanceof Element ? event.target : null;
+			if (target?.closest('button, input, textarea, select, a, [contenteditable]')) {
+				return;
 			}
+			beginPending(node, currentId, event);
 		};
 		node.addEventListener('pointerdown', onPointerDown);
-		node.addEventListener('click', onClick, true);
 
 		return {
 			/** @param {string} nextId */
@@ -277,7 +343,6 @@ export function createPointerDndController(options) {
 			},
 			destroy() {
 				node.removeEventListener('pointerdown', onPointerDown);
-				node.removeEventListener('click', onClick, true);
 				if (state.phase !== 'idle' && state.node === node) {
 					reset();
 				}
@@ -429,13 +494,14 @@ function createAutoScroller({ edgePx = 72, maxStepPx = 14 } = {}) {
 }
 
 /**
+ * Exported for unit tests: the auto-scroll edge math.
  * @param {number} position
  * @param {number} start
  * @param {number} end
  * @param {number} edgePx
  * @param {number} maxStepPx
  */
-function edgeDelta(position, start, end, edgePx, maxStepPx) {
+export function edgeDelta(position, start, end, edgePx, maxStepPx) {
 	if (position < start + edgePx) {
 		return -Math.ceil(((start + edgePx - position) / edgePx) * maxStepPx);
 	}

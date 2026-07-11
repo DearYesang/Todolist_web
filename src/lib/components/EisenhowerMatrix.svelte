@@ -2,7 +2,7 @@
     import { setContext } from 'svelte';
     import { filters, tasks, updateTask } from '$lib/client/task-store.js';
     import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
-    import { buildHierarchy, matchesFilters } from '$lib/shared/task-domain.js';
+    import { buildHierarchy, isTaskInEisenhowerQuadrant, matchesFilters, resolveEisenhowerMove } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
     let { openTask } = $props();
@@ -103,9 +103,7 @@
      * @param {EisenhowerQuadrant} quadrant
      */
     function isTaskInQuadrant(task, quadrant) {
-        const isImportant = task.priority === 'high';
-        const matchesImportance = quadrant.importance === 'important' ? isImportant : !isImportant;
-        return matchesImportance && task.urgency === quadrant.urgency;
+        return isTaskInEisenhowerQuadrant(task, quadrant);
     }
 
     /**
@@ -114,18 +112,10 @@
      */
     function moveTaskToQuadrant(taskId, quadrant) {
         const task = $tasks.find((candidate) => candidate.id === taskId);
-        // Dropping into the task's own quadrant must not touch priority or
-        // bump the version.
-        if (!task || isTaskInQuadrant(task, quadrant)) return;
-
-        updateTask(taskId, {
-            priority: quadrant.importance === 'important'
-                ? 'high'
-                : task.priority === 'high'
-                    ? 'medium'
-                    : task.priority,
-            urgency: quadrant.urgency
-        });
+        const patch = task ? resolveEisenhowerMove(task, quadrant) : null;
+        if (patch) {
+            updateTask(taskId, patch);
+        }
     }
 </script>
 

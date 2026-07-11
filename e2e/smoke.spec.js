@@ -298,8 +298,14 @@ test('keeps a dropped child in its own column attached to its parent', async ({ 
 		y: columnBox.y + columnBox.height - 20
 	});
 
-	// Still rendered as an indented child (child-card class survives).
+	// Still rendered as an indented child (child-card class survives)…
 	await expect(page.locator('.task-card.child-card', { has: page.getByText('Nested child task') })).toBeVisible();
+	// …and the persisted task graph still records the parent link.
+	const parentId = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
+			.find((task) => task.id === 'local-child-task')?.parentId
+	);
+	expect(parentId).toBe('local-parent-task');
 });
 
 test('moves a task between Eisenhower quadrants with pointer input', async ({ page }) => {
@@ -323,6 +329,11 @@ test('moves a task between Eisenhower quadrants with pointer input', async ({ pa
 	// 'Interrupting task' was medium/urgent (줄이기); dropping on 즉시 실행
 	// promotes it to important while keeping urgency.
 	await expect(target.getByText('Interrupting task')).toBeVisible();
+	const persisted = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
+			.find((task) => task.id === 'local-interrupting-task')
+	);
+	expect(persisted).toMatchObject({ priority: 'high', urgency: 'urgent' });
 });
 
 test('keeps the matrix view framed on iPad Pro width', async ({ page }) => {
