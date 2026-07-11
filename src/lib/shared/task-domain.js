@@ -498,6 +498,45 @@ function getLocalDateString() {
 }
 
 /**
+ * @typedef {{ importance: 'important' | 'less-important'; urgency: TaskUrgency }} EisenhowerQuadrantSpec
+ */
+
+/**
+ * @param {Task} task
+ * @param {EisenhowerQuadrantSpec} quadrant
+ */
+export function isTaskInEisenhowerQuadrant(task, quadrant) {
+    const isImportant = task.priority === 'high';
+    const matchesImportance = quadrant.importance === 'important' ? isImportant : !isImportant;
+    return matchesImportance && task.urgency === quadrant.urgency;
+}
+
+/**
+ * Patch for dropping a task into an Eisenhower quadrant, or null when the
+ * drop is a no-op. Moving into the task's own quadrant must not rewrite
+ * fields (spurious version bumps become fake sync conflicts), and demotion
+ * out of the important half only lowers 'high' — medium/low survive a round
+ * trip through an important quadrant unchanged on that axis.
+ * @param {Task} task
+ * @param {EisenhowerQuadrantSpec} quadrant
+ * @returns {{ priority: TaskPriority; urgency: TaskUrgency } | null}
+ */
+export function resolveEisenhowerMove(task, quadrant) {
+    if (isTaskInEisenhowerQuadrant(task, quadrant)) {
+        return null;
+    }
+
+    return {
+        priority: quadrant.importance === 'important'
+            ? 'high'
+            : task.priority === 'high'
+                ? 'medium'
+                : task.priority,
+        urgency: quadrant.urgency
+    };
+}
+
+/**
  * @param {Task[]} taskList
  * @param {TaskFilters} activeFilters
  * @returns {Task[]}

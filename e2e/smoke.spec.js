@@ -240,6 +240,102 @@ test('narrows every view with the search box and highlights overdue work', async
 	await expect(page.getByText('E2E cached task')).toBeVisible();
 });
 
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').Locator} card
+ * @param {{ x: number; y: number }} dropPoint
+ */
+async function pointerDrag(page, card, dropPoint) {
+	await card.scrollIntoViewIfNeeded();
+	const cardBox = await card.boundingBox();
+	expect(cardBox).toBeTruthy();
+
+	// Pointer-based drag: press, cross the activation threshold, drop.
+	await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + 12);
+	await page.mouse.down();
+	await page.mouse.move(cardBox.x + cardBox.width / 2 + 30, cardBox.y + 44, { steps: 5 });
+	await page.mouse.move(dropPoint.x, dropPoint.y, { steps: 10 });
+	await page.mouse.up();
+}
+
+test('drags a Kanban card to another column with pointer input', async ({ page }) => {
+	// Tall viewport keeps every drag source and target on screen; pointer
+	// events cannot reach elements outside the viewport.
+	await page.setViewportSize({ width: 1280, height: 1400 });
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	const card = page.locator('.task-card', { has: page.getByText('E2E cached task') }).first();
+	const target = page.locator('#col-doing .task-list');
+	const targetBox = await target.boundingBox();
+	expect(targetBox).toBeTruthy();
+
+	// Drop into the empty space at the bottom of the list — dropping onto an
+	// existing card means re-parenting, not a column move.
+	await pointerDrag(page, card, {
+		x: targetBox.x + targetBox.width / 2,
+		y: targetBox.y + targetBox.height - 20
+	});
+
+	await expect(page.locator('#col-doing').getByText('E2E cached task')).toBeVisible();
+	await expect(page.locator('#col-todo').getByText('E2E cached task')).toBeHidden();
+});
+
+test('keeps a dropped child in its own column attached to its parent', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 1400 });
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	const child = page.locator('.task-card', { has: page.getByText('Nested child task') }).first();
+	const column = page.locator('#col-todo .task-list');
+	const columnBox = await column.boundingBox();
+	expect(columnBox).toBeTruthy();
+
+	// Drop into empty space of the SAME column: the old HTML5 handler
+	// silently detached the child from its parent here.
+	await pointerDrag(page, child, {
+		x: columnBox.x + columnBox.width / 2,
+		y: columnBox.y + columnBox.height - 20
+	});
+
+	// Still rendered as an indented child (child-card class survives)…
+	await expect(page.locator('.task-card.child-card', { has: page.getByText('Nested child task') })).toBeVisible();
+	// …and the persisted task graph still records the parent link.
+	const parentId = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
+			.find((task) => task.id === 'local-child-task')?.parentId
+	);
+	expect(parentId).toBe('local-parent-task');
+});
+
+test('moves a task between Eisenhower quadrants with pointer input', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 1400 });
+	await seedOfflineBoard(page);
+
+	await page.goto('/');
+	await page.getByRole('button', { name: /매트릭스/ }).click();
+
+	const card = page.locator('.task-card', { has: page.getByText('Interrupting task') }).first();
+	const target = page.locator('.eisenhower-quadrant[data-quadrant="do"]');
+	await card.scrollIntoViewIfNeeded();
+	const targetBox = await target.boundingBox();
+	expect(targetBox).toBeTruthy();
+
+	await pointerDrag(page, card, {
+		x: targetBox.x + targetBox.width / 2,
+		y: targetBox.y + targetBox.height / 2
+	});
+
+	// 'Interrupting task' was medium/urgent (줄이기); dropping on 즉시 실행
+	// promotes it to important while keeping urgency.
+	await expect(target.getByText('Interrupting task')).toBeVisible();
+	const persisted = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
+			.find((task) => task.id === 'local-interrupting-task')
+	);
+	expect(persisted).toMatchObject({ priority: 'high', urgency: 'urgent' });
+});
+
 test('keeps the matrix view framed on iPad Pro width', async ({ page }) => {
 	await page.setViewportSize({ width: 1024, height: 1366 });
 	await seedOfflineBoard(page);
