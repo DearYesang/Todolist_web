@@ -412,6 +412,13 @@ export function setUrgencyFilter(value) {
 
 /**
  * @param {string} value
+ */
+export function setSearchFilter(value) {
+    filters.update((current) => ({ ...current, search: value }));
+}
+
+/**
+ * @param {string} value
  * @param {string | null} [name]
  */
 export function setCategoryFilter(value, name = null) {

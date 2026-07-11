@@ -11,6 +11,7 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 - Task hierarchy: 상위/하위 작업, 접기/펼치기, cascade delete
 - Checklist: 작업별 체크리스트, 진행률, URL 링크 표시
 - Date range picker: 작업 추가와 상세 수정에서 월간 캘린더로 시작일/마감일 선택
+- Search and due-date signals: 모든 뷰 공통 텍스트 검색(작업명·카테고리·체크리스트 대상), 기한 초과/오늘 마감 하이라이트
 - Filters and categories: 중요도, 시급성, 카테고리 필터, DB-backed 카테고리 이름 변경/병합/삭제, 색상/정렬/숨김, 작업 입력 중 규칙 기반 카테고리 추천
 - Backup: `kanban_backup_YYYY-MM-DD.json` 내보내기/불러오기
 - Calendar integration: 전체 일정 동기화용 `.ics` 링크, 작업별 all-day `.ics` 다운로드, 로그인 세션용 `/api/calendar.ics` 제공

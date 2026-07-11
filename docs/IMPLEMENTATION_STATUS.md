@@ -1,14 +1,16 @@
 # Implementation Status
 
-Last updated: 2026-05-10
+Last updated: 2026-07-11
 
 This document compares the current implementation against the working plan for the personal Vercel + Neon deployment.
 
 ## Production Snapshot
 
-- Latest production merge: `86305f6 Add Apache 2.0 license`.
-- Latest strict health smoke: `https://todokanban-alpha.vercel.app/api/health?strict=true` returned `ok: true` on 2026-05-09.
-- Calendar direction: `.ics` is the active product path. The whole-board `.ics` link was manually confirmed, and Google/Microsoft provider sync is deferred behind existing route/service scaffolding.
+- Latest production merges (2026-07-06 ~ 07-11): #54 offline-sync race-condition fixes, #55 dependency security update (`npm audit` 0), #56 server write-path hardening (atomic batches, recursive-CTE cascade delete, partial PATCH, per-user rate limits), #57 Playwright E2E in CI on Chromium + iPhone WebKit, plus Dependabot action bumps.
+- Latest strict health smoke: `https://todokanban-alpha.vercel.app/api/health?strict=true` returned `ok: true` on 2026-07-11, verified after each of the four production deploys.
+- Category entity v2 migration (0010) is confirmed applied in production (the board list join requires it and daily usage works).
+- Passkey login manually confirmed on-device after the better-auth 1.6.23 bump (2026-07-11).
+- Calendar direction: `.ics` is the active product path. The whole-board `.ics` link was manually confirmed, and Google/Microsoft provider sync is deferred behind existing route/service scaffolding. The unused local Google OAuth client credential file has been deleted; deleting the OAuth client in Google Cloud Console remains a pending manual step.
 
 ## Plan vs State
 
@@ -51,12 +53,11 @@ Browser / PWA
 
 ## Recommended Next Order
 
-1. Before deploying category entity v2, run the new Drizzle migration and then smoke category create/rename/merge/delete/color/sort/hide on production.
-2. Real-device smoke: Mac, Windows, iPhone 14 Pro, iPad Pro 12.9. Cover nested task + checklist sync, category rename/merge/delete, Gantt checklist toggles, matrix completed toggle, offline reload, refresh, installed PWA icon refresh, and cross-device default view persistence.
-3. Broaden the `.ics` calendar smoke beyond the already-confirmed link: subscribe from the target calendar apps, download a single-task `.ics`, and confirm full date ranges on Mac, Windows, iPhone, and iPad.
-4. Keep checklist/import conflicts report-first unless real conflicts make the extra complexity worthwhile.
-5. Revisit Google provider sync, cron logs, webhooks, and recurring events only if `.ics` becomes too limited.
-6. Consider direct Gantt checklist undo affordances only if accidental toggles become common in daily use.
+1. Pointer-based drag-and-drop shared across Kanban/Gantt/Eisenhower (touch support — card movement is currently dead on iOS/Android; the Eisenhower matrix has no touch fallback at all). The WebKit iPhone E2E project now in CI is the safety net for this work.
+2. Kanban manual ordering: add PATCH support for `tasks.position` (fractional midpoint — the `numeric(20,10)` column and index already exist) plus drop-position indicators.
+3. Generalize the sync-notice banner into a toast/undo system so cascade deletes and bulk actions become reversible.
+4. Technical hardening batch (one PR): client fetch timeouts + `retry-after` honoring, `rate_limit_buckets` and soft-deleted-task purge on the existing cron, single-JOIN task authorization query.
+5. Keep checklist/import conflicts report-first unless real conflicts make the extra complexity worthwhile.
 
 ## Deferred Decisions
 

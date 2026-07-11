@@ -12,6 +12,7 @@
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
+        getTaskDueStatus,
         PRIORITY_LABELS,
         STATUS_LABELS,
         URGENCY_LABELS
@@ -51,6 +52,7 @@
     const children = $derived(childrenByParent[task.id] || []);
     const directChildren = $derived(allTasks.filter((candidate) => candidate.parentId === task.id));
     const doneChildrenCount = $derived(directChildren.filter((candidate) => candidate.status === 'done').length);
+    const dueStatus = $derived(getTaskDueStatus(task));
     const foreignParent = $derived.by(() => {
         if (!task.parentId) return null;
         const parent = allTasks.find((candidate) => candidate.id === task.parentId) || null;
@@ -284,8 +286,12 @@
         {task.text}
     </div>
 
-    <button class="date-tag" onclick={handleOpenTask}>
-        📅 {task.startDate} ~ {task.endDate}
+    <button
+        class="date-tag"
+        class:overdue={dueStatus === 'overdue'}
+        class:due-today={dueStatus === 'due-today'}
+        onclick={handleOpenTask}>
+        {dueStatus === 'overdue' ? '⚠️' : '📅'} {task.startDate} ~ {task.endDate}{dueStatus === 'overdue' ? ' · 기한 초과' : dueStatus === 'due-today' ? ' · 오늘 마감' : ''}
     </button>
 
     {#if directChildren.length > 0}

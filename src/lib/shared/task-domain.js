@@ -43,6 +43,7 @@
  *   urgency: UrgencyFilter;
  *   category: string;
  *   categoryId: string;
+ *   search?: string;
  * }} TaskFilters
  */
 
@@ -55,7 +56,8 @@ export const DEFAULT_FILTERS = Object.freeze({
     priority: 'all',
     urgency: 'all',
     category: 'all',
-    categoryId: 'all'
+    categoryId: 'all',
+    search: ''
 });
 
 export const STATUS_LABELS = {
@@ -452,9 +454,47 @@ function hexToRgba(hex, alpha) {
 export function matchesFilters(task, activeFilters) {
     if (activeFilters.priority !== 'all' && task.priority !== activeFilters.priority) return false;
     if (activeFilters.urgency !== 'all' && task.urgency !== activeFilters.urgency) return false;
+    // The search check must run before the categoryId branch below, which
+    // returns early and would otherwise bypass it.
+    if (!matchesSearch(task, activeFilters.search)) return false;
     if (activeFilters.categoryId && activeFilters.categoryId !== 'all') return task.categoryId === activeFilters.categoryId;
     if (activeFilters.category !== 'all' && task.category !== activeFilters.category) return false;
     return true;
+}
+
+/**
+ * @param {Task} task
+ * @param {string | undefined} search
+ */
+function matchesSearch(task, search) {
+    const query = (search ?? '').trim().toLocaleLowerCase('ko');
+    if (!query) return true;
+
+    const haystacks = [task.text, task.category, ...task.subtasks.map((subtask) => subtask.text)];
+    return haystacks.some((value) => value && value.toLocaleLowerCase('ko').includes(query));
+}
+
+/**
+ * Classifies a task's schedule urgency for display. Done tasks never count.
+ * @param {Task} task
+ * @param {string} [today] YYYY-MM-DD; defaults to the local calendar date
+ * @returns {'overdue' | 'due-today' | null}
+ */
+export function getTaskDueStatus(task, today = getLocalDateString()) {
+    if (task.status === 'done' || !DATE_PATTERN.test(task.endDate)) {
+        return null;
+    }
+
+    if (task.endDate < today) return 'overdue';
+    if (task.endDate === today) return 'due-today';
+    return null;
+}
+
+function getLocalDateString() {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${now.getFullYear()}-${month}-${day}`;
 }
 
 /**

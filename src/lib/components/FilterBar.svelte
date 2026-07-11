@@ -3,6 +3,7 @@
         filters,
         setCategoryFilter,
         setPriorityFilter,
+        setSearchFilter,
         setUrgencyFilter,
         visibleCategorySummaries
     } from '$lib/client/task-store.js';
@@ -28,6 +29,20 @@
 </script>
 
 <div class="filter-bar">
+    <div class="filter-search">
+        <input
+            type="search"
+            class="filter-search-input"
+            placeholder="🔍 작업 검색"
+            aria-label="작업 검색"
+            value={$filters.search ?? ''}
+            oninput={(event) => setSearchFilter(event.currentTarget.value)} />
+        {#if $filters.search}
+            <button class="filter-search-clear" aria-label="검색 지우기" onclick={() => setSearchFilter('')}>✕</button>
+        {/if}
+    </div>
+
+    <div class="filter-divider"></div>
     <span class="filter-label">필터</span>
 
     {#each priorityOptions as option}
