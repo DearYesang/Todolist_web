@@ -1,5 +1,7 @@
 <script>
+    import { getContext } from 'svelte';
     import TaskTreeCard from './TaskTreeCard.svelte';
+    import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import {
         addSubtask,
         deleteSubtask,
@@ -24,25 +26,26 @@
      *   allTasks: import('$lib/shared/task-domain.js').Task[];
      *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
-     *   draggedId?: string | null;
      *   openTask: (id: string) => void;
-     *   onDragStart: (event: DragEvent, taskId: string) => void;
-     *   onDragEnd: () => void;
-     *   onDropOnTask: (event: DragEvent, targetTaskId: string) => void;
      * }} */
     let {
         task,
         allTasks,
         childrenByParent,
         depth = 0,
-        draggedId = null,
-        openTask,
-        onDragStart,
-        onDragEnd,
-        onDropOnTask
+        openTask
     } = $props();
 
-    let isDragOver = $state(false);
+    /** @type {{ controller: ReturnType<typeof import('$lib/client/pointer-dnd.js').createPointerDndController>; state: { draggedId: string | null; hoveredZone: string | null }; cardDrops: boolean } | undefined} */
+    const dnd = getContext('task-dnd');
+
+    /**
+     * @param {HTMLElement} node
+     * @param {string} id
+     */
+    function cardDraggable(node, id) {
+        return dnd ? dnd.controller.draggable(node, id) : undefined;
+    }
     let newSubtaskText = $state('');
     let isSubtaskComposing = $state(false);
     let didSubtaskCompositionJustEnd = $state(false);
@@ -68,16 +71,6 @@
     function handleOpenTask(event) {
         event.stopPropagation();
         openTask(task.id);
-    }
-
-    /**
-     * @param {DragEvent} event
-     */
-    function handleDrop(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        isDragOver = false;
-        onDropOnTask(event, task.id);
     }
 
     /**
@@ -229,24 +222,14 @@
 <div
     class="task-card"
     class:child-card={depth > 0}
-    class:drag-over-card={isDragOver && draggedId !== task.id}
+    class:drag-over-card={Boolean(dnd?.cardDrops)
+        && dnd?.state.hoveredZone === `card:${task.id}`
+        && dnd?.state.draggedId !== task.id}
     data-priority={task.priority}
-    draggable="true"
     role="listitem"
     style={depth > 0 ? `margin-left:${depth * 32}px;` : ''}
-    ondragstart={(event) => onDragStart(event, task.id)}
-    ondragend={onDragEnd}
-    ondragover={(event) => event.preventDefault()}
-    ondragenter={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        isDragOver = draggedId !== null && draggedId !== task.id;
-    }}
-    ondragleave={(event) => {
-        event.stopPropagation();
-        isDragOver = false;
-    }}
-    ondrop={handleDrop}>
+    use:cardDraggable={task.id}
+    {...(dnd?.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {})}>
     <div class="card-meta">
         <span class="priority-badge {task.priority}">{PRIORITY_LABELS[task.priority]}</span>
         <span class="urgency-badge {task.urgency}">{URGENCY_LABELS[task.urgency]}</span>
@@ -381,11 +364,7 @@
             allTasks={allTasks}
             childrenByParent={childrenByParent}
             depth={depth + 1}
-            draggedId={draggedId}
             openTask={openTask}
-            onDragEnd={onDragEnd}
-            onDragStart={onDragStart}
-            onDropOnTask={onDropOnTask}
             task={child} />
     {/each}
 {/if}

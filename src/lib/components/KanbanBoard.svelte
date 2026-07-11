@@ -1,5 +1,7 @@
 <script>
+    import { setContext } from 'svelte';
     import { assignParent, filters, moveTask, tasks } from '$lib/client/task-store.js';
+    import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import { buildColumnHierarchy, canAssignParent } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
@@ -11,10 +13,46 @@
         { id: 'done', title: '완료', emptyIcon: '🎉' }
     ];
 
-    /** @type {string | null} */
-    let draggedId = $state(null);
-    /** @type {string | null} */
-    let hoveredColumn = $state(null);
+    const dndState = $state({ draggedId: /** @type {string | null} */ (null), hoveredZone: /** @type {string | null} */ (null) });
+
+    const controller = createPointerDndController({
+        onStateChange(snapshot) {
+            dndState.draggedId = snapshot.draggedId;
+            dndState.hoveredZone = snapshot.hoveredZone;
+        },
+        onDrop(draggedId, zone) {
+            const [kind, target] = splitZone(zone);
+            if (kind === 'card') {
+                if (target === draggedId) return;
+                if (!canAssignParent($tasks, draggedId, target)) {
+                    alert('하위 작업을 해당 작업의 부모로 설정할 수 없습니다.');
+                    return;
+                }
+                assignParent(draggedId, target);
+                return;
+            }
+
+            if (kind === 'column') {
+                const task = $tasks.find((candidate) => candidate.id === draggedId);
+                // Dropping back into the same lane is a no-op; the old code
+                // silently detached the card from its parent here.
+                if (!task || task.status === target) return;
+                moveTask(draggedId, /** @type {'todo' | 'doing' | 'done'} */ (target));
+            }
+        }
+    });
+
+    // Cards are drop targets (re-parenting) only on the Kanban board.
+    setContext('task-dnd', { controller, state: dndState, cardDrops: true });
+
+    /**
+     * @param {string} zone
+     * @returns {[string, string]}
+     */
+    function splitZone(zone) {
+        const separator = zone.indexOf(':');
+        return [zone.slice(0, separator), zone.slice(separator + 1)];
+    }
 
     const columnData = $derived.by(() =>
         columns.map((column) => ({
@@ -22,57 +60,6 @@
             ...buildColumnHierarchy($tasks, /** @type {'todo' | 'doing' | 'done'} */ (column.id), $filters)
         }))
     );
-
-    /**
-     * @param {DragEvent} event
-     * @param {string} taskId
-     */
-    function onDragStart(event, taskId) {
-        draggedId = taskId;
-        if (event.dataTransfer) {
-            event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', taskId);
-        }
-    }
-
-    function onDragEnd() {
-        draggedId = null;
-        hoveredColumn = null;
-    }
-
-    /**
-     * @param {DragEvent} event
-     * @param {'todo' | 'doing' | 'done'} status
-     */
-    function onDropOnColumn(event, status) {
-        event.preventDefault();
-        const taskId = event.dataTransfer?.getData('text/plain');
-        if (!taskId) return;
-
-        assignParent(taskId, null);
-        moveTask(taskId, status);
-        draggedId = null;
-        hoveredColumn = null;
-    }
-
-    /**
-     * @param {DragEvent} event
-     * @param {string} targetTaskId
-     */
-    function onDropOnTask(event, targetTaskId) {
-        const taskId = event.dataTransfer?.getData('text/plain');
-        if (!taskId || taskId === targetTaskId) return;
-
-        if (!canAssignParent($tasks, taskId, targetTaskId)) {
-            alert('하위 작업을 해당 작업의 부모로 설정할 수 없습니다.');
-            draggedId = null;
-            return;
-        }
-
-        assignParent(taskId, targetTaskId);
-        draggedId = null;
-        hoveredColumn = null;
-    }
 </script>
 
 <div class="board">
@@ -86,18 +73,10 @@
 
             <div
                 class="task-list"
-                class:drag-over-col={hoveredColumn === column.id && draggedId !== null}
+                class:drag-over-col={dndState.draggedId !== null && dndState.hoveredZone === `column:${column.id}`}
                 role="list"
                 aria-label={`${column.title} 작업 목록`}
-                ondragover={(event) => event.preventDefault()}
-                ondragenter={(event) => {
-                    event.preventDefault();
-                    hoveredColumn = column.id;
-                }}
-                ondragleave={() => {
-                    if (hoveredColumn === column.id) hoveredColumn = null;
-                }}
-                ondrop={(event) => onDropOnColumn(event, /** @type {'todo' | 'doing' | 'done'} */ (column.id))}>
+                {...{ [DND_ZONE_ATTRIBUTE]: `column:${column.id}` }}>
                 {#if column.roots.length === 0}
                     <div class="empty-state">
                         <div class="icon">{column.emptyIcon}</div>
@@ -108,11 +87,7 @@
                         <TaskTreeCard
                             allTasks={$tasks}
                             childrenByParent={column.childrenByParent}
-                            draggedId={draggedId}
                             openTask={openTask}
-                            onDragEnd={onDragEnd}
-                            onDragStart={onDragStart}
-                            onDropOnTask={onDropOnTask}
                             task={task} />
                     {/each}
                 {/if}

@@ -1191,7 +1191,27 @@ select {
     border-radius: var(--radius-sm);
     background: var(--surface-raised);
     transition: all var(--transition);
-    touch-action: manipulation;
+    /* pan-y keeps one-finger scrolling; the pointer-DnD long-press owns the
+       gesture only after activation. Callout/selection suppression stops the
+       iOS long-press menu from racing the drag. */
+    touch-action: pan-y;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.task-card.dnd-source {
+    opacity: 0.35;
+}
+
+.dnd-ghost {
+    position: fixed;
+    z-index: 1000;
+    margin: 0;
+    pointer-events: none;
+    opacity: 0.92;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    transform: scale(1.02) rotate(1.5deg);
 }
 
 .task-card:hover {

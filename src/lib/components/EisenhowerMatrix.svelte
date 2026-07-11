@@ -1,5 +1,7 @@
 <script>
+    import { setContext } from 'svelte';
     import { filters, tasks, updateTask } from '$lib/client/task-store.js';
+    import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import { buildHierarchy, matchesFilters } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
@@ -52,11 +54,27 @@
         }
     ];
 
-    /** @type {string | null} */
-    let draggedId = $state(null);
-    /** @type {string | null} */
-    let hoveredQuadrant = $state(null);
     let showDoneTasks = $state(false);
+
+    const dndState = $state({ draggedId: /** @type {string | null} */ (null), hoveredZone: /** @type {string | null} */ (null) });
+
+    const controller = createPointerDndController({
+        onStateChange(snapshot) {
+            dndState.draggedId = snapshot.draggedId;
+            dndState.hoveredZone = snapshot.hoveredZone;
+        },
+        onDrop(draggedId, zone) {
+            const quadrant = quadrants.find((candidate) => `quadrant:${candidate.id}` === zone);
+            if (quadrant) {
+                moveTaskToQuadrant(draggedId, quadrant);
+            }
+        }
+    });
+
+    // Cards are NOT drop targets here: dropping anywhere in a quadrant —
+    // including on top of another card — means "move to this quadrant", so
+    // only quadrants get zone attributes and highlights.
+    setContext('task-dnd', { controller, state: dndState, cardDrops: false });
 
     const hiddenDoneCount = $derived(
         $tasks.filter((task) => task.status === 'done' && matchesFilters(task, $filters)).length
@@ -91,69 +109,21 @@
     }
 
     /**
-     * @param {DragEvent} event
-     * @param {string} taskId
-     */
-    function onDragStart(event, taskId) {
-        draggedId = taskId;
-        if (event.dataTransfer) {
-            event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', taskId);
-        }
-    }
-
-    function onDragEnd() {
-        draggedId = null;
-        hoveredQuadrant = null;
-    }
-
-    /**
-     * @param {DragEvent} event
-     * @param {EisenhowerQuadrant} quadrant
-     */
-    function onDropOnQuadrant(event, quadrant) {
-        event.preventDefault();
-        const taskId = event.dataTransfer?.getData('text/plain');
-        if (taskId) {
-            moveTaskToQuadrant(taskId, quadrant);
-        }
-        onDragEnd();
-    }
-
-    /**
-     * @param {DragEvent} event
-     * @param {string} targetTaskId
-     */
-    function onDropOnTask(event, targetTaskId) {
-        event.preventDefault();
-        const draggedTaskId = event.dataTransfer?.getData('text/plain');
-        if (!draggedTaskId || draggedTaskId === targetTaskId) {
-            onDragEnd();
-            return;
-        }
-
-        const targetTask = $tasks.find((task) => task.id === targetTaskId);
-        const targetQuadrant = quadrants.find((quadrant) => targetTask && isTaskInQuadrant(targetTask, quadrant));
-        if (targetQuadrant) {
-            moveTaskToQuadrant(draggedTaskId, targetQuadrant);
-        }
-        onDragEnd();
-    }
-
-    /**
      * @param {string} taskId
      * @param {EisenhowerQuadrant} quadrant
      */
     function moveTaskToQuadrant(taskId, quadrant) {
         const task = $tasks.find((candidate) => candidate.id === taskId);
-        if (!task) return;
+        // Dropping into the task's own quadrant must not touch priority or
+        // bump the version.
+        if (!task || isTaskInQuadrant(task, quadrant)) return;
 
         updateTask(taskId, {
             priority: quadrant.importance === 'important'
                 ? 'high'
-                : task.priority === 'low'
-                    ? 'low'
-                    : 'medium',
+                : task.priority === 'high'
+                    ? 'medium'
+                    : task.priority,
             urgency: quadrant.urgency
         });
     }
@@ -169,18 +139,10 @@
     {#each matrixData as quadrant (quadrant.id)}
         <section
             class="eisenhower-quadrant"
-            class:drag-over-col={hoveredQuadrant === quadrant.id && draggedId !== null}
+            class:drag-over-col={dndState.draggedId !== null && dndState.hoveredZone === `quadrant:${quadrant.id}`}
             data-quadrant={quadrant.id}
             aria-label={`${quadrant.title} 작업 목록`}
-            ondragover={(event) => event.preventDefault()}
-            ondragenter={(event) => {
-                event.preventDefault();
-                hoveredQuadrant = quadrant.id;
-            }}
-            ondragleave={() => {
-                if (hoveredQuadrant === quadrant.id) hoveredQuadrant = null;
-            }}
-            ondrop={(event) => onDropOnQuadrant(event, quadrant)}>
+            {...{ [DND_ZONE_ATTRIBUTE]: `quadrant:${quadrant.id}` }}>
             <div class="eisenhower-header">
                 <div>
                     <p class="eisenhower-label">{quadrant.icon} {quadrant.subtitle}</p>
@@ -200,11 +162,7 @@
                         <TaskTreeCard
                             allTasks={$tasks}
                             childrenByParent={quadrant.childrenByParent}
-                            draggedId={draggedId}
                             openTask={openTask}
-                            onDragEnd={onDragEnd}
-                            onDragStart={onDragStart}
-                            onDropOnTask={onDropOnTask}
                             task={task} />
                     {/each}
                 {/if}
