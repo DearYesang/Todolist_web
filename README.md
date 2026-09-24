@@ -144,7 +144,7 @@ Imported data is normalized before it reaches the app store:
 - missing, self-referential, or cyclic parent links are removed
 - child status is aligned with the effective parent lane
 
-The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persistence, optimistic mutations, and fallback behavior live in `src/lib/client/task-store.js`.
+The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persistence, optimistic mutations, and fallback behavior are imported from `src/lib/client/task-store.js`, which re-exports the modules in `src/lib/client/task-store/` (task cache, view preference, filters, categories, per-task sync engine, task edits and cross-tab sync).
 
 ## Current Limits
 
