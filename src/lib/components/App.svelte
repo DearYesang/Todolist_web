@@ -11,6 +11,7 @@
         createOfflineConflictReport,
         summarizeOfflineConflict
     } from '$lib/client/offline-conflicts.js';
+    import { setLinkOpenOwner } from '$lib/client/link-opener.js';
     import { enqueueOfflineMutation, setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { exportServerTasks, importServerTasks, updateBoardPreferences } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
@@ -38,6 +39,7 @@
     import FilterBar from './FilterBar.svelte';
     import GanttTimeline from './GanttTimeline.svelte';
     import KanbanBoard from './KanbanBoard.svelte';
+    import LinkOpenPanel from './LinkOpenPanel.svelte';
     import TaskForm from './TaskForm.svelte';
     import TaskModal from './TaskModal.svelte';
 
@@ -148,6 +150,7 @@
         scopedUserId = userId;
         setTaskStorageOwner(userId);
         setOfflineQueueOwner(userId);
+        setLinkOpenOwner(userId);
     }
 
     /**
@@ -528,6 +531,8 @@
     {#if selectedTaskId}
         <TaskModal taskId={selectedTaskId} onclose={() => selectedTaskId = null} />
     {/if}
+
+    <LinkOpenPanel />
 {:else}
     <main class="locked-app-state">
         <AuthPanel />

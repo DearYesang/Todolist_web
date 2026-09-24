@@ -67,14 +67,6 @@ export async function requestEmailVerificationCode(payload, fetcher = globalThis
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<RecoveryCodesResult>}
  */
-export async function getRecoveryCodeSummary(fetcher = globalThis.fetch) {
-	return requestRecoveryCodes('GET', fetcher);
-}
-
-/**
- * @param {typeof fetch} [fetcher]
- * @returns {Promise<RecoveryCodesResult>}
- */
 export async function createRecoveryCodes(fetcher = globalThis.fetch) {
 	return requestRecoveryCodes('POST', fetcher);
 }

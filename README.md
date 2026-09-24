@@ -9,7 +9,8 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 - Eisenhower matrix: 중요도/시급도 기준 4분면 보기, 완료 작업 기본 숨김과 필요 시 표시
 - View preference: 마지막으로 선택한 Kanban/Gantt/Eisenhower 뷰를 계정별로 저장하고, 오프라인에서는 기기별 캐시를 사용
 - Task hierarchy: 상위/하위 작업, 접기/펼치기, cascade delete
-- Checklist: 작업별 체크리스트, 진행률, URL 링크 표시
+- Checklist: 작업별 체크리스트, 진행률, URL 링크 표시(`기관(https://…)`처럼 괄호·문장부호가 붙은 주소도 정확히 인식, http(s)만 링크)
+- Open all links: 카드와 상세 패널에서 체크리스트 링크를 새 탭으로 한 번에 여는 `🔗 모두 열기 (N)`와 하위 작업까지 포함하는 `🔗 하위 포함 모두 열기 (M)`, 완료 항목 포함, 10개 초과 시 확인, 클릭당 최대 20개
 - Date range picker: 작업 추가와 상세 수정에서 월간 캘린더로 시작일/마감일 선택
 - Search and due-date signals: 모든 뷰 공통 텍스트 검색(작업명·카테고리·체크리스트 대상), 기한 초과/오늘 마감 하이라이트
 - Filters and categories: 중요도, 시급성, 카테고리 필터, DB-backed 카테고리 이름 변경/병합/삭제, 색상/정렬/숨김, 작업 입력 중 규칙 기반 카테고리 추천
@@ -20,6 +21,10 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 - Server sync: 인증된 작업 생성/조회/수정/삭제와 체크리스트 생성/수정/삭제, 부분 응답 merge 시 parent link 보존
 - Offline queue: 실패한 서버 write와 오프라인 JSON import를 사용자별 localStorage queue에 저장하고 다음 동기화 때 재시도, task 수정/삭제 충돌은 내 변경 적용 또는 서버 유지 선택 가능
 - Private mode: 로그인 전 앱 본문 숨김, 이전 로그인 기기는 오프라인 상태에서도 사용자별 로컬 캐시로 작업 가능
+
+### 링크 모두 열기와 팝업 허용
+
+브라우저는 사이트에 팝업을 허용하기 전까지 클릭 한 번에 새 탭을 하나만 엽니다. 그래서 처음 `모두 열기`를 누르면 첫 링크만 열리고, 화면 아래 패널에 나머지 링크 목록과 `다음 링크 열기 (i/k)` 버튼이 나타납니다. 주소창(설치한 앱은 창 위쪽 제목 표시줄)의 '팝업 차단됨' 아이콘에서 이 사이트를 '항상 허용'으로 한 번만 바꾸면 다음부터 한 번에 모두 열립니다(Brave: `brave://settings/content/popups`). 새 탭이 자동으로 열리지 않는 환경(iPhone 홈 화면 앱이 그럴 수 있으며, 아직 기기에서 확인하지 않았습니다)에서는 패널의 링크를 하나씩 누르면 됩니다.
 
 ## Tech Stack
 

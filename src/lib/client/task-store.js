@@ -30,8 +30,6 @@ import {
 } from '../shared/task-domain.js';
 import { normalizeCategoryName } from '../shared/category-suggestions.js';
 
-export * from '../shared/task-domain.js';
-
 const STORAGE_KEY = 'kanbanTasks';
 const VIEW_STORAGE_KEY = 'todokanbanCurrentView';
 const PENDING_VIEW_STORAGE_KEY = 'todokanbanPendingDefaultView';
