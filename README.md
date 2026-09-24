@@ -150,6 +150,8 @@ On the server, the API routes and the category and calendar services import the 
 
 In the browser, `src/lib/components/App.svelte` keeps the session-scoped storage owner, server sync and the online/offline state, and renders `AppHeader.svelte` (title, view toggle, account, refresh, calendar and backup controls) and `SyncNoticeBanner.svelte` (offline conflicts and sync notices). The banner's decisions live in `src/lib/client/offline-conflicts.js`, backup import and export in `src/lib/client/backup-transfer.js`, and the pagehide drain and service-worker update reload in `src/lib/client/page-lifecycle.js`. `AuthPanel.svelte` shows `AuthSignInControls.svelte` when signed out and `AuthAccountControls.svelte` (with `PasskeyManager.svelte`) when signed in; their pure helpers are in `src/lib/client/auth-labels.js` and `src/lib/client/passkey-signup.js`.
 
+The global stylesheet `src/app.css` is a list of `@import` lines for the partials in `src/styles/` (tokens and base, header and auth, buttons, the task form, filters, the board views and task cards, the Gantt chart, the detail panel, the link-open panel, and the breakpoint and touch overrides). The import order is the cascade order, so the breakpoint and touch partials stay last; add a rule to the partial that owns its component instead of reordering the imports. `src/app-css.test.js` fails if a partial is not imported exactly once or an override partial moves above a partial with base rules.
+
 ## Current Limits
 
 - Email verification delivery uses Resend or `EMAIL_DELIVERY_WEBHOOK_URL` in production; preview codes are local-development only and are blocked by production config checks.
