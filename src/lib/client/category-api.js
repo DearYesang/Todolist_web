@@ -1,3 +1,6 @@
+import { createFallbackResult, createHttpErrorResult, readJsonBody } from './http.js';
+
+// Not task-api's set, which also retries 409 and 429; they stay separate.
 const FALLBACK_STATUSES = new Set([401, 503]);
 
 /**
@@ -67,7 +70,7 @@ export async function listServerCategories(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return createErrorResult(response, body, 'Category API request failed');
+		return createHttpErrorResult(response, body, 'Category API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Category API request could not be completed.');
 	}
@@ -120,7 +123,7 @@ export async function mergeServerCategory(sourceCategoryId, targetCategoryId, fe
 			};
 		}
 
-		return createErrorResult(response, body, 'Category API request failed');
+		return createHttpErrorResult(response, body, 'Category API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Category API request could not be completed.');
 	}
@@ -151,7 +154,7 @@ export async function reorderServerCategories(categoryIds, fetcher = globalThis.
 			};
 		}
 
-		return createErrorResult(response, body, 'Category API request failed');
+		return createHttpErrorResult(response, body, 'Category API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Category API request could not be completed.');
 	}
@@ -186,48 +189,9 @@ async function writeCategory(url, method, payload, fetcher) {
 			};
 		}
 
-		return createErrorResult(response, body, 'Category API request failed');
+		return createHttpErrorResult(response, body, 'Category API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Category API request could not be completed.');
-	}
-}
-
-/**
- * @param {Response} response
- * @param {unknown} body
- * @param {string} fallbackMessage
- * @returns {{ ok: false; fallback: boolean; status: number; message: string }}
- */
-function createErrorResult(response, body, fallbackMessage) {
-	return {
-		ok: false,
-		fallback: FALLBACK_STATUSES.has(response.status),
-		status: response.status,
-		message: readErrorMessage(body) ?? `${fallbackMessage} with status ${response.status}.`
-	};
-}
-
-/**
- * @param {string} message
- * @returns {{ ok: false; fallback: true; status: 0; message: string }}
- */
-function createFallbackResult(message) {
-	return {
-		ok: false,
-		fallback: true,
-		status: 0,
-		message
-	};
-}
-
-/**
- * @param {Response} response
- */
-async function readJsonBody(response) {
-	try {
-		return await response.json();
-	} catch {
-		return null;
 	}
 }
 
@@ -267,16 +231,4 @@ function isCategoryMergeResponse(body) {
 		&& 'updatedTasks' in body
 		&& typeof /** @type {{ updatedTasks?: unknown }} */ (body).updatedTasks === 'number'
 	);
-}
-
-/**
- * @param {unknown} body
- */
-function readErrorMessage(body) {
-	if (!body || typeof body !== 'object' || !('message' in body)) {
-		return null;
-	}
-
-	const message = /** @type {{ message?: unknown }} */ (body).message;
-	return typeof message === 'string' && message.trim() ? message : null;
 }
