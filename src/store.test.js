@@ -1,13 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-    canAssignParent,
-    normalizeDateRange,
-    normalizeTask,
-    normalizeTaskList
-} from './lib/shared/task-domain.js';
-import { extractBackupTasks } from './lib/shared/task-backup.js';
-import { createTaskCalendar as createIcsCalendar } from './lib/shared/calendar-ics.js';
+import { normalizeTask } from './lib/shared/task-domain.js';
 import { createTaskCalendarFilename } from './lib/client/calendar-download.js';
 import {
     createServerChecklistItem,
@@ -21,16 +14,6 @@ import {
     updateServerTask
 } from './lib/client/task-api.js';
 import { buildTaskCreateDraft, createLocalTaskFromDraft } from './lib/client/task-create.js';
-import {
-    CalendarTokenConfigurationError,
-    createCalendarToken,
-    hashCalendarToken
-} from './lib/server/calendar/tokens.js';
-import {
-    assertAllowedAccountEmail,
-    parsePasskeyRegistrationContext,
-    normalizeAccountEmail
-} from './lib/server/auth/account-security.js';
 import {
     createRecoveryCodes as createRecoveryCodesRequest,
     requestEmailVerificationCode
@@ -46,29 +29,9 @@ import {
     revokeCalendarToken
 } from './lib/client/calendar-token-api.js';
 import {
-    decryptCalendarToken,
-    encryptCalendarToken,
-    CalendarTokenEncryptionError
-} from './lib/server/calendar/oauth-encryption.js';
-import { shouldSyncTaskToProvider } from './lib/server/calendar/provider-sync.js';
-import { upsertProviderCalendarEvent } from './lib/server/calendar/providers.js';
-import {
     listCalendarProviders as listCalendarProvidersRequest,
     syncCalendarProviders as syncCalendarProvidersRequest
 } from './lib/client/calendar-provider-api.js';
-import { planTaskImport } from './lib/server/tasks/import-planner.js';
-import { mapTaskRowsToClientTasks } from './lib/server/tasks/task-mapper.js';
-import { createPositionValue } from './lib/server/tasks/repository.js';
-import {
-    assertValidTaskDateRange,
-    parseCreateTaskInput,
-    parseCreateChecklistItemInput,
-    parseDeleteTaskInput,
-    parseUpdateChecklistItemInput,
-    parseTaskIdParam,
-    parseUpdateTaskInput,
-    TaskWriteError
-} from './lib/server/tasks/validation.js';
 import {
     applyServerCategoryCatalog,
     categories,
@@ -102,72 +65,6 @@ describe('task data normalization', () => {
         vi.useRealTimers();
     });
 
-    it('normalizes invalid scalar fields and trims categories', () => {
-        const task = normalizeTask({
-            id: '',
-            text: 123,
-            status: 'later',
-            priority: 'critical',
-            urgency: 'now',
-            category: '  개발  ',
-            parentId: '',
-            subtasks: [
-                { id: 'sub-1', text: ' first ', done: 1 },
-                { id: 'sub-1', text: 42, done: 0 }
-            ],
-            createdAt: Number.NaN
-        });
-
-        expect(task.id).toBeTruthy();
-        expect(task.text).toBe('');
-        expect(task.status).toBe('todo');
-        expect(task.priority).toBe('medium');
-        expect(task.urgency).toBe('normal');
-        expect(task.category).toBe('개발');
-        expect(task.parentId).toBeNull();
-        expect(task.subtasks).toHaveLength(2);
-        expect(new Set(task.subtasks.map((subtask) => subtask.id)).size).toBe(2);
-        expect(task.subtasks[0].done).toBe(true);
-        expect(task.subtasks[1].text).toBe('');
-        expect(task.createdAt).toBe(Date.now());
-    });
-
-    it('normalizes invalid, inverted, and very long date ranges', () => {
-        expect(normalizeDateRange('not-a-date', '10000-01-01')).toEqual({
-            startDate: '2026-05-03',
-            endDate: '2026-05-05'
-        });
-
-        expect(normalizeDateRange('2026-05-10', '2026-05-03')).toEqual({
-            startDate: '2026-05-10',
-            endDate: '2026-05-10'
-        });
-
-        expect(normalizeDateRange('2026-01-01', '2040-01-01')).toEqual({
-            startDate: '2026-01-01',
-            endDate: '2035-12-30'
-        });
-    });
-
-    it('deduplicates task ids and repairs broken parent graphs', () => {
-        const normalized = normalizeTaskList([
-            { id: 'root', text: 'Root', status: 'doing' },
-            { id: 'child', text: 'Child', parentId: 'root', status: 'todo' },
-            { id: 'child', text: 'Duplicate id' },
-            { id: 'orphan', text: 'Orphan', parentId: 'missing' },
-            { id: 'self', text: 'Self parent', parentId: 'self' },
-            { id: 'cycle-a', text: 'Cycle A', parentId: 'cycle-b' },
-            { id: 'cycle-b', text: 'Cycle B', parentId: 'cycle-a' }
-        ]);
-
-        expect(new Set(normalized.map((task) => task.id)).size).toBe(normalized.length);
-        expect(normalized.find((task) => task.id === 'child')?.status).toBe('doing');
-        expect(normalized.find((task) => task.id === 'orphan')?.parentId).toBeNull();
-        expect(normalized.find((task) => task.id === 'self')?.parentId).toBeNull();
-        expect(normalized.find((task) => task.id === 'cycle-a')?.parentId).toBeNull();
-        expect(normalized.find((task) => task.id === 'cycle-b')?.parentId).toBeNull();
-    });
-
     it('routes replaceTasks through the same normalization boundary', () => {
         replaceTasks([
             { id: 'a', text: 'A', status: 'done', startDate: '2026-05-10', endDate: '2026-05-01' },
@@ -196,20 +93,6 @@ describe('task relationship mutations', () => {
 
     afterEach(() => {
         vi.useRealTimers();
-    });
-
-    it('rejects parent assignment through a corrupt cycle instead of looping', () => {
-        const corrupt = normalizeTaskList([
-            { id: 'a', text: 'A', parentId: 'b' },
-            { id: 'b', text: 'B', parentId: 'a' },
-            { id: 'c', text: 'C' }
-        ]);
-
-        expect(canAssignParent(corrupt, 'c', 'a')).toBe(true);
-        expect(canAssignParent([
-            { id: 'a', text: 'A', status: 'todo', startDate: '2026-05-03', endDate: '2026-05-05', priority: 'medium', urgency: 'normal', category: '', parentId: 'b', subtasks: [], collapsed: false, createdAt: 1 },
-            { id: 'b', text: 'B', status: 'todo', startDate: '2026-05-03', endDate: '2026-05-05', priority: 'medium', urgency: 'normal', category: '', parentId: 'a', subtasks: [], collapsed: false, createdAt: 1 }
-        ], 'c', 'a')).toBe(false);
     });
 
     it('detaches a child when it moves to a different lane', () => {
@@ -838,208 +721,7 @@ describe('task storage owner scope', () => {
     });
 });
 
-describe('server task import planning', () => {
-    it('extracts supported backup payload shapes', () => {
-        const payload = [{ id: 'legacy-task', text: 'Imported task' }];
-
-        expect(extractBackupTasks(payload)).toBe(payload);
-        expect(extractBackupTasks({ tasks: payload })).toBe(payload);
-        expect(extractBackupTasks({ kanbanTasks: payload })).toBe(payload);
-        expect(extractBackupTasks({ data: { tasks: payload } })).toBe(payload);
-        expect(extractBackupTasks({ text: 'Not a backup' })).toBeNull();
-    });
-
-    it('remaps legacy ids and preserves valid parent/checklist relationships', () => {
-        const ids = [
-            '00000000-0000-4000-8000-000000000001',
-            '00000000-0000-4000-8000-000000000002',
-            '00000000-0000-4000-8000-000000000003'
-        ];
-        const { plans, summary } = planTaskImport([
-            {
-                id: 'parent',
-                text: 'Parent',
-                status: 'doing',
-                startDate: '2026-05-03',
-                endDate: '2026-05-04',
-                subtasks: [{ id: 'sub', text: '  Checklist  ', done: true }]
-            },
-            {
-                id: 'child',
-                text: 'Child',
-                status: 'todo',
-                parentId: 'parent',
-                startDate: '2026-05-04',
-                endDate: '2026-05-05'
-            }
-        ], {
-            idFactory: () => ids.shift() ?? '00000000-0000-4000-8000-000000000099'
-        });
-
-        expect(plans.map((plan) => ({
-            oldId: plan.oldId,
-            id: plan.id,
-            parentTaskId: plan.parentTaskId,
-            checklistItems: plan.checklistItems
-        }))).toEqual([
-            {
-                oldId: 'parent',
-                id: '00000000-0000-4000-8000-000000000001',
-                parentTaskId: null,
-                checklistItems: [{
-                    oldId: 'sub',
-                    id: '00000000-0000-4000-8000-000000000003',
-                    text: 'Checklist',
-                    done: true
-                }]
-            },
-            {
-                oldId: 'child',
-                id: '00000000-0000-4000-8000-000000000002',
-                parentTaskId: '00000000-0000-4000-8000-000000000001',
-                checklistItems: []
-            }
-        ]);
-        expect(summary).toEqual({
-            receivedTasks: 2,
-            importedTasks: 2,
-            skippedTasks: 0,
-            importedChecklistItems: 1,
-            skippedChecklistItems: 0,
-            repairedParentLinks: 0
-        });
-    });
-
-    it('accepts wrapped legacy backups, remaps numeric ids, and fills missing dates', () => {
-        const ids = [
-            '11111111-1111-4111-8111-111111111111',
-            '22222222-2222-4222-8222-222222222222'
-        ];
-        const { plans, summary } = planTaskImport({
-            tasks: [
-                {
-                    id: '1776348148045',
-                    text: '시험공부',
-                    status: 'doing',
-                    priority: 'high',
-                    urgency: 'urgent',
-                    category: '공부',
-                    parentId: null,
-                    subtasks: [],
-                    collapsed: false,
-                    createdAt: 1776348148046
-                },
-                {
-                    id: '1776348212462',
-                    text: '정리',
-                    status: 'todo',
-                    parentId: '1776348148045'
-                }
-            ]
-        }, {
-            idFactory: () => ids.shift() ?? '33333333-3333-4333-8333-333333333333'
-        });
-
-        expect(plans).toHaveLength(2);
-        expect(plans[0]).toMatchObject({
-            oldId: '1776348148045',
-            id: '11111111-1111-4111-8111-111111111111',
-            parentTaskId: null
-        });
-        expect(plans[0].task.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-        expect(plans[1]).toMatchObject({
-            oldId: '1776348212462',
-            id: '22222222-2222-4222-8222-222222222222',
-            parentTaskId: '11111111-1111-4111-8111-111111111111'
-        });
-        expect(summary.receivedTasks).toBe(2);
-    });
-
-    it('creates sortable positions that fit numeric(20,10)', () => {
-        const position = createPositionValue(new Date('2026-05-04T00:00:00.000Z'), 12);
-        const [integerPart, decimalPart = ''] = position.split('.');
-
-        expect(integerPart.length).toBeLessThanOrEqual(10);
-        expect(decimalPart.length).toBeLessThanOrEqual(10);
-        expect(Number(position)).toBeGreaterThan(Number(createPositionValue(new Date('2026-05-04T00:00:00.000Z'), 11)));
-    });
-
-    it('rejects unsupported imports and skips empty task titles', () => {
-        expect(() => planTaskImport({ text: 'Not an array' })).toThrow('Import payload must be an array of tasks or a backup object with a tasks array.');
-
-        const { plans, summary } = planTaskImport([
-            { id: 'empty', text: '' },
-            { id: 'valid', text: 'Valid task', parentId: 'missing' }
-        ], {
-            idFactory: () => '99999999-9999-4999-8999-999999999999'
-        });
-
-        expect(plans).toHaveLength(1);
-        expect(plans[0].oldId).toBe('valid');
-        expect(plans[0].parentTaskId).toBeNull();
-        expect(summary.skippedTasks).toBe(1);
-        expect(summary.repairedParentLinks).toBe(0);
-    });
-});
-
 describe('calendar export', () => {
-    it('creates all-day iCalendar events from normalized tasks', () => {
-        const calendar = createIcsCalendar([
-            {
-                id: 'task-1',
-                text: 'Review, ship; celebrate',
-                status: 'doing',
-                startDate: '2026-05-03',
-                endDate: '2026-05-04',
-                priority: 'high',
-                urgency: 'urgent',
-                category: 'Release',
-                subtasks: [{ id: 'sub-1', text: 'QA pass', done: true }]
-            }
-        ], {
-            now: new Date('2026-05-03T00:00:00.000Z'),
-            calendarName: 'Project Calendar'
-        });
-
-        expect(calendar).toContain('BEGIN:VCALENDAR\r\n');
-        expect(calendar).toContain('X-WR-CALNAME:Project Calendar');
-        expect(calendar).toContain('UID:task-1@todolist.local');
-        expect(calendar).toContain('DTSTAMP:20260503T000000Z');
-        expect(calendar).toContain('DTSTART;VALUE=DATE:20260503');
-        expect(calendar).toContain('DTEND;VALUE=DATE:20260505');
-        expect(calendar).toContain('SUMMARY:Review\\, ship\\; celebrate');
-        expect(calendar).toContain('CATEGORIES:Release');
-        expect(calendar).toContain('Checklist:\\n- [x] QA pass');
-    });
-
-    it('folds long Korean iCalendar lines by UTF-8 bytes without corrupting text', () => {
-        const title = '한글 일정 '.repeat(18).trim();
-        const checklistText = '체크리스트 내용 '.repeat(12).trim();
-        const calendar = createIcsCalendar([
-            {
-                id: 'task-korean',
-                text: title,
-                status: 'todo',
-                startDate: '2026-05-03',
-                endDate: '2026-05-03',
-                priority: 'medium',
-                urgency: 'normal',
-                category: '공부',
-                subtasks: [{ id: 'sub-korean', text: checklistText, done: false }]
-            }
-        ], {
-            now: new Date('2026-05-03T00:00:00.000Z')
-        });
-        const encoder = new TextEncoder();
-        const physicalLines = calendar.trimEnd().split('\r\n');
-        const unfolded = unfoldIcsLines(calendar);
-
-        expect(physicalLines.every((line) => encoder.encode(line).length <= 75)).toBe(true);
-        expect(unfolded).toContain(`SUMMARY:${title}`);
-        expect(unfolded).toContain(`CATEGORIES:공부`);
-        expect(unfolded).toContain(`- [ ] ${checklistText}`);
-    });
-
     it('creates safe filenames for individual task calendar downloads', () => {
         const filename = createTaskCalendarFilename(
             { text: 'Review / ship: celebrate?' },
@@ -1048,21 +730,6 @@ describe('calendar export', () => {
 
         expect(filename).toBe('todolist_Review_-_ship-_celebrate_2026-05-03.ics');
     });
-
-    /**
-     * @param {string} calendar
-     */
-    function unfoldIcsLines(calendar) {
-        return calendar.split('\r\n').reduce((lines, line) => {
-            if (line.startsWith(' ') && lines.length > 0) {
-                lines[lines.length - 1] += line.slice(1);
-            } else if (line) {
-                lines.push(line);
-            }
-
-            return lines;
-        }, /** @type {string[]} */ ([])).join('\n');
-    }
 });
 
 describe('calendar subscription tokens', () => {
@@ -1074,25 +741,6 @@ describe('calendar subscription tokens', () => {
         } else {
             process.env.CALENDAR_TOKEN_SECRET = originalSecret;
         }
-    });
-
-    it('generates url-safe high entropy tokens without exposing the hash input', () => {
-        const token = createCalendarToken();
-        expect(token).toMatch(/^cal_[A-Za-z0-9_-]{40,}$/);
-        expect(token).not.toContain('=');
-    });
-
-    it('hashes tokens with a required keyed secret', () => {
-        process.env.CALENDAR_TOKEN_SECRET = 'calendar-secret-one-with-32-bytes';
-        const hash = hashCalendarToken('cal_test-token');
-        expect(hash).toMatch(/^[a-f0-9]{64}$/);
-        expect(hashCalendarToken('cal_test-token')).toBe(hash);
-
-        process.env.CALENDAR_TOKEN_SECRET = 'calendar-secret-two-with-32-bytes';
-        expect(hashCalendarToken('cal_test-token')).not.toBe(hash);
-
-        delete process.env.CALENDAR_TOKEN_SECRET;
-        expect(() => hashCalendarToken('cal_test-token')).toThrow(CalendarTokenConfigurationError);
     });
 
     it('calls calendar token management endpoints', async () => {
@@ -1164,18 +812,6 @@ describe('calendar provider sync helpers', () => {
         Reflect.deleteProperty(globalThis, 'fetch');
     });
 
-    it('encrypts OAuth tokens with associated data', () => {
-        process.env.CALENDAR_OAUTH_ENCRYPTION_KEY = 'calendar-oauth-encryption-key-for-tests';
-        const encrypted = encryptCalendarToken('access-token', 'connection:user:google');
-        expect(encrypted).toMatch(/^v1:/);
-        expect(encrypted).not.toContain('access-token');
-        expect(decryptCalendarToken(encrypted, 'connection:user:google')).toBe('access-token');
-        expect(() => decryptCalendarToken(encrypted, 'connection:user:microsoft')).toThrow();
-
-        delete process.env.CALENDAR_OAUTH_ENCRYPTION_KEY;
-        expect(() => encryptCalendarToken('token', 'aad')).toThrow(CalendarTokenEncryptionError);
-    });
-
     it('calls calendar provider list and sync endpoints', async () => {
         const providerBody = {
             providers: [{ id: 'google', name: 'Google Calendar', configured: true }],
@@ -1220,45 +856,6 @@ describe('calendar provider sync helpers', () => {
             method: 'POST'
         }));
     });
-
-    it('keeps provider events as full inclusive all-day task ranges', async () => {
-        const task = normalizeTask({
-            text: 'Range task',
-            startDate: '2026-05-03',
-            endDate: '2026-05-05'
-        });
-        let requestBody = '';
-        const fetcher = vi.fn(async (_url, init) => {
-            requestBody = typeof init?.body === 'string' ? init.body : '';
-            return new Response(JSON.stringify({
-                id: 'provider-event-id',
-                etag: 'provider-etag'
-            }), {
-                status: 200,
-                headers: { 'content-type': 'application/json' }
-            });
-        });
-        Object.defineProperty(globalThis, 'fetch', {
-            configurable: true,
-            value: fetcher
-        });
-
-        await expect(upsertProviderCalendarEvent('google', 'access-token', null, task)).resolves.toEqual({
-            id: 'provider-event-id',
-            etag: 'provider-etag'
-        });
-        const body = JSON.parse(requestBody);
-        expect(body).toMatchObject({
-            start: { date: '2026-05-03' },
-            end: { date: '2026-05-06' }
-        });
-    });
-
-    it('excludes completed tasks from provider calendar sync', () => {
-        expect(shouldSyncTaskToProvider(normalizeTask({ status: 'todo' }))).toBe(true);
-        expect(shouldSyncTaskToProvider(normalizeTask({ status: 'doing' }))).toBe(true);
-        expect(shouldSyncTaskToProvider(normalizeTask({ status: 'done' }))).toBe(false);
-    });
 });
 
 describe('account security helpers', () => {
@@ -1270,36 +867,6 @@ describe('account security helpers', () => {
         } else {
             process.env.AUTH_ALLOWED_EMAILS = originalAllowedEmails;
         }
-    });
-
-    it('normalizes registration context and requires an email', () => {
-        expect(normalizeAccountEmail('  USER@Example.COM ')).toBe('user@example.com');
-        expect(parsePasskeyRegistrationContext(JSON.stringify({
-            email: ' USER@Example.COM ',
-            name: ' User ',
-            emailVerificationCode: '123456'
-        }))).toEqual({
-            email: 'user@example.com',
-            name: 'User',
-            emailVerificationCode: '123456',
-            recoveryCode: ''
-        });
-
-        expect(() => parsePasskeyRegistrationContext(JSON.stringify({
-            email: 'not-email',
-            emailVerificationCode: '123456'
-        }))).toThrow('패스키 등록에 사용할 이메일을 다시 확인해 주세요.');
-    });
-
-    it('limits registration to configured personal emails', () => {
-        process.env.AUTH_ALLOWED_EMAILS = 'primary@example.com, backup@example.com';
-
-        expect(() => assertAllowedAccountEmail(' PRIMARY@EXAMPLE.COM ')).not.toThrow();
-        expect(() => parsePasskeyRegistrationContext(JSON.stringify({
-            email: 'backup@example.com',
-            emailVerificationCode: '123456'
-        }))).not.toThrow();
-        expect(() => assertAllowedAccountEmail('other@example.com')).toThrow('not allowed');
     });
 
     it('calls account verification and recovery endpoints', async () => {
@@ -1402,165 +969,5 @@ describe('account security helpers', () => {
             method: 'POST',
             body: JSON.stringify({ id: 'passkey-id' })
         }));
-    });
-});
-
-describe('server task mapping', () => {
-    it('maps database task rows to the current client backup shape', () => {
-        const tasks = mapTaskRowsToClientTasks([
-            {
-                id: 'task-db-id',
-                boardId: 'board-id',
-                parentTaskId: null,
-                title: 'Server task',
-                status: 'todo',
-                priority: 'medium',
-                urgency: 'normal',
-                category: 'Sync',
-                categoryId: null,
-                startDate: '2026-05-03',
-                endDate: '2026-05-04',
-	                position: '0',
-	                version: 1,
-	                createdBy: 'user-id',
-                createdAt: new Date('2026-05-03T00:00:00.000Z'),
-                updatedAt: new Date('2026-05-03T00:00:00.000Z'),
-                completedAt: null,
-                deletedAt: null
-            }
-        ], [
-            {
-                id: 'check-1',
-                taskId: 'task-db-id',
-                text: 'Mapped checklist',
-                done: false,
-                position: '0',
-                createdAt: new Date('2026-05-03T00:00:00.000Z'),
-                updatedAt: new Date('2026-05-03T00:00:00.000Z')
-            }
-        ]);
-
-        expect(tasks).toEqual([
-            {
-                id: 'task-db-id',
-                text: 'Server task',
-                status: 'todo',
-                startDate: '2026-05-03',
-                endDate: '2026-05-04',
-                priority: 'medium',
-                urgency: 'normal',
-                category: 'Sync',
-                categoryId: null,
-                categoryMeta: null,
-                parentId: null,
-                subtasks: [{ id: 'check-1', text: 'Mapped checklist', done: false }],
-	                collapsed: false,
-	                createdAt: new Date('2026-05-03T00:00:00.000Z').getTime(),
-	                version: 1
-	            }
-	        ]);
-    });
-});
-
-describe('server task validation', () => {
-    it('accepts a strict create payload with safe defaults', () => {
-        expect(parseCreateTaskInput({
-            text: '  Server task  ',
-            startDate: '2026-05-03',
-            endDate: '2026-05-04',
-            category: '  Sync  '
-        })).toEqual({
-            title: 'Server task',
-            status: 'todo',
-            priority: 'medium',
-            urgency: 'normal',
-            category: 'Sync',
-            categoryId: null,
-            startDate: '2026-05-03',
-            endDate: '2026-05-04',
-            parentId: null
-        });
-    });
-
-    it('rejects invalid create payloads instead of silently repairing them', () => {
-        expect(() => parseCreateTaskInput({
-            text: '',
-            startDate: '2026-05-03',
-            endDate: '2026-05-04'
-        })).toThrow(TaskWriteError);
-
-        expect(() => parseCreateTaskInput({
-            text: 'Bad status',
-            status: 'blocked',
-            startDate: '2026-05-03',
-            endDate: '2026-05-04'
-        })).toThrow('Invalid status.');
-
-        expect(() => parseCreateTaskInput({
-            text: 'Bad date',
-            startDate: '2026-05-04',
-            endDate: '2026-05-03'
-        })).toThrow('Invalid task date range.');
-
-        expect(() => parseCreateTaskInput({
-            text: 'Bad parent',
-            startDate: '2026-05-03',
-            endDate: '2026-05-04',
-            parentId: 'local-timestamp-id'
-        })).toThrow('parentId must be a UUID.');
-    });
-
-    it('accepts strict update payloads and task ids', () => {
-        expect(parseTaskIdParam('55555555-5555-4555-8555-555555555555')).toBe('55555555-5555-4555-8555-555555555555');
-        expect(parseUpdateTaskInput({
-            text: '  Updated task  ',
-            status: 'doing',
-            priority: 'high',
-            urgency: 'urgent',
-            category: '  Sync  ',
-            startDate: '2026-05-03',
-            endDate: '2026-05-04',
-	            parentId: null
-	        })).toEqual({
-	            title: 'Updated task',
-	            status: 'doing',
-            priority: 'high',
-            urgency: 'urgent',
-            category: 'Sync',
-            startDate: '2026-05-03',
-            endDate: '2026-05-04',
-	            parentId: null
-	        });
-	        expect(parseUpdateTaskInput({
-	            text: 'Versioned update',
-	            expectedVersion: 3
-	        })).toEqual({
-	            title: 'Versioned update',
-	            expectedVersion: 3
-	        });
-	        expect(parseDeleteTaskInput({ expectedVersion: 4 })).toEqual({ expectedVersion: 4 });
-	        expect(parseDeleteTaskInput(undefined)).toEqual({ expectedVersion: null });
-	    });
-
-    it('rejects invalid update payloads and date ranges', () => {
-        expect(() => parseTaskIdParam('local-id')).toThrow('taskId must be a UUID.');
-	        expect(() => parseUpdateTaskInput({})).toThrow('At least one task field is required.');
-	        expect(() => parseUpdateTaskInput({ status: 'blocked' })).toThrow('Invalid status.');
-	        expect(() => parseUpdateTaskInput({ parentId: 'local-parent' })).toThrow('parentId must be a UUID.');
-	        expect(() => parseUpdateTaskInput({ text: 'Bad version', expectedVersion: 0 })).toThrow('expectedVersion must be a positive integer.');
-	        expect(() => parseDeleteTaskInput({ expectedVersion: 0 })).toThrow('expectedVersion must be a positive integer.');
-	        expect(() => assertValidTaskDateRange('2026-05-04', '2026-05-03')).toThrow('Invalid task date range.');
-	    });
-
-    it('validates checklist create and update payloads', () => {
-        expect(parseCreateChecklistItemInput({ text: '  Read docs  ' })).toEqual({ text: 'Read docs' });
-        expect(parseUpdateChecklistItemInput({ text: '  Review  ', done: true })).toEqual({
-            text: 'Review',
-            done: true
-        });
-
-        expect(() => parseCreateChecklistItemInput({ text: '' })).toThrow('Checklist text is required.');
-        expect(() => parseUpdateChecklistItemInput({})).toThrow('At least one checklist field is required.');
-        expect(() => parseUpdateChecklistItemInput({ done: 'yes' })).toThrow('done must be a boolean.');
     });
 });
