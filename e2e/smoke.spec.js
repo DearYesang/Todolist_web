@@ -242,6 +242,91 @@ test('narrows every view with the search box and highlights overdue work', async
 
 /**
  * @param {import('@playwright/test').Page} page
+ * @param {string} title
+ */
+function cardByTitle(page, title) {
+	return page.locator('.task-card', { has: page.locator('.card-text', { hasText: title }) });
+}
+
+test('asks the same delete question on a card and in the detail panel', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+
+	/** @type {string[]} */
+	const questions = [];
+	page.on('dialog', (dialog) => {
+		questions.push(`${dialog.type()}:${dialog.message()}`);
+		void dialog.dismiss();
+	});
+
+	const modal = page.locator('.side-panel');
+	const parentCard = cardByTitle(page, 'Nested parent task');
+	await parentCard.getByRole('button', { name: 'Nested parent task 삭제', exact: true }).click();
+	await parentCard.locator('.card-text').click();
+	await modal.getByRole('button', { name: /작업 삭제/ }).click();
+	await modal.locator('.close-btn').click();
+	await expect(modal).toHaveCount(0);
+
+	const childCard = cardByTitle(page, 'Nested child task');
+	await childCard.getByRole('button', { name: 'Nested child task 삭제', exact: true }).click();
+	await childCard.locator('.card-text').click();
+	await modal.getByRole('button', { name: /작업 삭제/ }).click();
+
+	const withChildren = 'confirm:이 작업에는 1개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?';
+	const leaf = 'confirm:이 작업을 삭제하시겠습니까?';
+	await expect.poll(() => questions).toEqual([withChildren, withChildren, leaf, leaf]);
+	// Dismissing the question deletes nothing and keeps the panel open.
+	await expect(modal).toBeVisible();
+	await expect(parentCard).toBeVisible();
+	await expect(childCard).toBeVisible();
+});
+
+test('shows the card labels for status, priority and urgency in the detail panel', async ({ page }) => {
+	await seedOfflineBoard(page, {
+		extraTasks: [{ id: 'local-low-done', text: 'Low priority finished task', status: 'done', priority: 'low', urgency: 'normal' }]
+	});
+	await page.goto('/');
+
+	const modal = page.locator('.side-panel');
+	/** @type {Array<[string, [string, string, string], [string, string, string]]>} */
+	const cases = [
+		['Urgent important', ['할 일', '🔴 높음', '🔥 시급'], ['todo', 'high', 'urgent']],
+		['Planned important', ['진행 중', '🔴 높음', '⏳ 여유'], ['doing', 'high', 'normal']],
+		['E2E cached task', ['할 일', '🟡 보통', '⏳ 여유'], ['todo', 'medium', 'normal']],
+		['Low priority finished task', ['완료', '🟢 낮음', '⏳ 여유'], ['done', 'low', 'normal']]
+	];
+
+	for (const [title, [status, priority, urgency], [statusValue, priorityValue, urgencyValue]] of cases) {
+		const card = cardByTitle(page, title);
+		await expect(card.locator('.priority-badge')).toHaveText(priority);
+		await expect(card.locator('.urgency-badge')).toHaveText(urgency);
+
+		await card.locator('.card-text').click();
+		await expect(modal).toBeVisible();
+		expect(await modal.locator('.summary-row .summary-chip').evaluateAll((chips) =>
+			chips.slice(0, 3).map((chip) => chip.textContent)
+		)).toEqual([status, priority, urgency]);
+		await expect(modal.locator('#modal-status')).toHaveValue(statusValue);
+		await expect(modal.locator('#modal-priority')).toHaveValue(priorityValue);
+		await expect(modal.locator('#modal-urgency')).toHaveValue(urgencyValue);
+
+		expect(await modal.locator('#modal-status option').evaluateAll((options) =>
+			options.map((option) => [option.getAttribute('value'), option.textContent])
+		)).toEqual([['todo', '할 일'], ['doing', '진행 중'], ['done', '완료']]);
+		expect(await modal.locator('#modal-priority option').evaluateAll((options) =>
+			options.map((option) => [option.getAttribute('value'), option.textContent])
+		)).toEqual([['high', '🔴 높음'], ['medium', '🟡 보통'], ['low', '🟢 낮음']]);
+		expect(await modal.locator('#modal-urgency option').evaluateAll((options) =>
+			options.map((option) => [option.getAttribute('value'), option.textContent])
+		)).toEqual([['urgent', '🔥 시급'], ['normal', '⏳ 여유']]);
+
+		await modal.locator('.close-btn').click();
+		await expect(modal).toHaveCount(0);
+	}
+});
+
+/**
+ * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').Locator} card
  * @param {{ x: number; y: number }} dropPoint
  */
