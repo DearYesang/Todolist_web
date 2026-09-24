@@ -293,6 +293,67 @@ test('remembers the selected view across reloads', async ({ page }) => {
 	await expect(page.getByRole('button', { name: /매트릭스/ })).toHaveClass(/active/);
 });
 
+/**
+ * Plays the event sequence a Korean IME produces around the Enter that
+ * confirms the last syllable. Playwright cannot drive a real IME, so this
+ * only checks how the inputs react to those events; the real thing needs a
+ * manual check with the Korean keyboard on a Mac and an iPhone.
+ * @param {import('@playwright/test').Locator} input
+ */
+async function pressEnterThroughImeComposition(input) {
+	await input.evaluate((node) => {
+		const enter = (init = {}) => node.dispatchEvent(new KeyboardEvent('keydown', {
+			key: 'Enter',
+			bubbles: true,
+			cancelable: true,
+			...init
+		}));
+		node.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		enter({ isComposing: true });
+		// Some engines report the composing Enter without isComposing.
+		enter();
+		node.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+		// The confirming Enter's keydown right after compositionend.
+		enter();
+	});
+}
+
+/**
+ * @param {import('@playwright/test').Locator} input
+ */
+async function pressEnterOnNextTask(input) {
+	await input.evaluate(async (node) => {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+	});
+}
+
+test('does not submit the Enter that confirms an IME composition', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+
+	const card = cardByTitle(page, 'E2E cached task');
+	const checklistInput = card.locator('.add-subtask-input');
+	await checklistInput.fill('한글 항목');
+	await pressEnterThroughImeComposition(checklistInput);
+	await expect(card.locator('.subtask-item')).toHaveCount(2);
+	await expect(checklistInput).toHaveValue('한글 항목');
+	// A later, separate Enter adds the item exactly once.
+	await pressEnterOnNextTask(checklistInput);
+	await expect(card.locator('.subtask-item')).toHaveCount(3);
+	await expect(card.locator('.subtask-text').nth(2)).toHaveText('한글 항목');
+	await expect(checklistInput).toHaveValue('');
+
+	await page.getByRole('button', { name: /새 작업 추가/ }).click();
+	const titleInput = page.locator('#task-text');
+	await titleInput.fill('한글 작업');
+	await pressEnterThroughImeComposition(titleInput);
+	await expect(titleInput).toHaveValue('한글 작업');
+	await expect(page.locator('.card-text', { hasText: '한글 작업' })).toHaveCount(0);
+	await pressEnterOnNextTask(titleInput);
+	await expect(page.locator('.card-text', { hasText: '한글 작업' })).toHaveCount(1);
+});
+
 test('keeps nested checklist tasks attached on iPhone-sized offline reloads', async ({ page }) => {
 	await page.setViewportSize({ width: 393, height: 852 });
 	await seedOfflineBoard(page);
