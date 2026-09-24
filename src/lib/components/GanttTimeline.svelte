@@ -1,14 +1,18 @@
 <script>
     import { onDestroy, tick } from 'svelte';
     import { filters, tasks, toggleSubtask, updateTask } from '$lib/client/task-store.js';
-    import { addDays, formatLocalDate, parseLocalDateNoon, todayString } from '$lib/shared/local-date.js';
-    import { buildHierarchy, getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
+    import {
+        buildGanttLayout,
+        GANTT_DAY_WIDTH,
+        getBarCoords,
+        getResizeDayOffset,
+        getResizePreview
+    } from '$lib/shared/gantt-layout.js';
+    import { getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
 
     let { openTask } = $props();
 
-    const dayWidth = 48;
-    const dayMs = 86400000;
-    const todayCenterPaddingDays = 18;
+    const dayWidth = GANTT_DAY_WIDTH;
     let suppressBarClick = $state(false);
     /** @type {string | null} */
     let expandedChecklistTaskId = $state(null);
@@ -27,80 +31,7 @@
      * }} */
     let resizeState = $state(null);
 
-    const ganttData = $derived.by(() => {
-        const visibleTasks = getFilteredTasks($tasks, $filters);
-        if (visibleTasks.length === 0) {
-            return {
-                displayList: [],
-                gridWidth: dayWidth,
-                headerDays: [],
-                minDate: new Date(),
-                totalDays: 0
-            };
-        }
-
-        const today = parseLocalDateNoon(todayString());
-        let minDate = new Date(today);
-        let maxDate = new Date(today);
-
-        visibleTasks.forEach((task) => {
-            const start = parseLocalDateNoon(task.startDate);
-            const end = parseLocalDateNoon(task.endDate);
-            if (start < minDate) minDate = new Date(start);
-            if (end > maxDate) maxDate = new Date(end);
-        });
-
-        minDate.setDate(minDate.getDate() - 3);
-        maxDate.setDate(maxDate.getDate() + 5);
-
-        const todayWindowStart = new Date(today);
-        todayWindowStart.setDate(todayWindowStart.getDate() - todayCenterPaddingDays);
-        const todayWindowEnd = new Date(today);
-        todayWindowEnd.setDate(todayWindowEnd.getDate() + todayCenterPaddingDays);
-        if (todayWindowStart < minDate) minDate = todayWindowStart;
-        if (todayWindowEnd > maxDate) maxDate = todayWindowEnd;
-
-        const totalDays = Math.round((maxDate.getTime() - minDate.getTime()) / 86400000);
-        const headerDays = [];
-
-        for (let index = 0; index <= totalDays; index += 1) {
-            const date = new Date(minDate);
-            date.setDate(date.getDate() + index);
-            headerDays.push({
-                key: date.toISOString(),
-                label: `${date.getMonth() + 1}/${date.getDate()}`,
-                isToday: formatLocalDate(date) === formatLocalDate(today)
-            });
-        }
-
-        const { roots, childrenByParent } = buildHierarchy(visibleTasks);
-        /** @type {{ task: import('$lib/shared/task-domain.js').Task; depth: number }[]} */
-        const displayList = [];
-
-        /**
-         * @param {import('$lib/shared/task-domain.js').Task[]} list
-         * @param {number} depth
-         */
-        function addToDisplay(list, depth) {
-            list.forEach((task) => {
-                displayList.push({ task, depth });
-                const children = childrenByParent[task.id] || [];
-                if (children.length > 0 && !task.collapsed) {
-                    addToDisplay(children, depth + 1);
-                }
-            });
-        }
-
-        addToDisplay(roots, 0);
-
-        return {
-            displayList,
-            gridWidth: Math.max((totalDays + 1) * dayWidth, dayWidth),
-            headerDays,
-            minDate,
-            totalDays
-        };
-    });
+    const ganttData = $derived(buildGanttLayout(getFilteredTasks($tasks, $filters), { dayWidth }));
 
     $effect(() => {
         if (hasCenteredToday || !timelineArea || ganttData.headerDays.length === 0) {
@@ -116,16 +47,7 @@
      * @param {import('$lib/shared/task-domain.js').Task} task
      */
     function getCoords(task) {
-        const { startDate, endDate } = getRenderedDates(task);
-        const start = parseLocalDateNoon(startDate);
-        const end = parseLocalDateNoon(endDate);
-        const offsetDays = (start.getTime() - ganttData.minDate.getTime()) / dayMs;
-        const durationDays = (end.getTime() - start.getTime()) / dayMs + 1;
-
-        return {
-            left: offsetDays * dayWidth,
-            width: Math.max(durationDays * dayWidth, 24)
-        };
+        return getBarCoords(getRenderedDates(task), ganttData.minDate, dayWidth);
     }
 
     function centerTodayInTimeline() {
@@ -205,29 +127,10 @@
     function handleResizeMove(event) {
         if (!resizeState) return;
 
-        const dayOffset = Math.round((event.clientX - resizeState.originX) / dayWidth);
-
-        if (resizeState.edge === 'start') {
-            let nextStartDate = addDays(resizeState.originStartDate, dayOffset);
-            if (parseLocalDateNoon(nextStartDate).getTime() > parseLocalDateNoon(resizeState.originEndDate).getTime()) {
-                nextStartDate = resizeState.originEndDate;
-            }
-
-            resizeState = {
-                ...resizeState,
-                previewStartDate: nextStartDate
-            };
-            return;
-        }
-
-        let nextEndDate = addDays(resizeState.originEndDate, dayOffset);
-        if (parseLocalDateNoon(nextEndDate).getTime() < parseLocalDateNoon(resizeState.originStartDate).getTime()) {
-            nextEndDate = resizeState.originStartDate;
-        }
-
+        const dayOffset = getResizeDayOffset(resizeState.originX, event.clientX, dayWidth);
         resizeState = {
             ...resizeState,
-            previewEndDate: nextEndDate
+            ...getResizePreview(resizeState, dayOffset)
         };
     }
 
