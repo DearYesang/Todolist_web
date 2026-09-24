@@ -8,8 +8,10 @@
         readCachedAuthScope
     } from '$lib/client/auth-session-scope.js';
     import {
+        canApplyLocalConflict,
         createOfflineConflictReport,
-        summarizeOfflineConflict
+        describeServerSyncResult,
+        resolveLocalConflict
     } from '$lib/client/offline-conflicts.js';
     import { createDatedFilename, downloadJson } from '$lib/client/download.js';
     import { setLinkOpenOwner } from '$lib/client/link-opener.js';
@@ -184,18 +186,15 @@
      * @param {{ showSuccess?: boolean }} options
      */
     function handleServerSyncResult(result, { showSuccess = false } = {}) {
-        const conflicts = Array.isArray(result.offlineConflicts) ? result.offlineConflicts : [];
-        if (conflicts.length > 0) {
-            syncConflicts = conflicts.map((conflict) => summarizeOfflineConflict(conflict, get(tasks)));
-            conflictDetailsOpen = false;
-            syncNotice = null;
-        } else if (result.ok) {
-            syncConflicts = [];
-            syncNotice = showSuccess ? '최신 작업 목록으로 새로고침했습니다.' : null;
-        } else if (showSuccess) {
-            syncNotice = result.fallback
-                ? '지금은 서버에 연결할 수 없어 이 기기의 작업 목록을 유지합니다.'
-                : result.message;
+        const update = describeServerSyncResult(result, get(tasks), { showSuccess });
+        if (update.conflicts) {
+            syncConflicts = update.conflicts;
+            if (update.conflicts.length > 0) {
+                conflictDetailsOpen = false;
+            }
+        }
+        if ('notice' in update) {
+            syncNotice = update.notice ?? null;
         }
     }
 
@@ -255,41 +254,16 @@
      * @param {import('$lib/client/offline-conflicts.js').OfflineConflictSummary} conflict
      */
     function applyLocalConflict(conflict) {
-        const mutation = conflict.mutation;
-        if (mutation.type === 'task.patch') {
-            const { expectedVersion: _expectedVersion, ...patch } = mutation.patch;
-            if (!get(tasks).some((task) => task.id === mutation.taskId)) {
-                syncNotice = '대상 작업을 찾지 못했습니다. 최신 상태를 확인해 주세요.';
-                return;
-            }
-
-            updateTask(mutation.taskId, patch);
-            dismissSyncConflict(conflict.id);
-            syncNotice = '내 변경을 최신 서버 상태 위에 다시 적용했습니다.';
-            return;
+        const resolution = resolveLocalConflict(conflict, get(tasks));
+        if (resolution.action === 'patch') {
+            updateTask(resolution.taskId, resolution.patch);
+        } else if (resolution.action === 'delete') {
+            deleteTaskCascade(resolution.taskId);
         }
-
-        if (mutation.type === 'task.delete') {
-            if (!get(tasks).some((task) => task.id === mutation.taskId)) {
-                syncNotice = '대상 작업이 이미 없습니다. 서버 상태를 유지합니다.';
-                dismissSyncConflict(conflict.id);
-                return;
-            }
-
-            deleteTaskCascade(mutation.taskId);
+        if (resolution.dismiss) {
             dismissSyncConflict(conflict.id);
-            syncNotice = '삭제 변경을 최신 서버 상태 위에 다시 적용했습니다.';
-            return;
         }
-
-        syncNotice = '이 충돌은 자동 적용보다 내역 저장 후 수동 확인이 안전합니다.';
-    }
-
-    /**
-     * @param {import('$lib/client/offline-conflicts.js').OfflineConflictSummary} conflict
-     */
-    function canApplyLocalConflict(conflict) {
-        return conflict.mutation.type === 'task.patch' || conflict.mutation.type === 'task.delete';
+        syncNotice = resolution.notice;
     }
 
     function downloadConflictReport() {
