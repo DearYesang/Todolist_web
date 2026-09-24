@@ -74,15 +74,6 @@ export async function listServerCategories(fetcher = globalThis.fetch) {
 }
 
 /**
- * @param {{ name: string; color?: string | null; hidden?: boolean }} payload
- * @param {typeof fetch} [fetcher]
- * @returns {Promise<CategoryWriteResult>}
- */
-export async function createServerCategory(payload, fetcher = globalThis.fetch) {
-	return writeCategory('/api/categories', 'POST', payload, fetcher);
-}
-
-/**
  * @param {string} categoryId
  * @param {{ name?: string; color?: string | null; hidden?: boolean; archived?: boolean }} patch
  * @param {typeof fetch} [fetcher]
