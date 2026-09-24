@@ -83,7 +83,7 @@
 
         const active = document.activeElement;
         if (active && active !== document.body) return;
-        target.focus({ preventScroll: true });
+        target.focus();
     }
 
     function handleFocusIn() {
