@@ -122,6 +122,79 @@ describe('splitTextIntoLinkParts', () => {
 			links: [{ value: 'https://a.com/x', href: 'https://a.com/x' }]
 		},
 		{
+			name: 'Hangul glued after a host stops the match',
+			input: 'https://kss.or.kr에서 확인',
+			links: [{ value: 'https://kss.or.kr', href: 'https://kss.or.kr/' }]
+		},
+		{
+			name: 'a question mark after glued Hangul is prose',
+			input: 'https://a.com/x인가요?',
+			links: [{ value: 'https://a.com/x', href: 'https://a.com/x' }]
+		},
+		{
+			name: 'unencoded Hangul query value',
+			input: 'https://search.naver.com/search.naver?query=맛집',
+			links: [{
+				value: 'https://search.naver.com/search.naver?query=맛집',
+				href: 'https://search.naver.com/search.naver?query=%EB%A7%9B%EC%A7%91'
+			}]
+		},
+		{
+			name: 'unencoded Hangul query values between parameters',
+			input: 'https://a.com/s?q=서울맛집&page=2&sort=최신, 참고',
+			links: [{
+				value: 'https://a.com/s?q=서울맛집&page=2&sort=최신',
+				href: 'https://a.com/s?q=%EC%84%9C%EC%9A%B8%EB%A7%9B%EC%A7%91&page=2&sort=%EC%B5%9C%EC%8B%A0'
+			}]
+		},
+		{
+			name: 'unencoded Hangul fragment',
+			input: 'https://a.com/doc#개요',
+			links: [{ value: 'https://a.com/doc#개요', href: 'https://a.com/doc#%EA%B0%9C%EC%9A%94' }]
+		},
+		{
+			name: 'Hangul path segments followed by more path',
+			input: 'https://a.com/카테고리/123 https://a.com/자료/파일.pdf',
+			links: [
+				{ value: 'https://a.com/카테고리/123', href: 'https://a.com/%EC%B9%B4%ED%85%8C%EA%B3%A0%EB%A6%AC/123' },
+				{
+					value: 'https://a.com/자료/파일.pdf',
+					href: 'https://a.com/%EC%9E%90%EB%A3%8C/%ED%8C%8C%EC%9D%BC.pdf'
+				}
+			]
+		},
+		{
+			name: 'Hangul words joined by an underscore',
+			input: 'https://ko.wikipedia.org/wiki/대한민국_임시정부',
+			links: [{
+				value: 'https://ko.wikipedia.org/wiki/대한민국_임시정부',
+				href: 'https://ko.wikipedia.org/wiki/%EB%8C%80%ED%95%9C%EB%AF%BC%EA%B5%AD_%EC%9E%84%EC%8B%9C%EC%A0%95%EB%B6%80'
+			}]
+		},
+		{
+			name: 'a hyphenated Hangul slug',
+			input: 'https://blog.example.com/2024/01/서울-여행',
+			links: [{
+				value: 'https://blog.example.com/2024/01/서울-여행',
+				href: 'https://blog.example.com/2024/01/%EC%84%9C%EC%9A%B8-%EC%97%AC%ED%96%89'
+			}]
+		},
+		{
+			// Accepted trade-off: a Hangul run that ends the URL cannot be told
+			// apart from glued prose ('https://kss.or.kr/에서'), so it stays out.
+			name: 'a trailing Hangul path segment is left out',
+			input: 'https://ko.wikipedia.org/wiki/대한민국',
+			links: [{ value: 'https://ko.wikipedia.org/wiki/', href: 'https://ko.wikipedia.org/wiki/' }]
+		},
+		{
+			name: 'Korean IDN host',
+			input: 'https://한국.kr/ 와 www.한국.kr',
+			links: [
+				{ value: 'https://한국.kr/', href: 'https://xn--3e0b707e.kr/' },
+				{ value: 'www.한국.kr', href: 'https://www.xn--3e0b707e.kr/' }
+			]
+		},
+		{
 			name: 'www. gets https://',
 			input: 'www.kams.or.kr.',
 			links: [{ value: 'www.kams.or.kr', href: 'https://www.kams.or.kr/' }]

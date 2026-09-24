@@ -25,8 +25,12 @@
 // A match stops at whitespace, straight and typographic quotes, angle
 // brackets, backticks and Hangul (Jamo, compatibility Jamo, syllables).
 // Browsers copy Korean URL paths percent-encoded, so Hangul glued to a URL
-// is surrounding prose.
-const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`“”‘’ᄀ-ᇿ㄰-㆏가-힣]+/gi;
+// is usually surrounding prose; readUrlCandidate decides when it is not.
+const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`“”‘’ᄀ-ᇿ㄰-㆏가-힣]*/gi;
+// The same URL character class and the Hangul it excludes, for resuming a
+// match after a Hangul run.
+const URL_CHARS = /[^\s<>"'`“”‘’ᄀ-ᇿ㄰-㆏가-힣]*/y;
+const HANGUL_RUN = /[ᄀ-ᇿ㄰-㆏가-힣]+/y;
 
 const TRAILING_PUNCTUATION = new Set([
 	'.', ',', ';', ':', '!', '?', "'", '"',
@@ -115,6 +119,58 @@ export function toSafeHref(raw) {
 }
 
 /**
+ * @param {string} url
+ */
+function isInHost(url) {
+	return !/[/?#]/.test(url.replace(/^https?:\/\//i, ''));
+}
+
+/**
+ * Unencoded Hangul right after a URL is part of it only where it cannot be
+ * prose: after `://`, `=`, `?`, `&`, `#`, `_` or `-` (a host label, a query
+ * or fragment value, a slug word), as a host label after a dot, or when URL
+ * structure follows it (`/대한민국/역사`, `/대한민국_임시정부`, `/파일.pdf`,
+ * `맛집&page=2`). Hangul that ends a path segment stays out, because
+ * `/wiki/대한민국` and `https://kss.or.kr/에서` cannot be told apart.
+ * @param {string} url the match so far
+ * @param {string} source
+ * @param {number} hangulEnd index just past the Hangul run
+ */
+function continuesThroughHangul(url, source, hangulEnd) {
+	if (/(?::\/\/|[=?&#_-])$/.test(url)) return true;
+	if (url.endsWith('.') && isInHost(url)) return true;
+
+	const next = source[hangulEnd];
+	if (next === '/' || next === '_' || next === '-') return true;
+	return /^[.?#=&%+~][A-Za-z0-9%]/.test(source.slice(hangulEnd, hangulEnd + 2));
+}
+
+/**
+ * The raw URL starting at `start`: the pattern match, extended through
+ * Hangul runs that belong to the URL.
+ * @param {string} source
+ * @param {number} start
+ * @param {number} matchLength
+ */
+function readUrlCandidate(source, start, matchLength) {
+	let end = start + matchLength;
+
+	for (;;) {
+		HANGUL_RUN.lastIndex = end;
+		const hangul = HANGUL_RUN.exec(source);
+		if (!hangul) break;
+
+		const hangulEnd = end + hangul[0].length;
+		if (!continuesThroughHangul(source.slice(start, end), source, hangulEnd)) break;
+
+		URL_CHARS.lastIndex = hangulEnd;
+		end = hangulEnd + (URL_CHARS.exec(source)?.[0].length ?? 0);
+	}
+
+	return source.slice(start, end);
+}
+
+/**
  * Splits text into plain and link parts. Joining every part's value gives
  * back the original text; unsafe matches stay plain text.
  * @param {string} text
@@ -125,10 +181,14 @@ export function splitTextIntoLinkParts(text) {
 	/** @type {LinkPart[]} */
 	const parts = [];
 	let cursor = 0;
+	const pattern = new RegExp(URL_PATTERN);
 
-	for (const match of source.matchAll(URL_PATTERN)) {
-		const start = match.index ?? 0;
-		const value = trimUrlTail(match[0]);
+	for (let match = pattern.exec(source); match; match = pattern.exec(source)) {
+		const start = match.index;
+		const raw = readUrlCandidate(source, start, match[0].length);
+		pattern.lastIndex = start + raw.length;
+
+		const value = trimUrlTail(raw);
 		const href = value ? toSafeHref(value) : null;
 		if (!href) continue;
 
