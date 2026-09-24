@@ -1,5 +1,5 @@
 <script>
-    import { getContext } from 'svelte';
+    import { getContext, onDestroy } from 'svelte';
     import TaskTreeCard from './TaskTreeCard.svelte';
     import OpenLinksButton from './OpenLinksButton.svelte';
     import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
@@ -22,7 +22,7 @@
         URGENCY_LABELS
     } from '$lib/shared/task-domain.js';
     import { collectSubtreeLinks, extractTaskLinks, splitTextIntoLinkParts } from '$lib/shared/task-links.js';
-    import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
+    import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
 
     /** @type {{
      *   task: import('$lib/shared/task-domain.js').Task;
@@ -52,10 +52,8 @@
         return dnd ? dnd.controller.draggable(node, id) : undefined;
     }
     let newSubtaskText = $state('');
-    let isSubtaskComposing = $state(false);
-    let didSubtaskCompositionJustEnd = $state(false);
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let subtaskCompositionResetTimer = null;
+    const subtaskComposition = createImeCompositionGuard();
+    onDestroy(() => subtaskComposition.reset());
 
     const children = $derived(childrenByParent[task.id] || []);
     // taskIndex is built once per board from the full task list, so a card
@@ -101,29 +99,15 @@
     }
 
     function handleSubtaskCompositionStart() {
-        isSubtaskComposing = true;
-        didSubtaskCompositionJustEnd = false;
-        clearSubtaskCompositionReset();
+        subtaskComposition.start();
     }
 
     /**
      * @param {CompositionEvent} event
      */
     function handleSubtaskCompositionEnd(event) {
-        isSubtaskComposing = false;
-        didSubtaskCompositionJustEnd = true;
+        subtaskComposition.end();
         newSubtaskText = /** @type {HTMLInputElement} */ (event.currentTarget).value;
-        clearSubtaskCompositionReset();
-        subtaskCompositionResetTimer = setTimeout(() => {
-            didSubtaskCompositionJustEnd = false;
-            subtaskCompositionResetTimer = null;
-        }, 0);
-    }
-
-    function clearSubtaskCompositionReset() {
-        if (!subtaskCompositionResetTimer) return;
-        clearTimeout(subtaskCompositionResetTimer);
-        subtaskCompositionResetTimer = null;
     }
 
     /**
@@ -135,10 +119,7 @@
         }
 
         event.stopPropagation();
-        if (shouldIgnoreImeSubmit(event, {
-            isComposing: isSubtaskComposing,
-            justEnded: didSubtaskCompositionJustEnd
-        })) {
+        if (subtaskComposition.shouldIgnoreEnter(event)) {
             return;
         }
 
