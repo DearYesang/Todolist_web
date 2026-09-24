@@ -146,6 +146,8 @@ Imported data is normalized before it reaches the app store:
 
 The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persistence, optimistic mutations, and fallback behavior are imported from `src/lib/client/task-store.js`, which re-exports the modules in `src/lib/client/task-store/` (task cache, view preference, filters, categories, per-task sync engine, task edits and cross-tab sync).
 
+On the server, the API routes and the category and calendar services import the task data layer from `src/lib/server/tasks/repository.js`. It re-exports its sibling modules: `task-repository.js` (task reads, create, partial update and cascade delete), `checklist-repository.js`, `import-repository.js` (backup import and replace), `board-provisioning.js` (each user's Personal workspace and Inbox board, and the board's default view) and `task-rows.js` (the task authorization read and other helpers the writers share).
+
 ## Current Limits
 
 - Email verification delivery uses Resend or `EMAIL_DELIVERY_WEBHOOK_URL` in production; preview codes are local-development only and are blocked by production config checks.
