@@ -13,6 +13,7 @@
     } from '$lib/client/passkey-management-api.js';
     import { clearOfflineWriteQueue, getOfflineQueueSize } from '$lib/client/offline-write-queue.js';
     import { clearLocalTaskCache } from '$lib/client/task-store.js';
+    import { formatLocalDate } from '$lib/shared/local-date.js';
 
     const session = authClient.useSession();
 
@@ -451,16 +452,6 @@
         }
 
         return '내 기기';
-    }
-
-    /**
-     * @param {Date} date
-     */
-    function formatLocalDate(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
     }
 
     /**

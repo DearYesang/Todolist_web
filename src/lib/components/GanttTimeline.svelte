@@ -1,6 +1,7 @@
 <script>
     import { onDestroy, tick } from 'svelte';
     import { filters, tasks, toggleSubtask, updateTask } from '$lib/client/task-store.js';
+    import { addDays, formatLocalDate, parseLocalDateNoon, todayString } from '$lib/shared/local-date.js';
     import { buildHierarchy, getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
 
     let { openTask } = $props();
@@ -38,13 +39,13 @@
             };
         }
 
-        const today = parseLocalDate(formatDate(new Date()));
+        const today = parseLocalDateNoon(todayString());
         let minDate = new Date(today);
         let maxDate = new Date(today);
 
         visibleTasks.forEach((task) => {
-            const start = parseLocalDate(task.startDate);
-            const end = parseLocalDate(task.endDate);
+            const start = parseLocalDateNoon(task.startDate);
+            const end = parseLocalDateNoon(task.endDate);
             if (start < minDate) minDate = new Date(start);
             if (end > maxDate) maxDate = new Date(end);
         });
@@ -68,7 +69,7 @@
             headerDays.push({
                 key: date.toISOString(),
                 label: `${date.getMonth() + 1}/${date.getDate()}`,
-                isToday: formatDate(date) === formatDate(today)
+                isToday: formatLocalDate(date) === formatLocalDate(today)
             });
         }
 
@@ -116,8 +117,8 @@
      */
     function getCoords(task) {
         const { startDate, endDate } = getRenderedDates(task);
-        const start = parseLocalDate(startDate);
-        const end = parseLocalDate(endDate);
+        const start = parseLocalDateNoon(startDate);
+        const end = parseLocalDateNoon(endDate);
         const offsetDays = (start.getTime() - ganttData.minDate.getTime()) / dayMs;
         const durationDays = (end.getTime() - start.getTime()) / dayMs + 1;
 
@@ -139,33 +140,6 @@
 
         timelineArea.scrollTo({ left: nextScrollLeft, behavior: 'auto' });
         hasCenteredToday = true;
-    }
-
-    /**
-     * @param {string} dateString
-     */
-    function parseLocalDate(dateString) {
-        return new Date(`${dateString}T12:00:00`);
-    }
-
-    /**
-     * @param {Date} date
-     */
-    function formatDate(date) {
-        const year = date.getFullYear();
-        const month = `${date.getMonth() + 1}`.padStart(2, '0');
-        const day = `${date.getDate()}`.padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    /**
-     * @param {string} dateString
-     * @param {number} offset
-     */
-    function addDays(dateString, offset) {
-        const date = parseLocalDate(dateString);
-        date.setDate(date.getDate() + offset);
-        return formatDate(date);
     }
 
     /**
@@ -235,7 +209,7 @@
 
         if (resizeState.edge === 'start') {
             let nextStartDate = addDays(resizeState.originStartDate, dayOffset);
-            if (parseLocalDate(nextStartDate).getTime() > parseLocalDate(resizeState.originEndDate).getTime()) {
+            if (parseLocalDateNoon(nextStartDate).getTime() > parseLocalDateNoon(resizeState.originEndDate).getTime()) {
                 nextStartDate = resizeState.originEndDate;
             }
 
@@ -247,7 +221,7 @@
         }
 
         let nextEndDate = addDays(resizeState.originEndDate, dayOffset);
-        if (parseLocalDate(nextEndDate).getTime() < parseLocalDate(resizeState.originStartDate).getTime()) {
+        if (parseLocalDateNoon(nextEndDate).getTime() < parseLocalDateNoon(resizeState.originStartDate).getTime()) {
             nextEndDate = resizeState.originStartDate;
         }
 

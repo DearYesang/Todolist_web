@@ -1,3 +1,5 @@
+import { addDays, formatLocalDate, todayString } from './local-date.js';
+
 /**
  * @typedef {'todo' | 'doing' | 'done'} TaskStatus
  * @typedef {'high' | 'medium' | 'low'} TaskPriority
@@ -100,20 +102,6 @@ export const CATEGORY_COLORS = [
 ];
 
 /**
- * @param {number} value
- */
-function padDatePart(value) {
-    return `${value}`.padStart(2, '0');
-}
-
-/**
- * @param {Date} date
- */
-function formatLocalDate(date) {
-    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
-}
-
-/**
  * @returns {{ startDate: string; endDate: string }}
  */
 export function getDefaultDateRange() {
@@ -181,15 +169,12 @@ function parseDateString(value) {
 }
 
 /**
+ * Validates strictly (parseDateString), then counts days from noon.
  * @param {string} dateString
  * @param {number} offset
  */
 function addDaysToDateString(dateString, offset) {
-    const date = parseDateString(dateString);
-    if (!date) return dateString;
-
-    date.setDate(date.getDate() + offset);
-    return formatLocalDate(date);
+    return parseDateString(dateString) ? addDays(dateString, offset) : dateString;
 }
 
 /**
@@ -491,7 +476,7 @@ function matchesSearch(task, search) {
  * @param {string} [today] YYYY-MM-DD; defaults to the local calendar date
  * @returns {'overdue' | 'due-today' | null}
  */
-export function getTaskDueStatus(task, today = getLocalDateString()) {
+export function getTaskDueStatus(task, today = todayString()) {
     if (task.status === 'done' || !DATE_PATTERN.test(task.endDate)) {
         return null;
     }
@@ -499,13 +484,6 @@ export function getTaskDueStatus(task, today = getLocalDateString()) {
     if (task.endDate < today) return 'overdue';
     if (task.endDate === today) return 'due-today';
     return null;
-}
-
-function getLocalDateString() {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${now.getFullYear()}-${month}-${day}`;
 }
 
 /**
