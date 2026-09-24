@@ -455,6 +455,20 @@ function linkParentCard(page) {
 test('renders checklist links without trailing punctuation and opens them all', async ({ page }) => {
 	await stubWindowOpen(page);
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
+	// Records open-links clicks that bubble past the app root. Svelte
+	// dispatches onclick from the root, so OpenLinksButton's stopPropagation
+	// is what keeps a click from reaching window (and any card-level
+	// handler added later).
+	await page.addInitScript(() => {
+		const bubbled = [];
+		Object.defineProperty(window, '__bubbled', { value: bubbled });
+		window.addEventListener('click', (event) => {
+			const button = event.target instanceof Element ? event.target.closest('.btn-open-links') : null;
+			if (button) {
+				bubbled.push(button.textContent.trim());
+			}
+		});
+	});
 
 	await page.goto('/');
 	const card = linkParentCard(page);
@@ -486,6 +500,19 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	await expect(liveRegion).toHaveAttribute('role', 'status');
 	await expect(liveRegion).toHaveText('');
 
+	// Pressing an open-links button and moving past the 4px mouse threshold
+	// must not pick up the card: pointer-dnd ignores presses on buttons.
+	await subtreeButton.scrollIntoViewIfNeeded();
+	const pressBox = await subtreeButton.boundingBox();
+	expect(pressBox).toBeTruthy();
+	await page.mouse.move(pressBox.x + pressBox.width / 2, pressBox.y + pressBox.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(pressBox.x + pressBox.width / 2 + 40, pressBox.y + pressBox.height / 2 + 40, { steps: 5 });
+	await expect(page.locator('.dnd-ghost')).toHaveCount(0);
+	await expect(page.locator('.dnd-source')).toHaveCount(0);
+	await page.mouse.up();
+	expect(await readOpenedUrls(page)).toEqual([]);
+
 	await subtreeButton.click();
 	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
 	// window.open(url, '_blank') with no features string: 'noopener' would
@@ -502,7 +529,9 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	await expect(liveRegion).toHaveText('링크 4개를 새 탭으로 열었습니다.');
 	await expect(panel).not.toHaveAttribute('role');
 	await expect(panel).not.toHaveAttribute('aria-live');
-	// The click neither opened the detail modal nor started a drag.
+	// The click stopped at the button: it neither bubbled out of the app nor
+	// opened the detail modal or started a drag.
+	expect(await page.evaluate(() => window.__bubbled)).toEqual([]);
 	await expect(page.locator('.side-panel')).toHaveCount(0);
 	await expect(page.locator('.dnd-ghost')).toHaveCount(0);
 	const persisted = await page.evaluate(() =>
@@ -544,6 +573,7 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	expect(await readOpenedUrls(page)).toHaveLength(10);
 	await expect(panel).toContainText('링크 4개를 새 탭으로 열었습니다.');
 	await expect(modal).toBeVisible();
+	expect(await page.evaluate(() => window.__bubbled)).toEqual([]);
 });
 
 test('falls back to a link list when the browser blocks pop-ups', async ({ page }) => {
