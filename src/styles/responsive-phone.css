@@ -1,0 +1,409 @@
+@media (max-width: 720px) {
+        body {
+            background:
+                radial-gradient(circle at top, rgba(88, 166, 255, 0.1), transparent 24%),
+                var(--bg);
+        }
+
+        .header {
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) 12px calc(12px + var(--safe-left));
+        }
+
+        .header h1 {
+            order: 1;
+            flex: 1 1 160px;
+            min-width: 0;
+            font-size: 20px;
+            white-space: nowrap;
+        }
+
+        .view-toggle {
+            order: 2;
+            width: 100%;
+            margin-left: 0;
+            overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .view-toggle::-webkit-scrollbar {
+        display: none;
+    }
+
+        .view-btn {
+            flex: 1 1 0;
+            min-height: 44px;
+            padding: 8px 10px;
+            white-space: nowrap;
+        }
+
+        .header-actions {
+            order: 3;
+            width: 100%;
+            margin-left: 0;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+        .header-actions::-webkit-scrollbar {
+            display: none;
+        }
+
+        .header-actions .refresh-btn {
+            order: 1;
+        }
+
+        .header-actions .calendar-feed-panel {
+            order: 2;
+        }
+
+        .header-actions .utility-action {
+            order: 3;
+        }
+
+        .header-actions .auth-panel {
+            order: 9;
+        }
+
+        .refresh-btn,
+        .calendar-feed-trigger {
+            min-width: 104px;
+        }
+
+        .action-label-full {
+            display: none;
+        }
+
+        .action-label-short {
+            display: inline;
+        }
+
+    .auth-panel {
+        flex: 0 0 auto;
+        min-width: max-content;
+    }
+
+    .locked-app-state .auth-panel {
+        width: min(100%, 420px);
+        min-width: 0;
+        align-items: stretch;
+        justify-content: center;
+    }
+
+    .locked-app-state .auth-input,
+    .locked-app-state .btn {
+        width: 100%;
+    }
+
+    .auth-input {
+        width: 170px;
+        min-height: 44px;
+    }
+
+    .passkey-manager {
+        width: min(520px, calc(100vw - 24px));
+    }
+
+    .passkey-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .passkey-row-actions {
+        width: 100%;
+    }
+
+    .passkey-row-actions .btn {
+        flex: 1 1 0;
+    }
+
+    .calendar-feed-panel,
+    .calendar-feed-panel > .btn,
+    .calendar-sync-panel,
+    .calendar-sync-panel > .btn {
+        flex: 0 0 auto;
+    }
+
+    .calendar-feed-panel > .btn,
+    .calendar-sync-panel > .btn {
+        width: 100%;
+    }
+
+        .calendar-feed-popover,
+        .calendar-sync-popover {
+            left: 0;
+            right: auto;
+            width: min(360px, calc(100vw - 24px - var(--safe-left) - var(--safe-right)));
+            max-height: min(70dvh, 520px);
+            overflow-y: auto;
+        }
+
+    .add-panel,
+    .filter-bar,
+    .sync-notice,
+    .board,
+    .gantt-board,
+    .eisenhower-toolbar,
+    .eisenhower-board {
+        padding-left: calc(12px + var(--safe-left));
+        padding-right: calc(12px + var(--safe-right));
+    }
+
+    .add-toggle {
+        min-height: 48px;
+        width: 100%;
+    }
+
+        .add-form {
+            padding: 14px;
+        }
+
+        .add-panel.open {
+            position: relative;
+            z-index: 260;
+        }
+
+        .date-picker-popover {
+            width: min(336px, calc(100vw - 36px - var(--safe-left) - var(--safe-right)));
+        }
+
+    .date-range {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .range-separator {
+        display: none;
+    }
+
+    .filter-bar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 12px;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .filter-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .filter-chip,
+    .filter-label,
+    .filter-divider {
+        flex: 0 0 auto;
+    }
+
+    .category-manager-row,
+    .category-merge-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .category-manager-actions {
+        justify-content: stretch;
+    }
+
+    .category-manager-actions .btn,
+    .category-merge-row .btn {
+        width: 100%;
+    }
+
+    .merge-arrow {
+        display: none;
+    }
+
+    .board {
+        gap: 12px;
+        min-height: auto;
+    }
+
+    .eisenhower-board {
+        gap: 12px;
+    }
+
+    .eisenhower-toolbar {
+        justify-content: stretch;
+    }
+
+    .eisenhower-done-toggle {
+        width: 100%;
+    }
+
+    .eisenhower-quadrant {
+        min-height: 320px;
+        border-radius: var(--radius-sm);
+    }
+
+    .eisenhower-header {
+        padding: 12px;
+    }
+
+    .eisenhower-list {
+        min-height: 220px;
+        padding: 10px;
+    }
+
+    .column {
+        min-width: 0;
+        border-radius: var(--radius-sm);
+    }
+
+    .task-list {
+        overflow-y: visible;
+    }
+
+    .task-card {
+        padding: 14px 12px;
+    }
+
+    .card-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .move-btns,
+    .card-secondary-actions {
+        width: 100%;
+    }
+
+    .move-btns .btn,
+    .card-secondary-actions .btn {
+        flex: 1 1 0;
+        min-height: 44px;
+    }
+
+        .gantt-board {
+            padding-bottom: calc(24px + var(--safe-bottom));
+        }
+
+        .gantt-sidebar-item,
+        .gantt-row {
+            height: max(42px, var(--gantt-row-height, 42px));
+            min-height: max(42px, var(--gantt-row-height, 42px));
+        }
+
+        .gantt-sidebar-title {
+            min-height: 42px;
+        }
+
+        .gantt-sidebar-rows,
+        .gantt-timeline {
+            padding-top: 6px;
+        }
+
+        .gantt-timeline-area {
+            overscroll-behavior-x: contain;
+        }
+
+        .gantt-bar-wrapper {
+            top: 9px;
+            height: 24px;
+    }
+
+    .bar-inner-text {
+        font-size: 11px;
+    }
+
+    .pill-section {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+        .panel-footer {
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 18px 16px;
+        }
+
+        .panel-body {
+            padding: 16px;
+        }
+
+        .panel-footer {
+            padding: 14px 16px calc(16px + var(--safe-bottom));
+        }
+
+    .sync-notice-main,
+    .sync-conflict-row {
+        grid-template-columns: 1fr;
+    }
+
+    .sync-notice-main {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .sync-notice-actions {
+        justify-content: stretch;
+    }
+
+    .sync-notice-actions .btn,
+    .sync-conflict-row-actions .btn {
+        flex: 1;
+    }
+
+    .sync-conflict-row-actions {
+        justify-content: stretch;
+    }
+
+    .panel-footer-actions {
+        justify-content: stretch;
+    }
+
+    .panel-footer .btn,
+    .panel-footer-actions .btn {
+        width: 100%;
+    }
+
+    .modal-link-actions .btn-open-links {
+        flex: 1 1 auto;
+    }
+
+        .side-panel {
+            width: 100%;
+            height: calc(100dvh - var(--safe-top));
+            border-left: none;
+        }
+    }
+
+@media (max-width: 720px) {
+        .add-panel.open .add-form.active {
+            position: fixed;
+            right: var(--safe-right);
+            bottom: 0;
+            left: var(--safe-left);
+            z-index: 300;
+            max-height: min(88dvh, calc(100dvh - 64px - var(--safe-top)));
+            margin: 0;
+            padding: 18px 16px calc(18px + var(--safe-bottom));
+            overflow-y: auto;
+            border-right: none;
+            border-bottom: none;
+            border-left: none;
+            border-radius: 18px 18px 0 0;
+            box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.42);
+        }
+
+        .modal-backdrop {
+            align-items: flex-end;
+            justify-content: center;
+            padding-right: var(--safe-right);
+            padding-left: var(--safe-left);
+        }
+
+        .side-panel {
+            height: min(92dvh, calc(100dvh - var(--safe-top)));
+            border-radius: 18px 18px 0 0;
+            box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.42);
+        }
+    }

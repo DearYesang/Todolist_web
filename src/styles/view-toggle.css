@@ -1,0 +1,52 @@
+.view-toggle {
+    display: flex;
+    overflow: hidden;
+    margin-left: auto;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+
+.view-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--transition);
+}
+
+.view-icon,
+.action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    line-height: 1;
+}
+
+.view-label,
+.action-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.action-label-short {
+    display: none;
+}
+
+.view-btn:hover {
+    color: var(--text);
+}
+
+.view-btn.active {
+    background: var(--surface-hover);
+    color: var(--accent);
+}
