@@ -14,7 +14,7 @@ SvelteKit 기반의 Kanban/Gantt/Eisenhower todo 앱입니다. 브라우저 `loc
 - Date range picker: 작업 추가와 상세 수정에서 월간 캘린더로 시작일/마감일 선택
 - Search and due-date signals: 모든 뷰 공통 텍스트 검색(작업명·카테고리·체크리스트 대상), 기한 초과/오늘 마감 하이라이트
 - Filters and categories: 중요도, 시급성, 카테고리 필터, DB-backed 카테고리 이름 변경/병합/삭제, 색상/정렬/숨김, 작업 입력 중 규칙 기반 카테고리 추천
-- Backup: `kanban_backup_YYYY-MM-DD.json` 내보내기/불러오기
+- Backup: `kanban_backup_YYYY-MM-DD.json` 내보내기/불러오기 (파일명 날짜는 기기의 현지 날짜)
 - Calendar integration: 전체 일정 동기화용 `.ics` 링크, 작업별 all-day `.ics` 다운로드, 로그인 세션용 `/api/calendar.ics` 제공
 - Responsive PWA UI: iPhone-sized screens use compact header actions and touch-oriented add/detail sheets; iPad-sized screens keep a small-desktop layout
 - Passkey onboarding: 허용 이메일 기반 패스키 생성, 복구 코드, 패스키 로그인, 로그아웃 UI
