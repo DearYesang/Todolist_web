@@ -54,7 +54,15 @@ describe('splitTextIntoLinkParts', () => {
 			}]
 		},
 		{
-			name: 'real backup: databricks link with an unclosed opener',
+			name: 'real backup: parenthesised databricks link',
+			input: 'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you)',
+			links: [{
+				value: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
+				href: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you'
+			}]
+		},
+		{
+			name: 'link after an opener that is never closed',
 			input: 'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
 			links: [{
 				value: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
@@ -408,7 +416,7 @@ describe('collectSubtreeLinks', () => {
 			'https://kss.or.kr/,',
 			'www.kams.or.kr.',
 			'KSBMB https://www.ksbmb.or.kr',
-			'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you'
+			'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you)'
 		], { parentId: 'explore', collapsed: true }),
 		task('papers', '논문 검색 리스트', [
 			'https://pubmed.ncbi.nlm.nih.gov/',
@@ -424,7 +432,13 @@ describe('collectSubtreeLinks', () => {
 		const root = /** @type {typeof externalInfo[number]} */ (externalInfo.find((candidate) => candidate.id === 'explore'));
 
 		expect(extractTaskLinks(root)).toHaveLength(2);
-		expect(collectSubtreeLinks(externalInfo, 'explore')).toHaveLength(10);
+		const links = collectSubtreeLinks(externalInfo, 'explore');
+		expect(links).toHaveLength(10);
+		// The 3 real parenthesised URLs open without the closing ')'.
+		expect(links.filter((link) => link.href.endsWith(')'))).toEqual([]);
+		expect(links.map((link) => link.href)).toContain(
+			'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you'
+		);
 	});
 
 	it('lists own links first, then children depth-first in list order', () => {
