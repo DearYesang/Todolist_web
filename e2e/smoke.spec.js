@@ -607,6 +607,58 @@ test('lists every link when new tabs cannot be opened at all', async ({ page }) 
 	await expect(panel.locator('a[target="_blank"]').first()).toBeFocused();
 });
 
+const MANY_LINK_URLS = Array.from({ length: 21 }, (_, index) => `https://example.com/doc/${index + 1}`);
+
+const MANY_LINK_TASKS = [
+	{
+		id: 'local-many-links',
+		text: 'E2E 링크 21개',
+		subtasks: MANY_LINK_URLS.map((url, index) => ({ id: `local-many-link-${index + 1}`, text: `자료 ${index + 1} ${url}`, done: false }))
+	}
+];
+
+test('confirms more than 10 links and opens them in batches of 20 from the keyboard', async ({ page }) => {
+	await stubWindowOpen(page);
+	await seedOfflineBoard(page, { extraTasks: MANY_LINK_TASKS });
+
+	await page.goto('/');
+	const card = page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 21개' }) });
+	const trigger = card.getByRole('button', { name: '모두 열기 (21)', exact: true });
+	await trigger.focus();
+	await page.keyboard.press('Enter');
+
+	// Above 10 links nothing opens until a second, confirming activation.
+	const panel = page.locator('.link-open-panel');
+	await expect(panel).toContainText('링크 21개를 새 탭으로 엽니다.');
+	await expect(panel).toContainText('한 번에 최대 20개씩 엽니다.');
+	expect(await readOpenedUrls(page)).toEqual([]);
+	const confirmButton = panel.getByRole('button', { name: '모두 열기', exact: true });
+	await expect(confirmButton).toBeFocused();
+
+	await page.keyboard.press('Enter');
+	expect(await readOpenedUrls(page)).toEqual(MANY_LINK_URLS.slice(0, 20));
+	await expect(panel).toContainText('링크 20개를 새 탭으로 열었습니다.');
+	const remainingButton = panel.getByRole('button', { name: '나머지 1개 열기' });
+	await expect(remainingButton).toBeFocused();
+
+	await page.keyboard.press('Enter');
+	expect(await readOpenedUrls(page)).toEqual(MANY_LINK_URLS);
+	await expect(panel).toContainText('링크 21개를 새 탭으로 열었습니다.');
+	await expect(panel.getByRole('button', { name: '닫기' })).toBeFocused();
+
+	// Escape closes the panel and returns focus to the button that opened it.
+	await page.keyboard.press('Escape');
+	await expect(panel).toHaveCount(0);
+	await expect(trigger).toBeFocused();
+
+	// 취소 opens nothing.
+	await page.keyboard.press('Enter');
+	await expect(confirmButton).toBeFocused();
+	await panel.getByRole('button', { name: '취소' }).click();
+	await expect(panel).toHaveCount(0);
+	expect(await readOpenedUrls(page)).toEqual(MANY_LINK_URLS);
+});
+
 test('drops a leftover link panel when another account signs in', async ({ page }) => {
 	await stubWindowOpen(page, 'one-per-click');
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
