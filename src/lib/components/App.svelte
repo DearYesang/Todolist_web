@@ -9,7 +9,6 @@
     } from '$lib/client/auth-session-scope.js';
     import { exportTaskBackup, importTaskBackup } from '$lib/client/backup-transfer.js';
     import {
-        canApplyLocalConflict,
         createOfflineConflictReport,
         describeServerSyncResult,
         resolveLocalConflict
@@ -41,6 +40,7 @@
     import GanttTimeline from './GanttTimeline.svelte';
     import KanbanBoard from './KanbanBoard.svelte';
     import LinkOpenPanel from './LinkOpenPanel.svelte';
+    import SyncNoticeBanner from './SyncNoticeBanner.svelte';
     import TaskForm from './TaskForm.svelte';
     import TaskModal from './TaskModal.svelte';
 
@@ -373,49 +373,15 @@
 </div>
 
 {#if appUnlocked}
-    {#if syncConflicts.length > 0}
-        <div class="sync-notice conflict-notice" role="status">
-            <div class="sync-notice-main">
-                <span>오프라인 변경 {syncConflicts.length}건이 서버의 최신 상태와 충돌했습니다.</span>
-                <div class="sync-notice-actions">
-                    <button class="btn btn-small" onclick={() => conflictDetailsOpen = !conflictDetailsOpen}>
-                        {conflictDetailsOpen ? '내역 닫기' : '내역 보기'}
-                    </button>
-                    <button class="btn btn-small" onclick={downloadConflictReport}>내역 저장</button>
-                    <button class="btn btn-small" onclick={dismissSyncConflicts}>확인</button>
-                </div>
-            </div>
-
-            {#if conflictDetailsOpen}
-                <div class="sync-conflict-list">
-                    {#each syncConflicts as conflict (conflict.id)}
-                        <div class="sync-conflict-row">
-                            <strong>{conflict.title}</strong>
-                            <span>{conflict.target}</span>
-                            <small>{conflict.detail}</small>
-                            <div class="sync-conflict-row-actions">
-                                <button
-                                    class="btn btn-small"
-                                    onclick={() => applyLocalConflict(conflict)}
-                                    disabled={!canApplyLocalConflict(conflict)}
-                                    title={canApplyLocalConflict(conflict) ? '내 오프라인 변경을 최신 서버 상태 위에 다시 적용합니다.' : '이 충돌은 내역 저장 후 수동 확인이 안전합니다.'}>
-                                    내 변경 적용
-                                </button>
-                                <button class="btn btn-small" onclick={() => keepServerConflict(conflict)}>서버 유지</button>
-                            </div>
-                        </div>
-                    {/each}
-                </div>
-            {/if}
-        </div>
-    {:else if syncNotice}
-        <div class="sync-notice" role="status">
-            <div class="sync-notice-main">
-                <span>{syncNotice}</span>
-                <button class="btn btn-small" onclick={() => syncNotice = null}>확인</button>
-            </div>
-        </div>
-    {/if}
+    <SyncNoticeBanner
+        conflicts={syncConflicts}
+        notice={syncNotice}
+        bind:detailsOpen={conflictDetailsOpen}
+        ondownloadreport={downloadConflictReport}
+        ondismissconflicts={dismissSyncConflicts}
+        onapplylocal={applyLocalConflict}
+        onkeepserver={keepServerConflict}
+        ondismissnotice={() => syncNotice = null} />
 
     <TaskForm />
     <FilterBar />
