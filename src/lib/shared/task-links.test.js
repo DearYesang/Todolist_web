@@ -152,6 +152,40 @@ describe('splitTextIntoLinkParts', () => {
 				{ value: 'https://example.com/a', href: 'https://example.com/a' }
 			]
 		},
+		{
+			name: 'typographic double quotes end a URL',
+			input: '“https://a.com/x” 참고',
+			links: [{ value: 'https://a.com/x', href: 'https://a.com/x' }]
+		},
+		{
+			// Swallowing the closing quote would change the host to a punycode domain.
+			name: 'typographic quotes around a bare host keep the host',
+			input: '“https://a.com”',
+			links: [{ value: 'https://a.com', href: 'https://a.com/' }]
+		},
+		{
+			name: 'typographic single quotes end a URL',
+			input: '‘https://a.com/x’',
+			links: [{ value: 'https://a.com/x', href: 'https://a.com/x' }]
+		},
+		{
+			name: 'trailing ellipsis',
+			input: '자료 https://a.com/x… 참고',
+			links: [{ value: 'https://a.com/x', href: 'https://a.com/x' }]
+		},
+		{
+			name: 'CJK lenticular and tortoise-shell brackets',
+			input: '【https://a.com/x】 〔https://b.com/y〕',
+			links: [
+				{ value: 'https://a.com/x', href: 'https://a.com/x' },
+				{ value: 'https://b.com/y', href: 'https://b.com/y' }
+			]
+		},
+		{
+			name: 'guillemets',
+			input: '«https://a.com/x»',
+			links: [{ value: 'https://a.com/x', href: 'https://a.com/x' }]
+		},
 		{ name: 'javascript: text never becomes a link', input: 'javascript:alert(1)', links: [] },
 		{ name: 'data: text never becomes a link', input: 'data:text/html,<script>alert(1)</script>', links: [] },
 		{ name: 'scheme without a host stays text', input: '(http://)', links: [] },
@@ -190,6 +224,8 @@ describe('trimUrlTail', () => {
 		expect(trimUrlTail('https://a.kr/Foo_(bar)),.')).toBe('https://a.kr/Foo_(bar)');
 		expect(trimUrlTail('https://a.kr/x}')).toBe('https://a.kr/x');
 		expect(trimUrlTail('https://a.kr/x）')).toBe('https://a.kr/x');
+		expect(trimUrlTail('https://a.kr/x】')).toBe('https://a.kr/x');
+		expect(trimUrlTail('https://a.kr/【x】')).toBe('https://a.kr/【x】');
 	});
 });
 

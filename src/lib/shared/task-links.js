@@ -22,15 +22,17 @@
  * @typedef {{ includeDone?: boolean }} LinkCollectOptions
  */
 
-// A match stops at whitespace, quotes, angle brackets, backticks and Hangul
-// (Jamo, compatibility Jamo, syllables). Browsers copy Korean URL paths
-// percent-encoded, so Hangul glued to a URL is surrounding prose.
-const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`ᄀ-ᇿ㄰-㆏가-힣]+/gi;
+// A match stops at whitespace, straight and typographic quotes, angle
+// brackets, backticks and Hangul (Jamo, compatibility Jamo, syllables).
+// Browsers copy Korean URL paths percent-encoded, so Hangul glued to a URL
+// is surrounding prose.
+const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`“”‘’ᄀ-ᇿ㄰-㆏가-힣]+/gi;
 
 const TRAILING_PUNCTUATION = new Set([
 	'.', ',', ';', ':', '!', '?', "'", '"',
 	'。', '、', '」', '』', '》', '〉',
-	'，', '．', '；', '：', '！', '？'
+	'，', '．', '；', '：', '！', '？',
+	'…', '‥', '»', '›'
 ]);
 
 /** @type {Record<string, string>} */
@@ -38,7 +40,13 @@ const CLOSING_BRACKETS = {
 	')': '(',
 	']': '[',
 	'}': '{',
-	'）': '（'
+	'）': '（',
+	'］': '［',
+	'｝': '｛',
+	'】': '【',
+	'〕': '〔',
+	'〗': '〖',
+	'〙': '〘'
 };
 
 /**
