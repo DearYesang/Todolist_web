@@ -148,6 +148,8 @@ The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persis
 
 On the server, the API routes and the category and calendar services import the task data layer from `src/lib/server/tasks/repository.js`. It re-exports its sibling modules: `task-repository.js` (task reads, create, partial update and cascade delete), `checklist-repository.js`, `import-repository.js` (backup import and replace), `board-provisioning.js` (each user's Personal workspace and Inbox board, and the board's default view) and `task-rows.js` (the task authorization read and other helpers the writers share).
 
+In the browser, `src/lib/components/App.svelte` keeps the session-scoped storage owner, server sync and the online/offline state, and renders `AppHeader.svelte` (title, view toggle, account, refresh, calendar and backup controls) and `SyncNoticeBanner.svelte` (offline conflicts and sync notices). The banner's decisions live in `src/lib/client/offline-conflicts.js`, backup import and export in `src/lib/client/backup-transfer.js`, and the pagehide drain and service-worker update reload in `src/lib/client/page-lifecycle.js`. `AuthPanel.svelte` shows `AuthSignInControls.svelte` when signed out and `AuthAccountControls.svelte` (with `PasskeyManager.svelte`) when signed in; their pure helpers are in `src/lib/client/auth-labels.js` and `src/lib/client/passkey-signup.js`.
+
 ## Current Limits
 
 - Email verification delivery uses Resend or `EMAIL_DELIVERY_WEBHOOK_URL` in production; preview codes are local-development only and are blocked by production config checks.

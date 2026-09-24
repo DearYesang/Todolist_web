@@ -60,7 +60,8 @@ Browser / PWA
 3. Generalize the sync-notice banner into a toast/undo system so cascade deletes and bulk actions become reversible.
 4. Technical hardening batch (one PR): client fetch timeouts + `retry-after` honoring (in the shared `src/lib/client/http.js`), `rate_limit_buckets` and soft-deleted-task purge on the existing cron, single-JOIN task authorization query (`getWritableTaskForUser` in `src/lib/server/tasks/task-rows.js`; the `repository-*.test.js` files stub its three selects, so they change with it).
 5. Before merging the shared-helpers refactor (download, local-date, Gantt layout, client HTTP and IME guard modules): check the Korean IME by hand on a Mac and an iPhone. Typing a Korean checklist item or task title and pressing Enter must add it exactly once, with the last syllable intact. E2E only replays synthetic composition events. The same PR fixes backup and conflict-report filenames that carried the UTC date before 09:00 KST, and a second finger moving or ending a Gantt resize; the per-task `.ics` filename still uses the UTC date.
-6. Keep checklist/import conflicts report-first unless real conflicts make the extra complexity worthwhile.
+6. Before merging the App/AuthPanel split (header, sync banner, backup, page lifecycle, sign-in and account controls, passkey manager): check passkeys by hand on a Mac and an iPhone, because E2E fakes the auth endpoints and never runs a real passkey ceremony. On the locked screen, `패스키 로그인` must sign in. Signed in, `패스키 추가` with `패스키 관리` open must add the passkey and show it in the list; renaming and deleting must still work, and `로그아웃` with `캐시 삭제` must ask about unsynced changes first. After the deploy, the installed PWA should reload once when the new service worker takes over, with no lost edits.
+7. Keep checklist/import conflicts report-first unless real conflicts make the extra complexity worthwhile.
 
 Pointer-based drag and drop (the previous item 1) shipped in #62.
 
