@@ -7,6 +7,7 @@
         clearCachedAuthScope,
         readCachedAuthScope
     } from '$lib/client/auth-session-scope.js';
+    import { exportTaskBackup, importTaskBackup } from '$lib/client/backup-transfer.js';
     import {
         canApplyLocalConflict,
         createOfflineConflictReport,
@@ -15,8 +16,8 @@
     } from '$lib/client/offline-conflicts.js';
     import { createDatedFilename, downloadJson } from '$lib/client/download.js';
     import { setLinkOpenOwner } from '$lib/client/link-opener.js';
-    import { enqueueOfflineMutation, setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
-    import { exportServerTasks, importServerTasks, updateBoardPreferences } from '$lib/client/task-api.js';
+    import { setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
+    import { updateBoardPreferences } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
         clearDoneTasks,
@@ -25,17 +26,13 @@
         deleteTaskCascade,
         markPendingDefaultView,
         readPendingDefaultView,
-        replaceTasks,
         drainPendingTaskSyncsToOfflineQueue,
-        resetFilters,
         setCurrentView,
         setTaskStorageOwner,
         setupCrossTabTaskSync,
         tasks,
         updateTask
     } from '$lib/client/task-store.js';
-    import { extractBackupTasks } from '$lib/shared/task-backup.js';
-    import { normalizeTaskList } from '$lib/shared/task-domain.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
     import EisenhowerMatrix from './EisenhowerMatrix.svelte';
@@ -286,55 +283,16 @@
             if (typeof fileText !== 'string') return;
 
             try {
-                const parsed = JSON.parse(fileText);
-                const parsedTasks = extractBackupTasks(parsed);
-                if (!parsedTasks) {
-                    alert('올바른 칸반 데이터 형식이 아닙니다.');
-                    return;
-                }
-
-                const importMode = get(tasks).length > 0 && confirm('현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.')
-                    ? 'replace'
-                    : 'append';
-
-                const result = await importServerTasks(parsedTasks, { mode: importMode });
-                if (result.ok) {
-                    replaceTasks(importMode === 'replace' ? result.tasks : [...get(tasks), ...result.tasks]);
-                    resetFilters();
-                    const replacedText = result.summary.replacedTasks ? ` 교체된 작업: ${result.summary.replacedTasks}개.` : '';
-                    alert(`데이터를 성공적으로 불러왔습니다. 가져온 작업: ${result.summary.importedTasks}개.${replacedText}`);
-                    return;
-                }
-
-                if (result.fallback) {
-                    const fallbackTasks = normalizeTaskList(parsedTasks);
-                    enqueueOfflineMutation({
-                        type: 'import.tasks',
-                        mode: importMode,
-                        payload: parsedTasks,
-                        localTaskIds: fallbackTasks.map((task) => task.id)
-                    });
-                    replaceTasks(importMode === 'replace' ? fallbackTasks : [...get(tasks), ...fallbackTasks]);
-                    resetFilters();
-                    alert('오프라인 상태라 이 기기에 먼저 불러왔습니다. 온라인이 되면 서버와 다른 기기에 자동 반영을 시도합니다.');
-                    return;
-                }
-
-                alert(result.message);
-            } catch (error) {
-                alert('파일을 읽는 중 오류가 발생했습니다.');
+                await importTaskBackup(fileText, {
+                    confirmReplace: (question) => confirm(question),
+                    notify: (message) => alert(message)
+                });
             } finally {
                 input.value = '';
             }
         };
 
         reader.readAsText(file);
-    }
-
-    async function exportData() {
-        const result = await exportServerTasks();
-        const sourceTasks = result.ok ? result.tasks : get(tasks);
-        downloadJson(sourceTasks, createDatedFilename('kanban_backup', 'json'));
     }
 
     function handleClearDone() {
@@ -421,7 +379,7 @@
                 <span class="action-icon" aria-hidden="true">📂</span>
                 <span class="action-label">불러오기</span>
             </button>
-            <button class="btn utility-action" onclick={exportData} aria-label="백업 JSON 내보내기" title="백업 JSON 내보내기">
+            <button class="btn utility-action" onclick={() => exportTaskBackup()} aria-label="백업 JSON 내보내기" title="백업 JSON 내보내기">
                 <span class="action-icon" aria-hidden="true">💾</span>
                 <span class="action-label">내보내기</span>
             </button>
