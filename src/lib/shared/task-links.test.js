@@ -259,6 +259,27 @@ describe('splitTextIntoLinkParts', () => {
 			input: '«https://a.com/x»',
 			links: [{ value: 'https://a.com/x', href: 'https://a.com/x' }]
 		},
+		{
+			name: 'Markdown link with a text label',
+			input: '[문서](https://a.com/path)',
+			links: [{ value: 'https://a.com/path', href: 'https://a.com/path' }]
+		},
+		{
+			name: 'Markdown link whose label is the same URL',
+			input: '[https://a.com](https://a.com)',
+			links: [
+				{ value: 'https://a.com', href: 'https://a.com/' },
+				{ value: 'https://a.com', href: 'https://a.com/' }
+			]
+		},
+		{
+			name: 'Markdown link whose label is a URL with a path',
+			input: '참고 [https://a.com/doc](https://a.com/doc).',
+			links: [
+				{ value: 'https://a.com/doc', href: 'https://a.com/doc' },
+				{ value: 'https://a.com/doc', href: 'https://a.com/doc' }
+			]
+		},
 		{ name: 'javascript: text never becomes a link', input: 'javascript:alert(1)', links: [] },
 		{ name: 'data: text never becomes a link', input: 'data:text/html,<script>alert(1)</script>', links: [] },
 		{ name: 'scheme without a host stays text', input: '(http://)', links: [] },
@@ -280,6 +301,16 @@ describe('splitTextIntoLinkParts', () => {
 		expect(splitTextIntoLinkParts('한국연구재단(https://www.nrf.re.kr/index)')).toEqual([
 			{ type: 'text', value: '한국연구재단(' },
 			{ type: 'url', value: 'https://www.nrf.re.kr/index', href: 'https://www.nrf.re.kr/index' },
+			{ type: 'text', value: ')' }
+		]);
+	});
+
+	it('splits a Markdown link into label and target parts', () => {
+		expect(splitTextIntoLinkParts('[https://a.com/doc](https://a.com/doc)')).toEqual([
+			{ type: 'text', value: '[' },
+			{ type: 'url', value: 'https://a.com/doc', href: 'https://a.com/doc' },
+			{ type: 'text', value: '](' },
+			{ type: 'url', value: 'https://a.com/doc', href: 'https://a.com/doc' },
 			{ type: 'text', value: ')' }
 		]);
 	});

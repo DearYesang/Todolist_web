@@ -147,7 +147,9 @@ function continuesThroughHangul(url, source, hangulEnd) {
 
 /**
  * The raw URL starting at `start`: the pattern match, extended through
- * Hangul runs that belong to the URL.
+ * Hangul runs that belong to the URL, and cut before a Markdown `](` so
+ * `[https://a.com](https://a.com)` yields two links instead of one broken
+ * one.
  * @param {string} source
  * @param {number} start
  * @param {number} matchLength
@@ -167,7 +169,9 @@ function readUrlCandidate(source, start, matchLength) {
 		end = hangulEnd + (URL_CHARS.exec(source)?.[0].length ?? 0);
 	}
 
-	return source.slice(start, end);
+	const candidate = source.slice(start, end);
+	const markdownBreak = candidate.indexOf('](');
+	return markdownBreak > 0 ? candidate.slice(0, markdownBreak) : candidate;
 }
 
 /**
