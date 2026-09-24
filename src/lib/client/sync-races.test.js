@@ -201,6 +201,72 @@ describe('sync race conditions', () => {
 		await waitForPendingTaskSyncs();
 	});
 
+	/**
+	 * Leaves a chained PATCH in flight after the server reported version 4,
+	 * then replaces the store with an older copy of the task (as a backup
+	 * import would) and queues one more edit behind the in-flight PATCH.
+	 * @param {Promise<Response>} secondResponse
+	 */
+	async function queueEditBehindStaleStoreVersion(secondResponse) {
+		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'One', version: 3 })]);
+		const firstResponse = createDeferred();
+		/** @type {Record<string, unknown>[]} */
+		const bodies = [];
+		const extraResponse = createDeferred();
+		Object.defineProperty(globalThis, 'fetch', {
+			configurable: true,
+			value: vi.fn((_url, init) => {
+				bodies.push(JSON.parse(init.body));
+				return [firstResponse.promise, secondResponse][bodies.length - 1] ?? extraResponse.promise;
+			})
+		});
+
+		updateTask(SERVER_TASK_ID, { text: 'Two' });
+		await settleMicrotasks();
+		updateTask(SERVER_TASK_ID, { text: 'Three' });
+		firstResponse.resolve(jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Two', version: 4 } }));
+		await settleMicrotasks();
+		expect(bodies[1]).toMatchObject({ text: 'Three', expectedVersion: 4 });
+
+		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Four', version: 3 })]);
+		updateTask(SERVER_TASK_ID, { text: 'Five' });
+		return { bodies, extraResponse };
+	}
+
+	it('sends a chained edit with the newest server version when the store copy is older', async () => {
+		const secondResponse = createDeferred();
+		const { bodies, extraResponse } = await queueEditBehindStaleStoreVersion(secondResponse.promise);
+
+		// A retryable failure reports no version, so the store stays at 3.
+		secondResponse.resolve(jsonResponse({ message: 'Busy.' }, 503));
+		await settleMicrotasks();
+
+		expect(bodies).toHaveLength(3);
+		expect(bodies[2]).toMatchObject({ text: 'Five', expectedVersion: 4 });
+
+		extraResponse.resolve(jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Five', version: 5 } }));
+		await waitForPendingTaskSyncs();
+	});
+
+	it('drains a chained edit with the newest server version when the store copy is older', async () => {
+		const secondResponse = createDeferred();
+		const { bodies } = await queueEditBehindStaleStoreVersion(secondResponse.promise);
+
+		drainPendingTaskSyncsToOfflineQueue();
+
+		expect(loadOfflineQueue()).toEqual([
+			expect.objectContaining({
+				type: 'task.patch',
+				taskId: SERVER_TASK_ID,
+				patch: expect.objectContaining({ text: 'Five', expectedVersion: 4 })
+			})
+		]);
+
+		secondResponse.resolve(jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Three', version: 5 } }));
+		await waitForPendingTaskSyncs();
+		expect(bodies).toHaveLength(2);
+	});
+
 	it('ignores out-of-order task responses with older versions', () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Fresh', version: 5 })]);
 
