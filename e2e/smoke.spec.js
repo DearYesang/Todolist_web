@@ -101,6 +101,64 @@ test('opens the task form date picker and Gantt checklist preview', async ({ pag
 	await expect(page.getByRole('button', { name: /일정 추가/ }).first()).toBeVisible();
 });
 
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {string} taskId
+ */
+function readPersistedTask(page, taskId) {
+	return page.evaluate((id) =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]').find((task) => task.id === id),
+	taskId);
+}
+
+/**
+ * @param {string} dateString
+ * @param {number} offset
+ */
+function shiftDate(dateString, offset) {
+	const date = new Date(`${dateString}T12:00:00Z`);
+	date.setUTCDate(date.getUTCDate() + offset);
+	return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Presses the end handle of a task's Gantt bar with the mouse.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} taskText
+ */
+async function pressGanttEndHandle(page, taskText) {
+	const bar = page.getByRole('button', { name: `${taskText} 일정 막대` });
+	const handle = bar.locator('.resize-handle.end');
+	await handle.scrollIntoViewIfNeeded();
+	const box = await handle.boundingBox();
+	expect(box).toBeTruthy();
+	const x = box.x + box.width / 2;
+	const y = box.y + box.height / 2;
+	await page.mouse.move(x, y);
+	await page.mouse.down();
+	return { bar, x, y };
+}
+
+test('resizes a Gantt bar by dragging its end handle', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+	await page.getByRole('button', { name: /간트 뷰/ }).click();
+
+	const before = await readPersistedTask(page, 'local-e2e-task');
+	const { bar, x, y } = await pressGanttEndHandle(page, 'E2E cached task');
+	// Two 48px days to the right.
+	await page.mouse.move(x + 60, y, { steps: 4 });
+	await page.mouse.move(x + 96, y, { steps: 4 });
+	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 2)})`);
+	await page.mouse.up();
+
+	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+		.toBe(shiftDate(before.endDate, 2));
+	expect((await readPersistedTask(page, 'local-e2e-task')).startDate).toBe(before.startDate);
+	// Letting go of a resize is not a click on the bar: no detail panel.
+	await expect(page.locator('.side-panel')).toHaveCount(0);
+});
+
 test('suggests categories and manages category names offline', async ({ page }) => {
 	await seedOfflineBoard(page);
 
