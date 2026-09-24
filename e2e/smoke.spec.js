@@ -343,6 +343,16 @@ test('shows the card labels for status, priority and urgency in the detail panel
 		await modal.locator('.close-btn').click();
 		await expect(modal).toHaveCount(0);
 	}
+
+	// The selects still edit the task and the chips follow.
+	await cardByTitle(page, 'E2E cached task').locator('.card-text').click();
+	await modal.locator('#modal-priority').selectOption('low');
+	await modal.locator('#modal-urgency').selectOption('urgent');
+	await expect(modal.locator('.priority-chip')).toHaveText('🟢 낮음');
+	await expect(modal.locator('.urgency-chip')).toHaveText('🔥 시급');
+	await expect(modal.locator('#modal-priority')).toHaveValue('low');
+	await modal.locator('.close-btn').click();
+	await expect(cardByTitle(page, 'E2E cached task').locator('.priority-badge')).toHaveText('🟢 낮음');
 });
 
 /**
