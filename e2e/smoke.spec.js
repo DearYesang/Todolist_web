@@ -375,11 +375,210 @@ test('keeps the matrix view framed on iPad Pro width', async ({ page }) => {
 	expect(firstBox.x).toBeLessThan(secondBox.x);
 });
 
+const LINK_TASKS = [
+	{
+		id: 'local-link-parent',
+		text: 'E2E 링크 모음',
+		subtasks: [
+			{ id: 'local-link-nrf', text: '한국연구재단(https://www.nrf.re.kr/index)', done: false },
+			// Checked items are included in "open all".
+			{ id: 'local-link-kss', text: 'https://kss.or.kr/,', done: true }
+		]
+	},
+	{
+		id: 'local-link-child',
+		text: 'E2E 링크 하위',
+		parentId: 'local-link-parent',
+		subtasks: [
+			{ id: 'local-link-ksbmb', text: '학회 https://www.ksbmb.or.kr', done: false },
+			{ id: 'local-link-kams', text: 'www.kams.or.kr.', done: false }
+		]
+	}
+];
+
+const LINK_TASK_URLS = [
+	'https://www.nrf.re.kr/index',
+	'https://kss.or.kr/',
+	'https://www.ksbmb.or.kr/',
+	'https://www.kams.or.kr/'
+];
+
+/**
+ * Replaces window.open with a recorder and blocks every non-local host, so
+ * no test ever reaches a real external site. Real pop-up blocking cannot be
+ * exercised here (Playwright Chromium runs with --disable-popup-blocking and
+ * Playwright WebKit does not block either), so 'one-per-click' models it:
+ * each click grants a single window.open, like Chromium/Brave and Safari
+ * before the site is allowed pop-ups.
+ * @param {import('@playwright/test').Page} page
+ * @param {'allow' | 'one-per-click' | 'block'} [mode]
+ */
+async function stubWindowOpen(page, mode = 'allow') {
+	await page.context().route(
+		(url) => url.hostname !== '127.0.0.1' && url.hostname !== 'localhost',
+		(route) => route.abort()
+	);
+	await page.addInitScript((openMode) => {
+		const calls = [];
+		let allowance = openMode === 'allow' ? Number.POSITIVE_INFINITY : 0;
+		if (openMode === 'one-per-click') {
+			window.addEventListener('click', () => {
+				allowance = 1;
+			}, true);
+		}
+		Object.defineProperty(window, '__opened', { value: calls });
+		window.open = (...args) => {
+			calls.push(args);
+			if (allowance <= 0) {
+				return null;
+			}
+			allowance -= 1;
+			return {};
+		};
+	}, mode);
+}
+
 /**
  * @param {import('@playwright/test').Page} page
  */
-async function seedOfflineBoard(page) {
-	await page.addInitScript(() => {
+function readOpenedUrls(page) {
+	return page.evaluate(() => window.__opened.map((args) => args[0]));
+}
+
+/**
+ * @param {import('@playwright/test').Page} page
+ */
+function linkParentCard(page) {
+	return page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 모음' }) });
+}
+
+test('renders checklist links without trailing punctuation and opens them all', async ({ page }) => {
+	await stubWindowOpen(page);
+	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
+
+	await page.goto('/');
+	const card = linkParentCard(page);
+	await expect(card).toBeVisible();
+
+	const links = card.locator('a.subtask-link');
+	await expect(links).toHaveCount(2);
+	await expect(links.nth(0)).toHaveAttribute('href', 'https://www.nrf.re.kr/index');
+	await expect(links.nth(0)).toHaveText('https://www.nrf.re.kr/index');
+	await expect(links.nth(0)).toHaveAttribute('target', '_blank');
+	await expect(links.nth(1)).toHaveAttribute('href', 'https://kss.or.kr/');
+	await expect(links.nth(1)).toHaveText('https://kss.or.kr/');
+	await expect(card.locator('.subtask-text').first()).toHaveText('한국연구재단(https://www.nrf.re.kr/index)');
+
+	const ownButton = card.getByRole('button', { name: '체크리스트 링크 2개를 새 탭에서 모두 열기' });
+	const subtreeButton = card.getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' });
+	await expect(ownButton).toContainText('모두 열기 (2)');
+	await expect(subtreeButton).toContainText('하위 포함 모두 열기 (4)');
+	// The child card has 2 links of its own and no children.
+	const childCard = page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 하위' }) });
+	await expect(childCard.getByRole('button', { name: '체크리스트 링크 2개를 새 탭에서 모두 열기' })).toBeVisible();
+
+	await subtreeButton.click();
+	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
+	// window.open(url, '_blank') with no features string: 'noopener' would
+	// make it return null even on success and hide blocked tabs.
+	expect(await page.evaluate(() => window.__opened.map((args) => args.slice(1)))).toEqual([
+		['_blank'],
+		['_blank'],
+		['_blank'],
+		['_blank']
+	]);
+
+	const panel = page.locator('.link-open-panel');
+	await expect(panel).toContainText('링크 4개를 새 탭으로 열었습니다.');
+	// The click neither opened the detail modal nor started a drag.
+	await expect(page.locator('.side-panel')).toHaveCount(0);
+	await expect(page.locator('.dnd-ghost')).toHaveCount(0);
+	const persisted = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
+			.filter((task) => task.id.startsWith('local-link-'))
+			.map((task) => [task.id, task.status, task.parentId])
+	);
+	expect(persisted).toEqual([
+		['local-link-parent', 'todo', null],
+		['local-link-child', 'todo', 'local-link-parent']
+	]);
+	await panel.getByRole('button', { name: '닫기' }).click();
+	await expect(panel).toHaveCount(0);
+
+	// Keyboard activation opens the task's own links.
+	await ownButton.focus();
+	await page.keyboard.press('Enter');
+	expect(await readOpenedUrls(page)).toEqual([...LINK_TASK_URLS, ...LINK_TASK_URLS.slice(0, 2)]);
+	await expect(panel).toContainText('링크 2개를 새 탭으로 열었습니다.');
+	await panel.getByRole('button', { name: '닫기' }).click();
+
+	// The detail modal (the only entry point from Gantt) offers the same buttons.
+	await card.locator('.card-text').click();
+	const modal = page.locator('.side-panel');
+	await expect(modal).toBeVisible();
+	await expect(modal.getByRole('button', { name: '체크리스트 링크 2개를 새 탭에서 모두 열기' })).toContainText('모두 열기 (2)');
+	const modalSubtree = modal.getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' });
+	await expect(modalSubtree).toContainText('하위 포함 모두 열기 (4)');
+	await modalSubtree.click();
+	expect(await readOpenedUrls(page)).toHaveLength(10);
+	await expect(panel).toContainText('링크 4개를 새 탭으로 열었습니다.');
+	await expect(modal).toBeVisible();
+});
+
+test('falls back to a link list when the browser blocks pop-ups', async ({ page }) => {
+	await stubWindowOpen(page, 'one-per-click');
+	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
+
+	await page.goto('/');
+	await linkParentCard(page).getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' }).click();
+	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
+
+	const panel = page.locator('.link-open-panel');
+	await expect(panel).toContainText('링크 4개 중 1개만 열렸습니다');
+	await expect(panel).toContainText('brave://settings/content/popups');
+	const fallbackLinks = panel.locator('a');
+	await expect(fallbackLinks).toHaveCount(3);
+	expect(await fallbackLinks.evaluateAll((anchors) =>
+		anchors.map((anchor) => [anchor.getAttribute('href'), anchor.getAttribute('target'), anchor.getAttribute('rel')])
+	)).toEqual(LINK_TASK_URLS.slice(1).map((href) => [href, '_blank', 'noopener noreferrer']));
+
+	// Each step is a fresh click, so exactly one more window.open per click.
+	await panel.getByRole('button', { name: '다음 링크 열기 (1/3)' }).click();
+	expect(await readOpenedUrls(page)).toEqual([...LINK_TASK_URLS, LINK_TASK_URLS[1]]);
+	await expect(fallbackLinks).toHaveCount(2);
+
+	await panel.getByRole('button', { name: '다음 링크 열기 (2/3)' }).click();
+	expect(await readOpenedUrls(page)).toEqual([...LINK_TASK_URLS, ...LINK_TASK_URLS.slice(1, 3)]);
+
+	await panel.getByRole('button', { name: '다음 링크 열기 (3/3)' }).click();
+	expect(await readOpenedUrls(page)).toEqual([...LINK_TASK_URLS, ...LINK_TASK_URLS.slice(1)]);
+	await expect(panel).toContainText('링크 4개를 새 탭으로 열었습니다.');
+	await expect(fallbackLinks).toHaveCount(0);
+});
+
+test('lists every link when new tabs cannot be opened at all', async ({ page }) => {
+	await stubWindowOpen(page, 'block');
+	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
+
+	await page.goto('/');
+	await linkParentCard(page).getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' }).click();
+
+	const panel = page.locator('.link-open-panel');
+	await expect(panel).toContainText('이 환경에서는 새 탭을 자동으로 열 수 없습니다.');
+	await expect(panel.locator('a[target="_blank"]')).toHaveCount(4);
+
+	// A single fresh open failing too hides the step button; the list stays.
+	await panel.getByRole('button', { name: '다음 링크 열기 (1/4)' }).click();
+	await expect(panel.getByRole('button', { name: /다음 링크 열기/ })).toHaveCount(0);
+	await expect(panel.locator('a[target="_blank"]')).toHaveCount(4);
+});
+
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {{ extraTasks?: Array<Record<string, unknown>> }} [options]
+ */
+async function seedOfflineBoard(page, { extraTasks = [] } = {}) {
+	await page.addInitScript((seedExtraTasks) => {
 		Object.defineProperty(navigator, 'onLine', {
 			configurable: true,
 			get: () => false
@@ -393,6 +592,19 @@ async function seedOfflineBoard(page) {
 		};
 		const past = new Date(today);
 		past.setDate(past.getDate() - 16);
+		const extraSeedTasks = seedExtraTasks.map((task) => ({
+			status: 'todo',
+			startDate: formatDate(past),
+			endDate: formatDate(past),
+			priority: 'medium',
+			urgency: 'normal',
+			category: '',
+			parentId: null,
+			subtasks: [],
+			collapsed: false,
+			createdAt: Date.now(),
+			...task
+		}));
 
 		localStorage.setItem('todokanbanAuthScope', JSON.stringify({
 			id: 'e2e-user',
@@ -505,7 +717,8 @@ async function seedOfflineBoard(page) {
 				subtasks: [],
 				collapsed: false,
 				createdAt: Date.now()
-			}
+			},
+			...extraSeedTasks
 		]));
-	});
+	}, extraTasks);
 }
