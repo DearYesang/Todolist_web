@@ -17,6 +17,7 @@
     import { createDatedFilename, downloadJson } from '$lib/client/download.js';
     import { setLinkOpenOwner } from '$lib/client/link-opener.js';
     import { setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
+    import { setupPageLifecycle } from '$lib/client/page-lifecycle.js';
     import { updateBoardPreferences } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
@@ -97,26 +98,7 @@
         }
 
         const teardownCrossTabSync = setupCrossTabTaskSync(window);
-
-        let reloadedForServiceWorkerUpdate = false;
-        const handleServiceWorkerUpdate = () => {
-            if (reloadedForServiceWorkerUpdate) return;
-            reloadedForServiceWorkerUpdate = true;
-            // Queued-but-unsent writes must survive this programmatic reload.
-            drainPendingTaskSyncsToOfflineQueue();
-            window.location.reload();
-        };
-        const handlePageHide = () => {
-            drainPendingTaskSyncsToOfflineQueue();
-        };
-        window.addEventListener('pagehide', handlePageHide);
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready
-                .then((registration) => registration.update())
-                .catch(() => {});
-            navigator.serviceWorker.addEventListener('controllerchange', handleServiceWorkerUpdate);
-        }
+        const teardownPageLifecycle = setupPageLifecycle(window, drainPendingTaskSyncsToOfflineQueue);
 
         const handleOnline = () => {
             isOnline = true;
@@ -132,10 +114,9 @@
         window.addEventListener('offline', handleOffline);
         return () => {
             teardownCrossTabSync();
-            window.removeEventListener('pagehide', handlePageHide);
+            teardownPageLifecycle();
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
-            navigator.serviceWorker?.removeEventListener('controllerchange', handleServiceWorkerUpdate);
         };
     });
 
