@@ -33,8 +33,13 @@
     }
 </script>
 
+<!-- Always mounted, so screen readers track it before the first result, and
+     holding only the short message, so each step is not read out with the
+     whole panel (hint, buttons and every fallback link). -->
+<p class="visually-hidden link-open-live" role="status">{summary?.message ?? ''}</p>
+
 {#if $linkOpenState && summary}
-    <div class="link-open-panel" data-tone={summary.tone} role="status" aria-live="polite">
+    <div class="link-open-panel" data-tone={summary.tone}>
         <div class="link-open-panel-header">
             <strong class="link-open-panel-title">
                 <span aria-hidden="true">🔗</span>

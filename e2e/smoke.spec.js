@@ -479,6 +479,13 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	const childCard = page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 하위' }) });
 	await expect(childCard.getByRole('button', { name: '모두 열기 (2)', exact: true })).toBeVisible();
 
+	// A permanent live region carries only the short result message; the
+	// panel itself is not a live region, so steps are not re-read in full.
+	const liveRegion = page.locator('.link-open-live');
+	await expect(liveRegion).toHaveCount(1);
+	await expect(liveRegion).toHaveAttribute('role', 'status');
+	await expect(liveRegion).toHaveText('');
+
 	await subtreeButton.click();
 	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
 	// window.open(url, '_blank') with no features string: 'noopener' would
@@ -492,6 +499,9 @@ test('renders checklist links without trailing punctuation and opens them all', 
 
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('링크 4개를 새 탭으로 열었습니다.');
+	await expect(liveRegion).toHaveText('링크 4개를 새 탭으로 열었습니다.');
+	await expect(panel).not.toHaveAttribute('role');
+	await expect(panel).not.toHaveAttribute('aria-live');
 	// The click neither opened the detail modal nor started a drag.
 	await expect(page.locator('.side-panel')).toHaveCount(0);
 	await expect(page.locator('.dnd-ghost')).toHaveCount(0);
@@ -545,6 +555,9 @@ test('falls back to a link list when the browser blocks pop-ups', async ({ page 
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('링크 4개 중 1개만 열렸습니다');
 	await expect(panel).toContainText('brave://settings/content/popups');
+	await expect(page.locator('.link-open-live')).toHaveText(
+		'링크 4개 중 1개만 열렸습니다. 브라우저가 나머지를 팝업으로 차단했습니다.'
+	);
 	const fallbackLinks = panel.locator('a');
 	await expect(fallbackLinks).toHaveCount(3);
 	expect(await fallbackLinks.evaluateAll((anchors) =>
