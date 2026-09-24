@@ -29,28 +29,22 @@ import {
     updateTaskInList
 } from '../shared/task-domain.js';
 import { normalizeCategoryName } from '../shared/category-suggestions.js';
+import { getStorage, PENDING_VIEW_STORAGE_KEY } from './task-store/storage.js';
+
+export {
+    applyServerDefaultView,
+    clearPendingDefaultView,
+    currentView,
+    isAppView,
+    markPendingDefaultView,
+    readPendingDefaultView,
+    setCurrentView
+} from './task-store/view-preference.js';
 
 const STORAGE_KEY = 'kanbanTasks';
-const VIEW_STORAGE_KEY = 'todokanbanCurrentView';
-const PENDING_VIEW_STORAGE_KEY = 'todokanbanPendingDefaultView';
 const DEFAULT_STORAGE_OWNER = 'anonymous';
-const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 
 let taskStorageOwner = DEFAULT_STORAGE_OWNER;
-
-/**
- * @returns {Storage | null}
- */
-function getStorage() {
-    try {
-        const storage = globalThis.localStorage;
-        return storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
-            ? storage
-            : null;
-    } catch {
-        return null;
-    }
-}
 
 /**
  * @returns {import('../shared/task-domain.js').Task[]}
@@ -215,90 +209,6 @@ function readLegacyTasks(storage) {
 function normalizeStorageOwner(ownerId) {
     const trimmed = ownerId?.trim();
     return trimmed || DEFAULT_STORAGE_OWNER;
-}
-
-/** @typedef {'kanban' | 'gantt' | 'matrix'} AppView */
-
-/** @type {import('svelte/store').Writable<AppView>} */
-export const currentView = writable(readInitialView());
-
-/**
- * @param {unknown} value
- */
-export function setCurrentView(value) {
-    if (isAppView(value)) {
-        currentView.set(value);
-    }
-}
-
-/**
- * @param {unknown} value
- */
-export function applyServerDefaultView(value) {
-    setCurrentView(value);
-}
-
-/**
- * @param {unknown} value
- */
-export function markPendingDefaultView(value) {
-    if (!isAppView(value)) return;
-
-    try {
-        const storage = getStorage();
-        storage?.setItem(PENDING_VIEW_STORAGE_KEY, value);
-    } catch (error) {
-        console.error('Failed to persist pending default view', error);
-    }
-}
-
-/** @returns {AppView | null} */
-export function readPendingDefaultView() {
-    try {
-        const storage = getStorage();
-        const stored = storage?.getItem(PENDING_VIEW_STORAGE_KEY);
-        return isAppView(stored) ? stored : null;
-    } catch {
-        return null;
-    }
-}
-
-export function clearPendingDefaultView() {
-    try {
-        getStorage()?.removeItem(PENDING_VIEW_STORAGE_KEY);
-    } catch (error) {
-        console.error('Failed to clear pending default view', error);
-    }
-}
-
-currentView.subscribe((value) => {
-    try {
-        const storage = getStorage();
-        if (!storage || !isAppView(value)) return;
-
-        storage.setItem(VIEW_STORAGE_KEY, value);
-    } catch (error) {
-        console.error('Failed to persist current view', error);
-    }
-});
-
-/** @returns {AppView} */
-function readInitialView() {
-    try {
-        const storage = getStorage();
-        const stored = storage?.getItem(VIEW_STORAGE_KEY);
-        return isAppView(stored) ? stored : 'kanban';
-    } catch {
-        return 'kanban';
-    }
-}
-
-/**
- * @param {unknown} value
- * @returns {value is AppView}
- */
-export function isAppView(value) {
-    return typeof value === 'string' && VALID_VIEWS.has(value);
 }
 
 /** @type {import('svelte/store').Writable<import('../shared/task-domain.js').TaskFilters>} */
