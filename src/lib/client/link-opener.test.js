@@ -11,6 +11,7 @@ import {
 	openPendingLinks,
 	POPUP_PERMISSION_HINT,
 	requestOpenLinks,
+	setLinkOpenOwner,
 	summarizeLinkOpenState
 } from './link-opener.js';
 
@@ -342,5 +343,35 @@ describe('panel lifetime', () => {
 		vi.advanceTimersByTime(LINK_RESULT_AUTO_HIDE_MS * 2);
 
 		expect(summarizeLinkOpenState(currentState()).tone).toBe('partial');
+	});
+});
+
+describe('account changes', () => {
+	it('drops a leftover confirm step on sign-out so nobody can confirm it later', () => {
+		const { openFn } = createOpener(() => true);
+		setLinkOpenOwner('user-a');
+		requestOpenLinks(makeLinks(11), { openFn });
+
+		// Re-applying the same owner (a session refetch) keeps the step.
+		setLinkOpenOwner('user-a');
+		expect(currentState().phase).toBe('confirm');
+
+		setLinkOpenOwner(null);
+		expect(get(linkOpenState)).toBeNull();
+		confirmOpen({ openFn });
+		expect(openFn).not.toHaveBeenCalled();
+		expect(get(linkOpenState)).toBeNull();
+	});
+
+	it('drops a partial result when another account signs in', () => {
+		const { openFn } = createOpener((callIndex) => callIndex === 0);
+		setLinkOpenOwner('user-a');
+		requestOpenLinks(makeLinks(3), { openFn });
+		expect(summarizeLinkOpenState(currentState()).tone).toBe('partial');
+
+		setLinkOpenOwner('user-b');
+		expect(get(linkOpenState)).toBeNull();
+		openNextBlocked({ openFn });
+		expect(openFn).toHaveBeenCalledTimes(3);
 	});
 });

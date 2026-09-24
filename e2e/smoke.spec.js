@@ -573,6 +573,34 @@ test('lists every link when new tabs cannot be opened at all', async ({ page }) 
 	await expect(panel.locator('a[target="_blank"]')).toHaveCount(4);
 });
 
+test('drops a leftover link panel when another account signs in', async ({ page }) => {
+	await stubWindowOpen(page, 'one-per-click');
+	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
+
+	await page.goto('/');
+	await linkParentCard(page).getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' }).click();
+	const panel = page.locator('.link-open-panel');
+	await expect(panel).toContainText('링크 4개 중 1개만 열렸습니다');
+
+	// Another account's session arrives in the same tab, with no page reload
+	// (sign-out, then a different sign-in). The DB-less server has no auth, so
+	// the session and task endpoints are faked here.
+	await page.route('**/api/auth/get-session**', (route) => route.fulfill({
+		json: {
+			session: { id: 'e2e-session-2', userId: 'e2e-user-2', expiresAt: '2099-01-01T00:00:00.000Z' },
+			user: { id: 'e2e-user-2', email: 'other@example.com', name: null }
+		}
+	}));
+	await page.route('**/api/tasks**', (route) => route.fulfill({ status: 503, json: { message: 'unavailable' } }));
+	await page.evaluate(() => window.dispatchEvent(new Event('online')));
+
+	await expect(page.locator('.auth-identity')).toHaveText('other@example.com');
+	await expect(page.getByRole('button', { name: /간트 뷰/ })).toBeVisible();
+	// The previous account's task title and URLs must not reappear.
+	await expect(panel).toHaveCount(0);
+	await expect(page.getByText('E2E 링크 모음')).toHaveCount(0);
+});
+
 /**
  * @param {import('@playwright/test').Page} page
  * @param {{ extraTasks?: Array<Record<string, unknown>> }} [options]

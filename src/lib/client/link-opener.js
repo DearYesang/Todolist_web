@@ -248,6 +248,22 @@ export function dismissLinkOpen() {
 	commit(null);
 }
 
+/** @type {string | null | undefined} */
+let linkOpenOwner;
+
+/**
+ * Called whenever the signed-in account (the storage owner) changes. A
+ * confirm step or a partial result lists the previous account's task titles
+ * and URLs, so it must not survive a sign-out or an account switch.
+ * @param {string | null} ownerId
+ */
+export function setLinkOpenOwner(ownerId) {
+	const nextOwner = ownerId ?? null;
+	if (nextOwner === linkOpenOwner) return;
+	linkOpenOwner = nextOwner;
+	dismissLinkOpen();
+}
+
 /**
  * Korean copy and derived lists for the panel.
  * @param {LinkOpenState} state

@@ -11,6 +11,7 @@
         createOfflineConflictReport,
         summarizeOfflineConflict
     } from '$lib/client/offline-conflicts.js';
+    import { setLinkOpenOwner } from '$lib/client/link-opener.js';
     import { enqueueOfflineMutation, setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { exportServerTasks, importServerTasks, updateBoardPreferences } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
@@ -149,6 +150,7 @@
         scopedUserId = userId;
         setTaskStorageOwner(userId);
         setOfflineQueueOwner(userId);
+        setLinkOpenOwner(userId);
     }
 
     /**
