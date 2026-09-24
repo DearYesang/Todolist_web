@@ -592,11 +592,41 @@ export function buildColumnHierarchy(taskList, status, activeFilters) {
 }
 
 /**
- * @param {Task[]} taskList
- * @param {string} taskId
+ * @typedef {{
+ *   byId: Map<string, Task>;
+ *   childrenByParentId: Map<string, Task[]>;
+ * }} TaskIndex
  */
-export function getDirectChildren(taskList, taskId) {
-    return taskList.filter((task) => task.parentId === taskId);
+
+/**
+ * One pass over the full task list, so each board card can look up its
+ * parent and direct children instead of scanning every task. Unlike
+ * buildHierarchy it ignores filters and columns. Children keep list order,
+ * and the first task with a given id wins, as with Array#find.
+ * @param {Task[]} taskList
+ * @returns {TaskIndex}
+ */
+export function buildTaskIndex(taskList) {
+    /** @type {Map<string, Task>} */
+    const byId = new Map();
+    /** @type {Map<string, Task[]>} */
+    const childrenByParentId = new Map();
+
+    taskList.forEach((task) => {
+        if (!byId.has(task.id)) {
+            byId.set(task.id, task);
+        }
+
+        if (!task.parentId) return;
+        const siblings = childrenByParentId.get(task.parentId);
+        if (siblings) {
+            siblings.push(task);
+        } else {
+            childrenByParentId.set(task.parentId, [task]);
+        }
+    });
+
+    return { byId, childrenByParentId };
 }
 
 /**

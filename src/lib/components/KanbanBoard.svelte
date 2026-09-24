@@ -2,7 +2,7 @@
     import { setContext } from 'svelte';
     import { assignParent, filters, moveTask, tasks } from '$lib/client/task-store.js';
     import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
-    import { buildColumnHierarchy, canAssignParent } from '$lib/shared/task-domain.js';
+    import { buildColumnHierarchy, buildTaskIndex, canAssignParent } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
     let { openTask } = $props();
@@ -54,6 +54,9 @@
         return [zone.slice(0, separator), zone.slice(separator + 1)];
     }
 
+    // Parent and child lookups for every card, from the full task list.
+    const taskIndex = $derived(buildTaskIndex($tasks));
+
     const columnData = $derived.by(() =>
         columns.map((column) => ({
             ...column,
@@ -86,6 +89,7 @@
                     {#each column.roots as task (task.id)}
                         <TaskTreeCard
                             allTasks={$tasks}
+                            taskIndex={taskIndex}
                             childrenByParent={column.childrenByParent}
                             openTask={openTask}
                             task={task} />

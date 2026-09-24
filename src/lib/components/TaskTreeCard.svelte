@@ -16,7 +16,6 @@
     import {
         getCategoryColor,
         getDeleteTaskConfirmMessage,
-        getDirectChildren,
         getTaskDueStatus,
         PRIORITY_LABELS,
         STATUS_LABELS,
@@ -28,6 +27,7 @@
     /** @type {{
      *   task: import('$lib/shared/task-domain.js').Task;
      *   allTasks: import('$lib/shared/task-domain.js').Task[];
+     *   taskIndex: import('$lib/shared/task-domain.js').TaskIndex;
      *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
      *   openTask: (id: string) => void;
@@ -35,6 +35,7 @@
     let {
         task,
         allTasks,
+        taskIndex,
         childrenByParent,
         depth = 0,
         openTask
@@ -57,12 +58,14 @@
     let subtaskCompositionResetTimer = null;
 
     const children = $derived(childrenByParent[task.id] || []);
-    const directChildren = $derived(getDirectChildren(allTasks, task.id));
+    // taskIndex is built once per board from the full task list, so a card
+    // finds its children and parent without scanning allTasks.
+    const directChildren = $derived(taskIndex.childrenByParentId.get(task.id) ?? []);
     const doneChildrenCount = $derived(directChildren.filter((candidate) => candidate.status === 'done').length);
     const dueStatus = $derived(getTaskDueStatus(task));
     const foreignParent = $derived.by(() => {
         if (!task.parentId) return null;
-        const parent = allTasks.find((candidate) => candidate.id === task.parentId) || null;
+        const parent = taskIndex.byId.get(task.parentId) || null;
         return parent && parent.status !== task.status ? parent : null;
     });
     const categoryColor = $derived(getCategoryColor(task.category, task.categoryMeta?.color));
@@ -343,6 +346,7 @@
     {#each children as child (child.id)}
         <TaskTreeCard
             allTasks={allTasks}
+            taskIndex={taskIndex}
             childrenByParent={childrenByParent}
             depth={depth + 1}
             openTask={openTask}
