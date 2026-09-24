@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
 	buildGanttLayout,
+	canStartResize,
 	GANTT_DAY_WIDTH,
 	getBarCoords,
 	getResizeDayOffset,
@@ -179,5 +180,25 @@ describe('ownsResizePointer', () => {
 	it('falls back to accepting events when either side has no pointer id', () => {
 		expect(ownsResizePointer({}, { pointerId: 2 })).toBe(true);
 		expect(ownsResizePointer({ pointerId: 1 }, {})).toBe(true);
+	});
+});
+
+describe('canStartResize', () => {
+	it('starts a resize when none is active', () => {
+		expect(canStartResize(null, { pointerId: 3 })).toBe(true);
+	});
+
+	it('refuses a press from another pointer while a resize is active', () => {
+		expect(canStartResize({ pointerId: 1 }, { pointerId: 99 })).toBe(false);
+		expect(canStartResize({ pointerId: 5 }, { pointerId: 6 })).toBe(false);
+	});
+
+	it('lets the owning pointer restart after its release was lost', () => {
+		expect(canStartResize({ pointerId: 1 }, { pointerId: 1 })).toBe(true);
+	});
+
+	it('falls back to allowing the press when either side has no pointer id', () => {
+		expect(canStartResize({}, { pointerId: 2 })).toBe(true);
+		expect(canStartResize({ pointerId: 1 }, {})).toBe(true);
 	});
 });

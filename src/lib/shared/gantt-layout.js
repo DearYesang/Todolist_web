@@ -182,3 +182,15 @@ export function ownsResizePointer(resize, event) {
 		|| event.pointerId === undefined
 		|| event.pointerId === resize.pointerId;
 }
+
+/**
+ * A press may start a resize only when none is active, or when it comes from
+ * the pointer that owns the active one (its release was lost, e.g. a
+ * right-click on a handle opened the native context menu). A second finger
+ * landing on any handle mid-resize must not take the gesture over.
+ * @param {{ pointerId?: number } | null} resize
+ * @param {{ pointerId?: number }} event
+ */
+export function canStartResize(resize, event) {
+	return !resize || ownsResizePointer(resize, event);
+}

@@ -3,6 +3,7 @@
     import { filters, tasks, toggleSubtask, updateTask } from '$lib/client/task-store.js';
     import {
         buildGanttLayout,
+        canStartResize,
         GANTT_DAY_WIDTH,
         getBarCoords,
         getResizeDayOffset,
@@ -105,6 +106,7 @@
     function startResize(event, task, edge) {
         event.preventDefault();
         event.stopPropagation();
+        if (!canStartResize(resizeState, event)) return;
         suppressBarClick = true;
 
         resizeState = {

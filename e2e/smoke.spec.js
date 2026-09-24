@@ -186,6 +186,40 @@ test('ignores a second pointer while a Gantt bar is being resized', async ({ pag
 		.toBe(shiftDate(before.endDate, 2));
 });
 
+test('ignores a second pointer pressing a handle while a Gantt bar is being resized', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+	await page.getByRole('button', { name: /간트 뷰/ }).click();
+
+	const before = await readPersistedTask(page, 'local-e2e-task');
+	const { bar, x, y } = await pressGanttEndHandle(page, 'E2E cached task');
+	await page.mouse.move(x + 48, y, { steps: 4 });
+
+	// A second finger lands on the start handle mid-resize, drags far left and
+	// lifts. It must not take the resize over from the mouse (pointer 1).
+	const startHandle = bar.locator('.resize-handle.start');
+	const startBox = await startHandle.boundingBox();
+	expect(startBox).toBeTruthy();
+	await startHandle.evaluate((handle, { sx, sy }) => {
+		const init = { pointerId: 99, pointerType: 'touch', isPrimary: false, clientX: sx, clientY: sy, bubbles: true, cancelable: true };
+		handle.dispatchEvent(new PointerEvent('pointerdown', init));
+		window.dispatchEvent(new PointerEvent('pointermove', { ...init, clientX: sx - 480 }));
+		window.dispatchEvent(new PointerEvent('pointerup', { ...init, clientX: sx - 480 }));
+	}, { sx: startBox.x + startBox.width / 2, sy: startBox.y + startBox.height / 2 });
+	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 1)})`);
+	expect(await readPersistedTask(page, 'local-e2e-task')).toMatchObject({
+		startDate: before.startDate,
+		endDate: before.endDate
+	});
+
+	// The mouse still owns the resize and commits only its own edge.
+	await page.mouse.move(x + 96, y, { steps: 4 });
+	await page.mouse.up();
+	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+		.toBe(shiftDate(before.endDate, 2));
+	expect((await readPersistedTask(page, 'local-e2e-task')).startDate).toBe(before.startDate);
+});
+
 test('suggests categories and manages category names offline', async ({ page }) => {
 	await seedOfflineBoard(page);
 
