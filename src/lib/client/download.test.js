@@ -1,5 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
-import { downloadBlob, downloadJson } from './download.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createDatedFilename, downloadBlob, downloadJson } from './download.js';
+
+const originalTimeZone = process.env.TZ;
+
+afterEach(() => {
+	vi.useRealTimers();
+	if (originalTimeZone === undefined) {
+		delete process.env.TZ;
+	} else {
+		process.env.TZ = originalTimeZone;
+	}
+});
 
 function createFakeEnvironment() {
 	/** @type {string[]} */
@@ -59,5 +70,30 @@ describe('downloadJson', () => {
 		]);
 		expect(blobs[0].type).toBe('application/json');
 		expect(await blobs[0].text()).toBe(JSON.stringify([{ id: 'a', text: '백업' }], null, 2));
+	});
+});
+
+describe('createDatedFilename', () => {
+	it('stamps the local date of an injected time', () => {
+		// Local components, so this holds in every time zone.
+		expect(createDatedFilename('kanban_backup', 'json', new Date(2026, 8, 24, 8, 30)))
+			.toBe('kanban_backup_2026-09-24.json');
+	});
+
+	it('uses the Korean date at 08:30 KST, while UTC is still on the previous day', () => {
+		process.env.TZ = 'Asia/Seoul';
+		const kstMorning = new Date('2026-09-23T23:30:00.000Z');
+
+		expect(kstMorning.toISOString().split('T')[0]).toBe('2026-09-23');
+		expect(createDatedFilename('kanban_backup', 'json', kstMorning)).toBe('kanban_backup_2026-09-24.json');
+		expect(createDatedFilename('offline_conflicts', 'json', kstMorning)).toBe('offline_conflicts_2026-09-24.json');
+	});
+
+	it('defaults to the current time', () => {
+		process.env.TZ = 'Asia/Seoul';
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-09-23T23:30:00.000Z'));
+
+		expect(createDatedFilename('kanban_backup', 'json')).toBe('kanban_backup_2026-09-24.json');
 	});
 });

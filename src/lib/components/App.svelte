@@ -11,7 +11,7 @@
         createOfflineConflictReport,
         summarizeOfflineConflict
     } from '$lib/client/offline-conflicts.js';
-    import { downloadJson } from '$lib/client/download.js';
+    import { createDatedFilename, downloadJson } from '$lib/client/download.js';
     import { setLinkOpenOwner } from '$lib/client/link-opener.js';
     import { enqueueOfflineMutation, setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { exportServerTasks, importServerTasks, updateBoardPreferences } from '$lib/client/task-api.js';
@@ -295,7 +295,7 @@
     function downloadConflictReport() {
         if (syncConflicts.length === 0) return;
 
-        downloadJson(createOfflineConflictReport(syncConflicts), `offline_conflicts_${new Date().toISOString().split('T')[0]}.json`);
+        downloadJson(createOfflineConflictReport(syncConflicts), createDatedFilename('offline_conflicts', 'json'));
     }
 
     /**
@@ -360,7 +360,7 @@
     async function exportData() {
         const result = await exportServerTasks();
         const sourceTasks = result.ok ? result.tasks : get(tasks);
-        downloadJson(sourceTasks, `kanban_backup_${new Date().toISOString().split('T')[0]}.json`);
+        downloadJson(sourceTasks, createDatedFilename('kanban_backup', 'json'));
     }
 
     function handleClearDone() {

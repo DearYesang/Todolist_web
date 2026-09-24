@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 test('keeps the private app locked before login', async ({ page }) => {
@@ -247,6 +248,25 @@ test('narrows every view with the search box and highlights overdue work', async
 function cardByTitle(page, title) {
 	return page.locator('.task-card', { has: page.locator('.card-text', { hasText: title }) });
 }
+
+test.describe('in Korea before 09:00', () => {
+	test.use({ timezoneId: 'Asia/Seoul' });
+
+	test('names the backup export with the local date, not the UTC one', async ({ page }) => {
+		// 2026-09-24 08:30 KST is still 2026-09-23 in UTC.
+		await page.clock.setFixedTime(new Date('2026-09-23T23:30:00.000Z'));
+		await seedOfflineBoard(page);
+		await page.goto('/');
+
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByRole('button', { name: '백업 JSON 내보내기' }).click();
+		const download = await downloadPromise;
+
+		expect(download.suggestedFilename()).toBe('kanban_backup_2026-09-24.json');
+		const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+		expect(exported.map((task) => task.text)).toContain('E2E cached task');
+	});
+});
 
 test('asks the same delete question on a card and in the detail panel', async ({ page }) => {
 	await seedOfflineBoard(page);
