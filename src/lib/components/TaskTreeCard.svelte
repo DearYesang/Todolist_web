@@ -1,5 +1,5 @@
 <script>
-    import { getContext } from 'svelte';
+    import { getContext, onDestroy } from 'svelte';
     import TaskTreeCard from './TaskTreeCard.svelte';
     import OpenLinksButton from './OpenLinksButton.svelte';
     import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
@@ -15,18 +15,19 @@
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
-        getDirectChildren,
+        getDeleteTaskConfirmMessage,
         getTaskDueStatus,
         PRIORITY_LABELS,
         STATUS_LABELS,
         URGENCY_LABELS
     } from '$lib/shared/task-domain.js';
     import { collectSubtreeLinks, extractTaskLinks, splitTextIntoLinkParts } from '$lib/shared/task-links.js';
-    import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
+    import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
 
     /** @type {{
      *   task: import('$lib/shared/task-domain.js').Task;
      *   allTasks: import('$lib/shared/task-domain.js').Task[];
+     *   taskIndex: import('$lib/shared/task-domain.js').TaskIndex;
      *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
      *   openTask: (id: string) => void;
@@ -34,6 +35,7 @@
     let {
         task,
         allTasks,
+        taskIndex,
         childrenByParent,
         depth = 0,
         openTask
@@ -50,18 +52,18 @@
         return dnd ? dnd.controller.draggable(node, id) : undefined;
     }
     let newSubtaskText = $state('');
-    let isSubtaskComposing = $state(false);
-    let didSubtaskCompositionJustEnd = $state(false);
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let subtaskCompositionResetTimer = null;
+    const subtaskComposition = createImeCompositionGuard();
+    onDestroy(() => subtaskComposition.reset());
 
     const children = $derived(childrenByParent[task.id] || []);
-    const directChildren = $derived(getDirectChildren(allTasks, task.id));
+    // taskIndex is built once per board from the full task list, so a card
+    // finds its children and parent without scanning allTasks.
+    const directChildren = $derived(taskIndex.childrenByParentId.get(task.id) ?? []);
     const doneChildrenCount = $derived(directChildren.filter((candidate) => candidate.status === 'done').length);
     const dueStatus = $derived(getTaskDueStatus(task));
     const foreignParent = $derived.by(() => {
         if (!task.parentId) return null;
-        const parent = allTasks.find((candidate) => candidate.id === task.parentId) || null;
+        const parent = taskIndex.byId.get(task.parentId) || null;
         return parent && parent.status !== task.status ? parent : null;
     });
     const categoryColor = $derived(getCategoryColor(task.category, task.categoryMeta?.color));
@@ -97,29 +99,15 @@
     }
 
     function handleSubtaskCompositionStart() {
-        isSubtaskComposing = true;
-        didSubtaskCompositionJustEnd = false;
-        clearSubtaskCompositionReset();
+        subtaskComposition.start();
     }
 
     /**
      * @param {CompositionEvent} event
      */
     function handleSubtaskCompositionEnd(event) {
-        isSubtaskComposing = false;
-        didSubtaskCompositionJustEnd = true;
+        subtaskComposition.end();
         newSubtaskText = /** @type {HTMLInputElement} */ (event.currentTarget).value;
-        clearSubtaskCompositionReset();
-        subtaskCompositionResetTimer = setTimeout(() => {
-            didSubtaskCompositionJustEnd = false;
-            subtaskCompositionResetTimer = null;
-        }, 0);
-    }
-
-    function clearSubtaskCompositionReset() {
-        if (!subtaskCompositionResetTimer) return;
-        clearTimeout(subtaskCompositionResetTimer);
-        subtaskCompositionResetTimer = null;
     }
 
     /**
@@ -131,10 +119,7 @@
         }
 
         event.stopPropagation();
-        if (shouldIgnoreImeSubmit(event, {
-            isComposing: isSubtaskComposing,
-            justEnded: didSubtaskCompositionJustEnd
-        })) {
+        if (subtaskComposition.shouldIgnoreEnter(event)) {
             return;
         }
 
@@ -146,11 +131,7 @@
      */
     function handleDeleteTask(event) {
         event.stopPropagation();
-        const message = directChildren.length > 0
-            ? `이 작업에는 ${directChildren.length}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`
-            : '이 작업을 삭제하시겠습니까?';
-
-        if (confirm(message)) {
+        if (confirm(getDeleteTaskConfirmMessage(directChildren.length))) {
             deleteTaskCascade(task.id);
         }
     }
@@ -346,6 +327,7 @@
     {#each children as child (child.id)}
         <TaskTreeCard
             allTasks={allTasks}
+            taskIndex={taskIndex}
             childrenByParent={childrenByParent}
             depth={depth + 1}
             openTask={openTask}

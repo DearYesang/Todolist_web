@@ -1,3 +1,5 @@
+import { createErrorResult, readErrorMessage, readJsonBody } from './http.js';
+
 /**
  * @typedef {{
  *   total: number;
@@ -34,7 +36,7 @@
  */
 export async function requestEmailVerificationCode(payload, fetcher = globalThis.fetch) {
 	if (typeof fetcher !== 'function') {
-		return { ok: false, status: 0, message: 'Account API is not available.' };
+		return createErrorResult(0, 'Account API is not available.');
 	}
 
 	try {
@@ -57,9 +59,9 @@ export async function requestEmailVerificationCode(payload, fetcher = globalThis
 			}
 		}
 
-		return createErrorResult(response.status, body);
+		return createErrorResult(response.status, readErrorMessage(body) ?? `Account API request failed with status ${response.status}.`);
 	} catch {
-		return { ok: false, status: 0, message: 'Email verification request could not be completed.' };
+		return createErrorResult(0, 'Email verification request could not be completed.');
 	}
 }
 
@@ -86,7 +88,7 @@ export async function revokeRecoveryCodes(fetcher = globalThis.fetch) {
  */
 async function requestRecoveryCodes(method, fetcher) {
 	if (typeof fetcher !== 'function') {
-		return { ok: false, status: 0, message: 'Account API is not available.' };
+		return createErrorResult(0, 'Account API is not available.');
 	}
 
 	try {
@@ -104,34 +106,10 @@ async function requestRecoveryCodes(method, fetcher) {
 			};
 		}
 
-		return createErrorResult(response.status, body);
+		return createErrorResult(response.status, readErrorMessage(body) ?? `Account API request failed with status ${response.status}.`);
 	} catch {
-		return { ok: false, status: 0, message: 'Recovery code request could not be completed.' };
+		return createErrorResult(0, 'Recovery code request could not be completed.');
 	}
-}
-
-/**
- * @param {Response} response
- */
-async function readJsonBody(response) {
-	try {
-		return await response.json();
-	} catch {
-		return null;
-	}
-}
-
-/**
- * @param {number} status
- * @param {unknown} body
- * @returns {{ ok: false; status: number; message: string }}
- */
-function createErrorResult(status, body) {
-	return {
-		ok: false,
-		status,
-		message: readErrorMessage(body) ?? `Account API request failed with status ${status}.`
-	};
 }
 
 /**
@@ -166,16 +144,4 @@ function isRecoveryCodeSummary(value) {
 			|| typeof /** @type {{ lastCreatedAt?: unknown }} */ (value).lastCreatedAt === 'string'
 		)
 	);
-}
-
-/**
- * @param {unknown} body
- */
-function readErrorMessage(body) {
-	if (!body || typeof body !== 'object' || !('message' in body)) {
-		return null;
-	}
-
-	const message = /** @type {{ message?: unknown }} */ (body).message;
-	return typeof message === 'string' && message.trim() ? message : null;
 }

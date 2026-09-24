@@ -1,4 +1,5 @@
 <script>
+    import { formatLocalDate, parseLocalDateNoon, todayString } from '$lib/shared/local-date.js';
     import { normalizeDateRange } from '$lib/shared/task-domain.js';
 
     let {
@@ -56,13 +57,13 @@
         if (!isSelectingRange || !anchorDate) {
             anchorDate = date;
             isSelectingRange = true;
-            commitRange(formatDate(date), formatDate(date));
+            commitRange(formatLocalDate(date), formatLocalDate(date));
             return;
         }
 
         const start = date < anchorDate ? date : anchorDate;
         const end = date < anchorDate ? anchorDate : date;
-        commitRange(formatDate(start), formatDate(end));
+        commitRange(formatLocalDate(start), formatLocalDate(end));
         anchorDate = null;
         isSelectingRange = false;
     }
@@ -124,7 +125,7 @@
      * @param {Date} date
      */
     function isToday(date) {
-        return isSameDate(date, parseLocalDate(formatDate(new Date())));
+        return isSameDate(date, parseLocalDateNoon(todayString()));
     }
 
     /**
@@ -133,8 +134,8 @@
     function parseLocalDate(value) {
         const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
             ? value
-            : formatDate(new Date());
-        return new Date(`${normalized}T12:00:00`);
+            : todayString();
+        return parseLocalDateNoon(normalized);
     }
 
     /**
@@ -145,21 +146,11 @@
     }
 
     /**
-     * @param {Date} date
-     */
-    function formatDate(date) {
-        const year = date.getFullYear();
-        const month = `${date.getMonth() + 1}`.padStart(2, '0');
-        const day = `${date.getDate()}`.padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    /**
      * @param {Date} left
      * @param {Date} right
      */
     function isSameDate(left, right) {
-        return formatDate(left) === formatDate(right);
+        return formatLocalDate(left) === formatLocalDate(right);
     }
 
     /**
@@ -175,7 +166,7 @@
             date.setDate(gridStart.getDate() + index);
             return {
                 date,
-                key: formatDate(date),
+                key: formatLocalDate(date),
                 label: String(date.getDate()),
                 inMonth: date.getMonth() === month.getMonth()
             };

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_FILTERS, getTaskDueStatus, matchesFilters, normalizeTask, resolveEisenhowerMove } from './task-domain.js';
 
 function createTask(overrides = {}) {
@@ -59,6 +59,24 @@ describe('due status', () => {
 	it('defaults to the local calendar date', () => {
 		// Sanity only: a task ending far in the future is never overdue.
 		expect(getTaskDueStatus(createTask({ endDate: '2099-01-01' }))).toBe(null);
+	});
+
+	it('uses the Korean date before 09:00 KST, not the UTC one', () => {
+		const originalTimeZone = process.env.TZ;
+		process.env.TZ = 'Asia/Seoul';
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-09-23T23:30:00.000Z'));
+		try {
+			expect(getTaskDueStatus(createTask({ endDate: '2026-09-23' }))).toBe('overdue');
+			expect(getTaskDueStatus(createTask({ endDate: '2026-09-24' }))).toBe('due-today');
+		} finally {
+			vi.useRealTimers();
+			if (originalTimeZone === undefined) {
+				delete process.env.TZ;
+			} else {
+				process.env.TZ = originalTimeZone;
+			}
+		}
 	});
 });
 

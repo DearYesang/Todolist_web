@@ -1,7 +1,13 @@
 <script>
     import { categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
-    import { getCategoryColor } from '$lib/shared/task-domain.js';
+    import {
+        getCategoryColor,
+        getDeleteTaskConfirmMessage,
+        PRIORITY_LABELS,
+        STATUS_LABELS,
+        URGENCY_LABELS
+    } from '$lib/shared/task-domain.js';
     import { collectSubtreeLinks, extractTaskLinks } from '$lib/shared/task-links.js';
     import { fade, fly } from 'svelte/transition';
     import CategoryInput from './CategoryInput.svelte';
@@ -35,11 +41,7 @@
     }
 
     function deleteTask() {
-        const message = childCount > 0
-            ? `이 작업에는 ${childCount}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`
-            : '이 작업을 삭제하시겠습니까?';
-
-        if (confirm(message)) {
+        if (confirm(getDeleteTaskConfirmMessage(childCount))) {
             deleteTaskCascade(taskId);
             onclose();
         }
@@ -105,12 +107,12 @@
 
             <div class="panel-body">
                 <div class="summary-row">
-                    <span class="summary-chip status-chip {task.status}">{task.status === 'todo' ? '할 일' : task.status === 'doing' ? '진행 중' : '완료'}</span>
+                    <span class="summary-chip status-chip {task.status}">{STATUS_LABELS[task.status]}</span>
                     <span class="summary-chip priority-chip {task.priority}">
-                        {task.priority === 'high' ? '🔴 높음' : task.priority === 'medium' ? '🟡 보통' : '🟢 낮음'}
+                        {PRIORITY_LABELS[task.priority]}
                     </span>
                     <span class="summary-chip urgency-chip {task.urgency}">
-                        {task.urgency === 'urgent' ? '🔥 시급' : '⏳ 여유'}
+                        {URGENCY_LABELS[task.urgency]}
                     </span>
                     {#if task.category && categoryColor}
                         <span class="summary-chip category-chip" style={`background:${categoryColor.bg}; color:${categoryColor.fg}; border-color:${categoryColor.border};`}>
@@ -180,9 +182,9 @@
                             id="modal-priority"
                             value={task.priority}
                             onchange={(event) => updateField('priority', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
-                            <option value="high">🔴 높음</option>
-                            <option value="medium">🟡 보통</option>
-                            <option value="low">🟢 낮음</option>
+                            <option value="high">{PRIORITY_LABELS.high}</option>
+                            <option value="medium">{PRIORITY_LABELS.medium}</option>
+                            <option value="low">{PRIORITY_LABELS.low}</option>
                         </select>
                     </div>
 
@@ -192,8 +194,8 @@
                             id="modal-urgency"
                             value={task.urgency}
                             onchange={(event) => updateField('urgency', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
-                            <option value="urgent">🔥 시급</option>
-                            <option value="normal">⏳ 여유</option>
+                            <option value="urgent">{URGENCY_LABELS.urgent}</option>
+                            <option value="normal">{URGENCY_LABELS.normal}</option>
                         </select>
                     </div>
                 </div>
@@ -217,9 +219,9 @@
                             id="modal-status"
                             value={task.status}
                             onchange={(event) => updateField('status', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
-                            <option value="todo">할 일</option>
-                            <option value="doing">진행 중</option>
-                            <option value="done">완료</option>
+                            <option value="todo">{STATUS_LABELS.todo}</option>
+                            <option value="doing">{STATUS_LABELS.doing}</option>
+                            <option value="done">{STATUS_LABELS.done}</option>
                         </select>
                         {#if parentTask}
                             <small class="field-hint">상태를 바꾸면 상위 작업에서 분리됩니다.</small>

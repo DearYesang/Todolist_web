@@ -1,5 +1,6 @@
 import { normalizeTask, normalizeTaskList } from '../shared/task-domain.js';
 import { extractBackupTasks } from '../shared/task-backup.js';
+import { createFallbackResult, createHttpErrorResult, readJsonBody } from './http.js';
 
 // 429 must stay retryable: a throttled offline-queue flush keeps its
 // mutations queued for the next sync instead of dropping them.
@@ -95,12 +96,7 @@ export async function listServerTasks(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Task API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
 	}
@@ -130,12 +126,7 @@ export async function exportServerTasks(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Task API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
 	}
@@ -184,12 +175,7 @@ export async function importServerTasks(payload, options = {}, fetcher = globalT
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Task API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
 	}
@@ -219,12 +205,7 @@ export async function getBoardPreferences(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Board preferences request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Board preferences request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Board preferences request could not be completed.');
 	}
@@ -257,12 +238,7 @@ export async function updateBoardPreferences(preferences, fetcher = globalThis.f
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Board preferences request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Board preferences request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Board preferences request could not be completed.');
 	}
@@ -295,12 +271,7 @@ export async function createServerTask(payload, fetcher = globalThis.fetch) {
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Task API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
 	}
@@ -334,12 +305,7 @@ export async function updateServerTask(taskId, patch, fetcher = globalThis.fetch
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Task API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
 	}
@@ -378,12 +344,7 @@ export async function deleteServerTask(taskId, options = {}, fetcher = globalThi
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Task API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
 	}
@@ -456,38 +417,9 @@ async function writeServerTask(url, request, fetcher) {
 			};
 		}
 
-		return {
-			ok: false,
-			fallback: FALLBACK_STATUSES.has(response.status),
-			status: response.status,
-			message: readErrorMessage(body) ?? `Task API request failed with status ${response.status}.`
-		};
+		return createHttpErrorResult(response, body, 'Task API request failed', FALLBACK_STATUSES);
 	} catch {
 		return createFallbackResult('Task API request could not be completed.');
-	}
-}
-
-/**
- * @param {string} message
- * @returns {{ ok: false; fallback: true; status: 0; message: string }}
- */
-function createFallbackResult(message) {
-	return {
-		ok: false,
-		fallback: true,
-		status: 0,
-		message
-	};
-}
-
-/**
- * @param {Response} response
- */
-async function readJsonBody(response) {
-	try {
-		return await response.json();
-	} catch {
-		return null;
 	}
 }
 
@@ -543,16 +475,4 @@ function isImportResponse(body) {
 		&& body.summary
 		&& typeof body.summary === 'object'
 	);
-}
-
-/**
- * @param {unknown} body
- */
-function readErrorMessage(body) {
-	if (!body || typeof body !== 'object' || !('message' in body)) {
-		return null;
-	}
-
-	const message = /** @type {{ message?: unknown }} */ (body).message;
-	return typeof message === 'string' && message.trim() ? message : null;
 }

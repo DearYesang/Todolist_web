@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 test('keeps the private app locked before login', async ({ page }) => {
@@ -98,6 +99,125 @@ test('opens the task form date picker and Gantt checklist preview', async ({ pag
 
 	await page.getByRole('button', { name: /칸반 뷰/ }).click();
 	await expect(page.getByRole('button', { name: /일정 추가/ }).first()).toBeVisible();
+});
+
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {string} taskId
+ */
+function readPersistedTask(page, taskId) {
+	return page.evaluate((id) =>
+		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]').find((task) => task.id === id),
+	taskId);
+}
+
+/**
+ * @param {string} dateString
+ * @param {number} offset
+ */
+function shiftDate(dateString, offset) {
+	const date = new Date(`${dateString}T12:00:00Z`);
+	date.setUTCDate(date.getUTCDate() + offset);
+	return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Presses the end handle of a task's Gantt bar with the mouse.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} taskText
+ */
+async function pressGanttEndHandle(page, taskText) {
+	const bar = page.getByRole('button', { name: `${taskText} 일정 막대` });
+	const handle = bar.locator('.resize-handle.end');
+	await handle.scrollIntoViewIfNeeded();
+	const box = await handle.boundingBox();
+	expect(box).toBeTruthy();
+	const x = box.x + box.width / 2;
+	const y = box.y + box.height / 2;
+	await page.mouse.move(x, y);
+	await page.mouse.down();
+	return { bar, x, y };
+}
+
+test('resizes a Gantt bar by dragging its end handle', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+	await page.getByRole('button', { name: /간트 뷰/ }).click();
+
+	const before = await readPersistedTask(page, 'local-e2e-task');
+	const { bar, x, y } = await pressGanttEndHandle(page, 'E2E cached task');
+	// Two 48px days to the right.
+	await page.mouse.move(x + 60, y, { steps: 4 });
+	await page.mouse.move(x + 96, y, { steps: 4 });
+	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 2)})`);
+	await page.mouse.up();
+
+	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+		.toBe(shiftDate(before.endDate, 2));
+	expect((await readPersistedTask(page, 'local-e2e-task')).startDate).toBe(before.startDate);
+	// Letting go of a resize is not a click on the bar: no detail panel.
+	await expect(page.locator('.side-panel')).toHaveCount(0);
+});
+
+test('ignores a second pointer while a Gantt bar is being resized', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+	await page.getByRole('button', { name: /간트 뷰/ }).click();
+
+	const before = await readPersistedTask(page, 'local-e2e-task');
+	const { bar, x, y } = await pressGanttEndHandle(page, 'E2E cached task');
+	await page.mouse.move(x + 48, y, { steps: 4 });
+
+	// A second finger (or a resting palm) moves far right and lifts while the
+	// first pointer still holds the handle. The mouse is pointer 1.
+	await page.evaluate(({ foreignX, foreignY }) => {
+		const init = { pointerId: 99, pointerType: 'touch', isPrimary: false, clientX: foreignX, clientY: foreignY, bubbles: true };
+		window.dispatchEvent(new PointerEvent('pointermove', init));
+		window.dispatchEvent(new PointerEvent('pointerup', init));
+		window.dispatchEvent(new PointerEvent('pointercancel', init));
+	}, { foreignX: x + 480, foreignY: y });
+	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 1)})`);
+	expect((await readPersistedTask(page, 'local-e2e-task')).endDate).toBe(before.endDate);
+
+	// The resize still follows the first pointer and ends when it lifts.
+	await page.mouse.move(x + 96, y, { steps: 4 });
+	await page.mouse.up();
+	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+		.toBe(shiftDate(before.endDate, 2));
+});
+
+test('ignores a second pointer pressing a handle while a Gantt bar is being resized', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+	await page.getByRole('button', { name: /간트 뷰/ }).click();
+
+	const before = await readPersistedTask(page, 'local-e2e-task');
+	const { bar, x, y } = await pressGanttEndHandle(page, 'E2E cached task');
+	await page.mouse.move(x + 48, y, { steps: 4 });
+
+	// A second finger lands on the start handle mid-resize, drags far left and
+	// lifts. It must not take the resize over from the mouse (pointer 1).
+	const startHandle = bar.locator('.resize-handle.start');
+	const startBox = await startHandle.boundingBox();
+	expect(startBox).toBeTruthy();
+	await startHandle.evaluate((handle, { sx, sy }) => {
+		const init = { pointerId: 99, pointerType: 'touch', isPrimary: false, clientX: sx, clientY: sy, bubbles: true, cancelable: true };
+		handle.dispatchEvent(new PointerEvent('pointerdown', init));
+		window.dispatchEvent(new PointerEvent('pointermove', { ...init, clientX: sx - 480 }));
+		window.dispatchEvent(new PointerEvent('pointerup', { ...init, clientX: sx - 480 }));
+	}, { sx: startBox.x + startBox.width / 2, sy: startBox.y + startBox.height / 2 });
+	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 1)})`);
+	expect(await readPersistedTask(page, 'local-e2e-task')).toMatchObject({
+		startDate: before.startDate,
+		endDate: before.endDate
+	});
+
+	// The mouse still owns the resize and commits only its own edge.
+	await page.mouse.move(x + 96, y, { steps: 4 });
+	await page.mouse.up();
+	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+		.toBe(shiftDate(before.endDate, 2));
+	expect((await readPersistedTask(page, 'local-e2e-task')).startDate).toBe(before.startDate);
 });
 
 test('suggests categories and manages category names offline', async ({ page }) => {
@@ -207,6 +327,67 @@ test('remembers the selected view across reloads', async ({ page }) => {
 	await expect(page.getByRole('button', { name: /매트릭스/ })).toHaveClass(/active/);
 });
 
+/**
+ * Plays the event sequence a Korean IME produces around the Enter that
+ * confirms the last syllable. Playwright cannot drive a real IME, so this
+ * only checks how the inputs react to those events; the real thing needs a
+ * manual check with the Korean keyboard on a Mac and an iPhone.
+ * @param {import('@playwright/test').Locator} input
+ */
+async function pressEnterThroughImeComposition(input) {
+	await input.evaluate((node) => {
+		const enter = (init = {}) => node.dispatchEvent(new KeyboardEvent('keydown', {
+			key: 'Enter',
+			bubbles: true,
+			cancelable: true,
+			...init
+		}));
+		node.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		enter({ isComposing: true });
+		// Some engines report the composing Enter without isComposing.
+		enter();
+		node.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+		// The confirming Enter's keydown right after compositionend.
+		enter();
+	});
+}
+
+/**
+ * @param {import('@playwright/test').Locator} input
+ */
+async function pressEnterOnNextTask(input) {
+	await input.evaluate(async (node) => {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+	});
+}
+
+test('does not submit the Enter that confirms an IME composition', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+
+	const card = cardByTitle(page, 'E2E cached task');
+	const checklistInput = card.locator('.add-subtask-input');
+	await checklistInput.fill('한글 항목');
+	await pressEnterThroughImeComposition(checklistInput);
+	await expect(card.locator('.subtask-item')).toHaveCount(2);
+	await expect(checklistInput).toHaveValue('한글 항목');
+	// A later, separate Enter adds the item exactly once.
+	await pressEnterOnNextTask(checklistInput);
+	await expect(card.locator('.subtask-item')).toHaveCount(3);
+	await expect(card.locator('.subtask-text').nth(2)).toHaveText('한글 항목');
+	await expect(checklistInput).toHaveValue('');
+
+	await page.getByRole('button', { name: /새 작업 추가/ }).click();
+	const titleInput = page.locator('#task-text');
+	await titleInput.fill('한글 작업');
+	await pressEnterThroughImeComposition(titleInput);
+	await expect(titleInput).toHaveValue('한글 작업');
+	await expect(page.locator('.card-text', { hasText: '한글 작업' })).toHaveCount(0);
+	await pressEnterOnNextTask(titleInput);
+	await expect(page.locator('.card-text', { hasText: '한글 작업' })).toHaveCount(1);
+});
+
 test('keeps nested checklist tasks attached on iPhone-sized offline reloads', async ({ page }) => {
 	await page.setViewportSize({ width: 393, height: 852 });
 	await seedOfflineBoard(page);
@@ -238,6 +419,120 @@ test('narrows every view with the search box and highlights overdue work', async
 
 	await page.getByRole('button', { name: '검색 지우기' }).click();
 	await expect(page.getByText('E2E cached task')).toBeVisible();
+});
+
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {string} title
+ */
+function cardByTitle(page, title) {
+	return page.locator('.task-card', { has: page.locator('.card-text', { hasText: title }) });
+}
+
+test.describe('in Korea before 09:00', () => {
+	test.use({ timezoneId: 'Asia/Seoul' });
+
+	test('names the backup export with the local date, not the UTC one', async ({ page }) => {
+		// 2026-09-24 08:30 KST is still 2026-09-23 in UTC.
+		await page.clock.setFixedTime(new Date('2026-09-23T23:30:00.000Z'));
+		await seedOfflineBoard(page);
+		await page.goto('/');
+
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByRole('button', { name: '백업 JSON 내보내기' }).click();
+		const download = await downloadPromise;
+
+		expect(download.suggestedFilename()).toBe('kanban_backup_2026-09-24.json');
+		const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+		expect(exported.map((task) => task.text)).toContain('E2E cached task');
+	});
+});
+
+test('asks the same delete question on a card and in the detail panel', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+
+	/** @type {string[]} */
+	const questions = [];
+	page.on('dialog', (dialog) => {
+		questions.push(`${dialog.type()}:${dialog.message()}`);
+		void dialog.dismiss();
+	});
+
+	const modal = page.locator('.side-panel');
+	const parentCard = cardByTitle(page, 'Nested parent task');
+	await parentCard.getByRole('button', { name: 'Nested parent task 삭제', exact: true }).click();
+	await parentCard.locator('.card-text').click();
+	await modal.getByRole('button', { name: /작업 삭제/ }).click();
+	await modal.locator('.close-btn').click();
+	await expect(modal).toHaveCount(0);
+
+	const childCard = cardByTitle(page, 'Nested child task');
+	await childCard.getByRole('button', { name: 'Nested child task 삭제', exact: true }).click();
+	await childCard.locator('.card-text').click();
+	await modal.getByRole('button', { name: /작업 삭제/ }).click();
+
+	const withChildren = 'confirm:이 작업에는 1개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?';
+	const leaf = 'confirm:이 작업을 삭제하시겠습니까?';
+	await expect.poll(() => questions).toEqual([withChildren, withChildren, leaf, leaf]);
+	// Dismissing the question deletes nothing and keeps the panel open.
+	await expect(modal).toBeVisible();
+	await expect(parentCard).toBeVisible();
+	await expect(childCard).toBeVisible();
+});
+
+test('shows the card labels for status, priority and urgency in the detail panel', async ({ page }) => {
+	await seedOfflineBoard(page, {
+		extraTasks: [{ id: 'local-low-done', text: 'Low priority finished task', status: 'done', priority: 'low', urgency: 'normal' }]
+	});
+	await page.goto('/');
+
+	const modal = page.locator('.side-panel');
+	/** @type {Array<[string, [string, string, string], [string, string, string]]>} */
+	const cases = [
+		['Urgent important', ['할 일', '🔴 높음', '🔥 시급'], ['todo', 'high', 'urgent']],
+		['Planned important', ['진행 중', '🔴 높음', '⏳ 여유'], ['doing', 'high', 'normal']],
+		['E2E cached task', ['할 일', '🟡 보통', '⏳ 여유'], ['todo', 'medium', 'normal']],
+		['Low priority finished task', ['완료', '🟢 낮음', '⏳ 여유'], ['done', 'low', 'normal']]
+	];
+
+	for (const [title, [status, priority, urgency], [statusValue, priorityValue, urgencyValue]] of cases) {
+		const card = cardByTitle(page, title);
+		await expect(card.locator('.priority-badge')).toHaveText(priority);
+		await expect(card.locator('.urgency-badge')).toHaveText(urgency);
+
+		await card.locator('.card-text').click();
+		await expect(modal).toBeVisible();
+		expect(await modal.locator('.summary-row .summary-chip').evaluateAll((chips) =>
+			chips.slice(0, 3).map((chip) => chip.textContent)
+		)).toEqual([status, priority, urgency]);
+		await expect(modal.locator('#modal-status')).toHaveValue(statusValue);
+		await expect(modal.locator('#modal-priority')).toHaveValue(priorityValue);
+		await expect(modal.locator('#modal-urgency')).toHaveValue(urgencyValue);
+
+		expect(await modal.locator('#modal-status option').evaluateAll((options) =>
+			options.map((option) => [option.getAttribute('value'), option.textContent])
+		)).toEqual([['todo', '할 일'], ['doing', '진행 중'], ['done', '완료']]);
+		expect(await modal.locator('#modal-priority option').evaluateAll((options) =>
+			options.map((option) => [option.getAttribute('value'), option.textContent])
+		)).toEqual([['high', '🔴 높음'], ['medium', '🟡 보통'], ['low', '🟢 낮음']]);
+		expect(await modal.locator('#modal-urgency option').evaluateAll((options) =>
+			options.map((option) => [option.getAttribute('value'), option.textContent])
+		)).toEqual([['urgent', '🔥 시급'], ['normal', '⏳ 여유']]);
+
+		await modal.locator('.close-btn').click();
+		await expect(modal).toHaveCount(0);
+	}
+
+	// The selects still edit the task and the chips follow.
+	await cardByTitle(page, 'E2E cached task').locator('.card-text').click();
+	await modal.locator('#modal-priority').selectOption('low');
+	await modal.locator('#modal-urgency').selectOption('urgent');
+	await expect(modal.locator('.priority-chip')).toHaveText('🟢 낮음');
+	await expect(modal.locator('.urgency-chip')).toHaveText('🔥 시급');
+	await expect(modal.locator('#modal-priority')).toHaveValue('low');
+	await modal.locator('.close-btn').click();
+	await expect(cardByTitle(page, 'E2E cached task').locator('.priority-badge')).toHaveText('🟢 낮음');
 });
 
 /**

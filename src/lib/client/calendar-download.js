@@ -1,4 +1,5 @@
 import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
+import { downloadBlob } from './download.js';
 
 /**
  * @param {import('$lib/shared/task-domain.js').Task} task
@@ -11,12 +12,7 @@ export function downloadTaskCalendar(task, options = {}) {
 		now
 	});
 	const blob = new Blob([calendar], { type: 'text/calendar;charset=utf-8' });
-	const url = URL.createObjectURL(blob);
-	const anchor = document.createElement('a');
-	anchor.href = url;
-	anchor.download = createTaskCalendarFilename(task, now);
-	anchor.click();
-	URL.revokeObjectURL(url);
+	downloadBlob(blob, createTaskCalendarFilename(task, now));
 }
 
 /**

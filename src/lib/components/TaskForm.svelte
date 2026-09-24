@@ -1,10 +1,11 @@
 <script>
+    import { onDestroy } from 'svelte';
     import { get } from 'svelte/store';
     import { createServerTask } from '$lib/client/task-api.js';
     import { buildTaskCreateDraft, createLocalTaskFromDraft } from '$lib/client/task-create.js';
     import { enqueueOfflineMutation } from '$lib/client/offline-write-queue.js';
     import { categories, tasks } from '$lib/client/task-store.js';
-    import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
+    import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
     import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
     import CategoryInput from './CategoryInput.svelte';
     import DateRangePicker from './DateRangePicker.svelte';
@@ -19,10 +20,8 @@
     let parentId = $state('');
     let isSubmitting = $state(false);
     let formError = $state('');
-    let isTaskTextComposing = $state(false);
-    let didTaskTextCompositionJustEnd = $state(false);
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let taskTextCompositionResetTimer = null;
+    const taskTextComposition = createImeCompositionGuard();
+    onDestroy(() => taskTextComposition.reset());
 
     const defaults = getDefaultDateRange();
     let startDate = $state(defaults.startDate);
@@ -47,9 +46,7 @@
         isSubmitting = false;
         formError = '';
         isFormOpen = false;
-        didTaskTextCompositionJustEnd = false;
-        isTaskTextComposing = false;
-        clearTaskTextCompositionReset();
+        taskTextComposition.reset();
     }
 
     /**
@@ -116,10 +113,7 @@
             return;
         }
 
-        if (shouldIgnoreImeSubmit(event, {
-            isComposing: isTaskTextComposing,
-            justEnded: didTaskTextCompositionJustEnd
-        })) {
+        if (taskTextComposition.shouldIgnoreEnter(event)) {
             return;
         }
 
@@ -128,29 +122,15 @@
     }
 
     function handleTaskTextCompositionStart() {
-        isTaskTextComposing = true;
-        didTaskTextCompositionJustEnd = false;
-        clearTaskTextCompositionReset();
+        taskTextComposition.start();
     }
 
     /**
      * @param {CompositionEvent} event
      */
     function handleTaskTextCompositionEnd(event) {
-        isTaskTextComposing = false;
-        didTaskTextCompositionJustEnd = true;
+        taskTextComposition.end();
         newTaskText = /** @type {HTMLInputElement} */ (event.currentTarget).value;
-        clearTaskTextCompositionReset();
-        taskTextCompositionResetTimer = setTimeout(() => {
-            didTaskTextCompositionJustEnd = false;
-            taskTextCompositionResetTimer = null;
-        }, 0);
-    }
-
-    function clearTaskTextCompositionReset() {
-        if (!taskTextCompositionResetTimer) return;
-        clearTimeout(taskTextCompositionResetTimer);
-        taskTextCompositionResetTimer = null;
     }
 </script>
 

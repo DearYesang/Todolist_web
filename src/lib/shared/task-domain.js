@@ -1,3 +1,5 @@
+import { addDays, formatLocalDate, todayString } from './local-date.js';
+
 /**
  * @typedef {'todo' | 'doing' | 'done'} TaskStatus
  * @typedef {'high' | 'medium' | 'low'} TaskPriority
@@ -77,6 +79,17 @@ export const URGENCY_LABELS = {
     normal: '⏳ 여유'
 };
 
+/**
+ * The question asked before deleting a task, from a card or the detail
+ * panel. Child tasks are deleted along with it.
+ * @param {number} childCount direct children of the task
+ */
+export function getDeleteTaskConfirmMessage(childCount) {
+    return childCount > 0
+        ? `이 작업에는 ${childCount}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`
+        : '이 작업을 삭제하시겠습니까?';
+}
+
 export const CATEGORY_COLORS = [
     { bg: 'rgba(88, 166, 255, 0.15)', fg: '#58a6ff', border: '#58a6ff' },
     { bg: 'rgba(63, 185, 80, 0.15)', fg: '#3fb950', border: '#3fb950' },
@@ -87,20 +100,6 @@ export const CATEGORY_COLORS = [
     { bg: 'rgba(210, 106, 155, 0.15)', fg: '#d26a9b', border: '#d26a9b' },
     { bg: 'rgba(255, 166, 87, 0.15)', fg: '#ffa657', border: '#ffa657' }
 ];
-
-/**
- * @param {number} value
- */
-function padDatePart(value) {
-    return `${value}`.padStart(2, '0');
-}
-
-/**
- * @param {Date} date
- */
-function formatLocalDate(date) {
-    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
-}
 
 /**
  * @returns {{ startDate: string; endDate: string }}
@@ -170,15 +169,12 @@ function parseDateString(value) {
 }
 
 /**
+ * Validates strictly (parseDateString), then counts days from noon.
  * @param {string} dateString
  * @param {number} offset
  */
 function addDaysToDateString(dateString, offset) {
-    const date = parseDateString(dateString);
-    if (!date) return dateString;
-
-    date.setDate(date.getDate() + offset);
-    return formatLocalDate(date);
+    return parseDateString(dateString) ? addDays(dateString, offset) : dateString;
 }
 
 /**
@@ -480,7 +476,7 @@ function matchesSearch(task, search) {
  * @param {string} [today] YYYY-MM-DD; defaults to the local calendar date
  * @returns {'overdue' | 'due-today' | null}
  */
-export function getTaskDueStatus(task, today = getLocalDateString()) {
+export function getTaskDueStatus(task, today = todayString()) {
     if (task.status === 'done' || !DATE_PATTERN.test(task.endDate)) {
         return null;
     }
@@ -488,13 +484,6 @@ export function getTaskDueStatus(task, today = getLocalDateString()) {
     if (task.endDate < today) return 'overdue';
     if (task.endDate === today) return 'due-today';
     return null;
-}
-
-function getLocalDateString() {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${now.getFullYear()}-${month}-${day}`;
 }
 
 /**
@@ -581,11 +570,41 @@ export function buildColumnHierarchy(taskList, status, activeFilters) {
 }
 
 /**
- * @param {Task[]} taskList
- * @param {string} taskId
+ * @typedef {{
+ *   byId: Map<string, Task>;
+ *   childrenByParentId: Map<string, Task[]>;
+ * }} TaskIndex
  */
-export function getDirectChildren(taskList, taskId) {
-    return taskList.filter((task) => task.parentId === taskId);
+
+/**
+ * One pass over the full task list, so each board card can look up its
+ * parent and direct children instead of scanning every task. Unlike
+ * buildHierarchy it ignores filters and columns. Children keep list order,
+ * and the first task with a given id wins, as with Array#find.
+ * @param {Task[]} taskList
+ * @returns {TaskIndex}
+ */
+export function buildTaskIndex(taskList) {
+    /** @type {Map<string, Task>} */
+    const byId = new Map();
+    /** @type {Map<string, Task[]>} */
+    const childrenByParentId = new Map();
+
+    taskList.forEach((task) => {
+        if (!byId.has(task.id)) {
+            byId.set(task.id, task);
+        }
+
+        if (!task.parentId) return;
+        const siblings = childrenByParentId.get(task.parentId);
+        if (siblings) {
+            siblings.push(task);
+        } else {
+            childrenByParentId.set(task.parentId, [task]);
+        }
+    });
+
+    return { byId, childrenByParentId };
 }
 
 /**
