@@ -15,6 +15,7 @@
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
+        getDeleteTaskConfirmMessage,
         getDirectChildren,
         getTaskDueStatus,
         PRIORITY_LABELS,
@@ -146,11 +147,7 @@
      */
     function handleDeleteTask(event) {
         event.stopPropagation();
-        const message = directChildren.length > 0
-            ? `이 작업에는 ${directChildren.length}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`
-            : '이 작업을 삭제하시겠습니까?';
-
-        if (confirm(message)) {
+        if (confirm(getDeleteTaskConfirmMessage(directChildren.length))) {
             deleteTaskCascade(task.id);
         }
     }

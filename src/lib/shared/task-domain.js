@@ -77,6 +77,17 @@ export const URGENCY_LABELS = {
     normal: '⏳ 여유'
 };
 
+/**
+ * The question asked before deleting a task, from a card or the detail
+ * panel. Child tasks are deleted along with it.
+ * @param {number} childCount direct children of the task
+ */
+export function getDeleteTaskConfirmMessage(childCount) {
+    return childCount > 0
+        ? `이 작업에는 ${childCount}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`
+        : '이 작업을 삭제하시겠습니까?';
+}
+
 export const CATEGORY_COLORS = [
     { bg: 'rgba(88, 166, 255, 0.15)', fg: '#58a6ff', border: '#58a6ff' },
     { bg: 'rgba(63, 185, 80, 0.15)', fg: '#3fb950', border: '#3fb950' },

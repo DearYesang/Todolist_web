@@ -1,7 +1,7 @@
 <script>
     import { categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
-    import { getCategoryColor } from '$lib/shared/task-domain.js';
+    import { getCategoryColor, getDeleteTaskConfirmMessage } from '$lib/shared/task-domain.js';
     import { collectSubtreeLinks, extractTaskLinks } from '$lib/shared/task-links.js';
     import { fade, fly } from 'svelte/transition';
     import CategoryInput from './CategoryInput.svelte';
@@ -35,11 +35,7 @@
     }
 
     function deleteTask() {
-        const message = childCount > 0
-            ? `이 작업에는 ${childCount}개의 하위 작업이 있습니다.\n모두 함께 삭제하시겠습니까?`
-            : '이 작업을 삭제하시겠습니까?';
-
-        if (confirm(message)) {
+        if (confirm(getDeleteTaskConfirmMessage(childCount))) {
             deleteTaskCascade(taskId);
             onclose();
         }
