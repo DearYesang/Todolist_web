@@ -517,11 +517,13 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	await panel.getByRole('button', { name: '닫기' }).click();
 	await expect(panel).toHaveCount(0);
 
-	// Keyboard activation opens the task's own links.
+	// Keyboard activation opens the task's own links. A full success only
+	// announces itself; focus stays on the button.
 	await ownButton.focus();
 	await page.keyboard.press('Enter');
 	expect(await readOpenedUrls(page)).toEqual([...LINK_TASK_URLS, ...LINK_TASK_URLS.slice(0, 2)]);
 	await expect(panel).toContainText('링크 2개를 새 탭으로 열었습니다.');
+	await expect(ownButton).toBeFocused();
 	await panel.getByRole('button', { name: '닫기' }).click();
 
 	// The detail modal (the only entry point from Gantt) offers the same buttons.
@@ -558,6 +560,9 @@ test('falls back to a link list when the browser blocks pop-ups', async ({ page 
 	await expect(page.locator('.link-open-live')).toHaveText(
 		'링크 4개 중 1개만 열렸습니다. 브라우저가 나머지를 팝업으로 차단했습니다.'
 	);
+	// The panel is mounted last in the page: focus moves to its next step
+	// instead of leaving keyboard users a board's worth of Tab stops away.
+	await expect(panel.getByRole('button', { name: '다음 링크 열기 (1/3)' })).toBeFocused();
 	const fallbackLinks = panel.locator('a');
 	await expect(fallbackLinks).toHaveCount(3);
 	expect(await fallbackLinks.evaluateAll((anchors) =>
@@ -576,6 +581,10 @@ test('falls back to a link list when the browser blocks pop-ups', async ({ page 
 	expect(await readOpenedUrls(page)).toEqual([...LINK_TASK_URLS, ...LINK_TASK_URLS.slice(1)]);
 	await expect(panel).toContainText('링크 4개를 새 탭으로 열었습니다.');
 	await expect(fallbackLinks).toHaveCount(0);
+	// The step button is gone, so focus lands on 닫기 rather than <body>.
+	await expect(panel.getByRole('button', { name: '닫기' })).toBeFocused();
+	await page.keyboard.press('Escape');
+	await expect(panel).toHaveCount(0);
 });
 
 test('lists every link when new tabs cannot be opened at all', async ({ page }) => {
@@ -588,11 +597,14 @@ test('lists every link when new tabs cannot be opened at all', async ({ page }) 
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('이 환경에서는 새 탭을 자동으로 열 수 없습니다.');
 	await expect(panel.locator('a[target="_blank"]')).toHaveCount(4);
+	await expect(panel.getByRole('button', { name: '다음 링크 열기 (1/4)' })).toBeFocused();
 
-	// A single fresh open failing too hides the step button; the list stays.
+	// A single fresh open failing too hides the step button; the list stays
+	// and focus moves to its first link.
 	await panel.getByRole('button', { name: '다음 링크 열기 (1/4)' }).click();
 	await expect(panel.getByRole('button', { name: /다음 링크 열기/ })).toHaveCount(0);
 	await expect(panel.locator('a[target="_blank"]')).toHaveCount(4);
+	await expect(panel.locator('a[target="_blank"]').first()).toBeFocused();
 });
 
 test('drops a leftover link panel when another account signs in', async ({ page }) => {

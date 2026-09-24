@@ -1,5 +1,5 @@
 <script>
-    import { tick } from 'svelte';
+    import { tick, untrack } from 'svelte';
     import {
         confirmOpen,
         dismissLinkOpen,
@@ -9,17 +9,109 @@
         summarizeLinkOpenState
     } from '$lib/client/link-opener.js';
 
-    /** @type {HTMLButtonElement | null} */
-    let confirmButton = $state(null);
+    /** @type {HTMLDivElement | null} */
+    let panelElement = $state(null);
 
     const summary = $derived($linkOpenState ? summarizeLinkOpenState($linkOpenState) : null);
-    const isConfirming = $derived($linkOpenState?.phase === 'confirm');
+
+    // Plain (non-reactive) bookkeeping for focus management.
+    /** @type {HTMLElement | null} */
+    let returnFocusTarget = null;
+    let panelHasFocus = false;
+    /** @type {import('$lib/shared/task-links.js').TaskLink[] | null} */
+    let shownLinks = null;
+    /** @type {string | null} */
+    let shownTone = null;
 
     $effect(() => {
-        if (!isConfirming) return;
-        // Keyboard users land on the confirming button (Tab + Enter flow).
-        tick().then(() => confirmButton?.focus({ preventScroll: true }));
+        const state = $linkOpenState;
+        const tone = summary?.tone ?? null;
+        const previousLinks = shownLinks;
+        const previousTone = shownTone;
+        shownLinks = state?.links ?? null;
+        shownTone = tone;
+
+        if (!state) {
+            if (previousTone !== null) restoreFocus();
+            return;
+        }
+
+        // Every request builds a new links array; later steps keep it.
+        const isNewRequest = state.links !== previousLinks;
+        if (isNewRequest) untrack(rememberTrigger);
+
+        // The panel is mounted last in the page, so keyboard users are moved
+        // into it whenever it asks for an answer (confirm) or offers the next
+        // step (partial, blocked); a full success only announces itself.
+        // When the focused control disappears (confirm, the last step), focus
+        // moves to the next control instead of falling back to <body>.
+        const needsAnswer = (isNewRequest || tone !== previousTone) && tone !== 'success';
+        tick().then(() => {
+            if (needsAnswer || lostFocusInPanel()) focusFirstControl();
+        });
     });
+
+    function rememberTrigger() {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLElement) || active === document.body) return;
+        if (panelElement?.contains(active)) return;
+        returnFocusTarget = active;
+    }
+
+    function lostFocusInPanel() {
+        const active = document.activeElement;
+        return panelHasFocus && (!active || active === document.body);
+    }
+
+    function focusFirstControl() {
+        const target = panelElement?.querySelector('.link-open-panel-actions button')
+            ?? panelElement?.querySelector('.link-open-panel-list a')
+            ?? panelElement?.querySelector('.link-open-panel-close');
+        if (target instanceof HTMLElement) {
+            target.focus({ preventScroll: true });
+        }
+    }
+
+    // Back to the button that opened the panel, but only when the panel held
+    // focus and nothing else has taken it since.
+    function restoreFocus() {
+        const target = returnFocusTarget;
+        const hadFocus = panelHasFocus;
+        returnFocusTarget = null;
+        panelHasFocus = false;
+        if (!hadFocus || !target?.isConnected) return;
+
+        const active = document.activeElement;
+        if (active && active !== document.body) return;
+        target.focus({ preventScroll: true });
+    }
+
+    function handleFocusIn() {
+        panelHasFocus = true;
+    }
+
+    /**
+     * A removed control reports no relatedTarget; only a move to another
+     * element outside the panel means focus left it.
+     * @param {FocusEvent} event
+     */
+    function handleFocusOut(event) {
+        const next = event.relatedTarget;
+        if (next instanceof Node && !panelElement?.contains(next)) {
+            panelHasFocus = false;
+        }
+    }
+
+    /**
+     * @param {KeyboardEvent} event
+     */
+    function handleWindowKeydown(event) {
+        if (event.key !== 'Escape' || !$linkOpenState) return;
+        const target = event.target;
+        if (!(target instanceof Node) || !panelElement?.contains(target)) return;
+        event.preventDefault();
+        dismissLinkOpen();
+    }
 
     /**
      * @param {string} href
@@ -33,13 +125,20 @@
     }
 </script>
 
+<svelte:window onkeydown={handleWindowKeydown} />
+
 <!-- Always mounted, so screen readers track it before the first result, and
      holding only the short message, so each step is not read out with the
      whole panel (hint, buttons and every fallback link). -->
 <p class="visually-hidden link-open-live" role="status">{summary?.message ?? ''}</p>
 
 {#if $linkOpenState && summary}
-    <div class="link-open-panel" data-tone={summary.tone}>
+    <div
+        class="link-open-panel"
+        data-tone={summary.tone}
+        bind:this={panelElement}
+        onfocusin={handleFocusIn}
+        onfocusout={handleFocusOut}>
         <div class="link-open-panel-header">
             <strong class="link-open-panel-title">
                 <span aria-hidden="true">🔗</span>
@@ -58,7 +157,6 @@
                 <button
                     type="button"
                     class="btn btn-small btn-open-links"
-                    bind:this={confirmButton}
                     onclick={() => confirmOpen()}>
                     모두 열기
                 </button>
