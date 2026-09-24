@@ -519,6 +519,13 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	await expect(modal.getByRole('button', { name: '체크리스트 링크 2개를 새 탭에서 모두 열기' })).toContainText('모두 열기 (2)');
 	const modalSubtree = modal.getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' });
 	await expect(modalSubtree).toContainText('하위 포함 모두 열기 (4)');
+	// They sit in the body, so the footer keeps its layout: on the 440px side
+	// panel they used to squeeze '작업 삭제' into a 3-line column, and on
+	// phones every footer button is its own full-width row.
+	await expect(modal.locator('.panel-footer .btn-open-links')).toHaveCount(0);
+	const deleteBox = await modal.locator('.panel-footer .btn-danger').boundingBox();
+	expect(deleteBox).toBeTruthy();
+	expect(deleteBox.height).toBeLessThan(50);
 	await modalSubtree.click();
 	expect(await readOpenedUrls(page)).toHaveLength(10);
 	await expect(panel).toContainText('링크 4개를 새 탭으로 열었습니다.');

@@ -17,6 +17,8 @@
     const categoryColor = $derived(task ? getCategoryColor(task.category, task.categoryMeta?.color) : null);
     const ownLinks = $derived(task ? extractTaskLinks(task) : []);
     const subtreeLinks = $derived(task && childCount > 0 ? collectSubtreeLinks($tasks, task.id) : ownLinks);
+    // subtreeLinks always includes ownLinks; OpenLinksButton needs 2 or more.
+    const hasLinkActions = $derived(subtreeLinks.length >= 2);
 
     $effect(() => {
         if (task && categoryDraft !== task.category) {
@@ -134,6 +136,25 @@
                     </div>
                 {/if}
 
+                {#if hasLinkActions}
+                    <!-- In the body, not the footer: the footer has no room on the
+                         440px side panel and stacks every button on phones. -->
+                    <div class="modal-link-actions">
+                        <OpenLinksButton
+                            links={ownLinks}
+                            title={task.text}
+                            label={`모두 열기 (${ownLinks.length})`}
+                            ariaLabel={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
+                        {#if subtreeLinks.length > ownLinks.length}
+                            <OpenLinksButton
+                                links={subtreeLinks}
+                                title={`${task.text} (하위 포함)`}
+                                label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
+                                ariaLabel={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
+                        {/if}
+                    </div>
+                {/if}
+
                 <div class="form-section">
                     <label for="modal-task-text">작업명</label>
                     <input
@@ -210,18 +231,6 @@
             <div class="panel-footer">
                 <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
                 <div class="panel-footer-actions">
-                    <OpenLinksButton
-                        links={ownLinks}
-                        title={task.text}
-                        label={`모두 열기 (${ownLinks.length})`}
-                        ariaLabel={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
-                    {#if subtreeLinks.length > ownLinks.length}
-                        <OpenLinksButton
-                            links={subtreeLinks}
-                            title={`${task.text} (하위 포함)`}
-                            label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
-                            ariaLabel={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
-                    {/if}
                     <button class="btn btn-calendar" onclick={downloadCalendar}>📅 일정 추가(.ics)</button>
                     <button class="btn btn-primary" onclick={onclose}>완료</button>
                 </div>
