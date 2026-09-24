@@ -7,7 +7,6 @@
         clearCachedAuthScope,
         readCachedAuthScope
     } from '$lib/client/auth-session-scope.js';
-    import { exportTaskBackup, importTaskBackup } from '$lib/client/backup-transfer.js';
     import {
         createOfflineConflictReport,
         describeServerSyncResult,
@@ -33,8 +32,8 @@
         tasks,
         updateTask
     } from '$lib/client/task-store.js';
+    import AppHeader from './AppHeader.svelte';
     import AuthPanel from './AuthPanel.svelte';
-    import CalendarFeedPanel from './CalendarFeedPanel.svelte';
     import EisenhowerMatrix from './EisenhowerMatrix.svelte';
     import FilterBar from './FilterBar.svelte';
     import GanttTimeline from './GanttTimeline.svelte';
@@ -250,32 +249,6 @@
         downloadJson(createOfflineConflictReport(syncConflicts), createDatedFilename('offline_conflicts', 'json'));
     }
 
-    /**
-     * @param {Event} event
-     */
-    function importData(event) {
-        const input = /** @type {HTMLInputElement} */ (event.currentTarget);
-        const file = input.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (loadEvent) => {
-            const fileText = loadEvent.target?.result;
-            if (typeof fileText !== 'string') return;
-
-            try {
-                await importTaskBackup(fileText, {
-                    confirmReplace: (question) => confirm(question),
-                    notify: (message) => alert(message)
-                });
-            } finally {
-                input.value = '';
-            }
-        };
-
-        reader.readAsText(file);
-    }
-
     function handleClearDone() {
         const doneCount = get(tasks).filter((task) => task.status === 'done').length;
         if (doneCount === 0) return;
@@ -314,63 +287,13 @@
     }
 </script>
 
-<div class="header">
-    <h1>🚀 나의 칸반 보드</h1>
-
-    {#if appUnlocked}
-        <div class="view-toggle">
-            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => selectView('kanban')} aria-label="칸반 뷰">
-                <span class="view-icon" aria-hidden="true">📋</span>
-                <span class="view-label">칸반</span>
-            </button>
-            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => selectView('gantt')} aria-label="간트 뷰">
-                <span class="view-icon" aria-hidden="true">📊</span>
-                <span class="view-label">간트</span>
-            </button>
-            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => selectView('matrix')} aria-label="매트릭스 뷰">
-                <span class="view-icon" aria-hidden="true">🧭</span>
-                <span class="view-label">매트릭스</span>
-            </button>
-        </div>
-    {/if}
-
-    <div class="header-actions">
-        {#if appUnlocked}
-            {#if !$session.data?.user && !isOnline}
-                <span class="auth-status">오프라인</span>
-            {:else}
-                <AuthPanel />
-            {/if}
-            <button
-                class="btn refresh-btn primary-action"
-                onclick={refreshAppData}
-                disabled={isRefreshing}
-                aria-label={isRefreshing ? '새로고침 중' : '새로고침'}
-                title={isRefreshing ? '새로고침 중' : '새로고침'}>
-                <span class="action-icon" aria-hidden="true">{isRefreshing ? '⏳' : '🔄'}</span>
-                <span class="action-label">{isRefreshing ? '새로고침 중' : '새로고침'}</span>
-            </button>
-            <CalendarFeedPanel />
-            <input type="file" id="import-file" accept=".json" hidden onchange={importData} />
-            <button
-                class="btn utility-action"
-                onclick={() => document.getElementById('import-file')?.click()}
-                aria-label="백업 JSON 불러오기"
-                title="백업 JSON 불러오기">
-                <span class="action-icon" aria-hidden="true">📂</span>
-                <span class="action-label">불러오기</span>
-            </button>
-            <button class="btn utility-action" onclick={() => exportTaskBackup()} aria-label="백업 JSON 내보내기" title="백업 JSON 내보내기">
-                <span class="action-icon" aria-hidden="true">💾</span>
-                <span class="action-label">내보내기</span>
-            </button>
-            <button class="btn utility-action" onclick={handleClearDone} aria-label="완료 작업 정리" title="완료 작업 정리">
-                <span class="action-icon" aria-hidden="true">🧹</span>
-                <span class="action-label">정리</span>
-            </button>
-        {/if}
-    </div>
-</div>
+<AppHeader
+    appUnlocked={appUnlocked}
+    showOfflineStatus={!$session.data?.user && !isOnline}
+    isRefreshing={isRefreshing}
+    onselectview={selectView}
+    onrefresh={refreshAppData}
+    oncleardone={handleClearDone} />
 
 {#if appUnlocked}
     <SyncNoticeBanner
