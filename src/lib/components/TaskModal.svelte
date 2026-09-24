@@ -144,13 +144,13 @@
                             links={ownLinks}
                             title={task.text}
                             label={`모두 열기 (${ownLinks.length})`}
-                            ariaLabel={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
+                            description={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
                         {#if subtreeLinks.length > ownLinks.length}
                             <OpenLinksButton
                                 links={subtreeLinks}
                                 title={`${task.text} (하위 포함)`}
                                 label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
-                                ariaLabel={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
+                                description={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
                         {/if}
                     </div>
                 {/if}

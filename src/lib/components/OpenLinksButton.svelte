@@ -5,9 +5,9 @@
      *   links: import('$lib/shared/task-links.js').TaskLink[];
      *   title: string;
      *   label: string;
-     *   ariaLabel: string;
+     *   description: string;
      * }} */
-    let { links, title, label, ariaLabel } = $props();
+    let { links, title, label, description } = $props();
 
     /**
      * Must stay synchronous: window.open only gets the click's user
@@ -21,11 +21,12 @@
 </script>
 
 {#if links.length >= 2}
+    <!-- The visible label is the accessible name (voice control matches what
+         is on screen); the longer wording is the tooltip and description. -->
     <button
         type="button"
         class="btn btn-small btn-open-links"
-        aria-label={ariaLabel}
-        title={ariaLabel}
+        title={description}
         onclick={handleClick}>
         <span aria-hidden="true">🔗</span>
         <span>{label}</span>

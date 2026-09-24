@@ -469,13 +469,15 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	await expect(links.nth(1)).toHaveText('https://kss.or.kr/');
 	await expect(card.locator('.subtask-text').first()).toHaveText('한국연구재단(https://www.nrf.re.kr/index)');
 
-	const ownButton = card.getByRole('button', { name: '체크리스트 링크 2개를 새 탭에서 모두 열기' });
-	const subtreeButton = card.getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' });
-	await expect(ownButton).toContainText('모두 열기 (2)');
-	await expect(subtreeButton).toContainText('하위 포함 모두 열기 (4)');
+	const ownButton = card.getByRole('button', { name: '모두 열기 (2)', exact: true });
+	const subtreeButton = card.getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true });
+	// The accessible name is the visible label (WCAG 2.5.3); the longer
+	// wording is the tooltip and accessible description.
+	await expect(ownButton).toHaveAccessibleDescription('체크리스트 링크 2개를 새 탭에서 모두 열기');
+	await expect(subtreeButton).toHaveAccessibleDescription('하위 작업 포함 링크 4개를 새 탭에서 모두 열기');
 	// The child card has 2 links of its own and no children.
 	const childCard = page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 하위' }) });
-	await expect(childCard.getByRole('button', { name: '체크리스트 링크 2개를 새 탭에서 모두 열기' })).toBeVisible();
+	await expect(childCard.getByRole('button', { name: '모두 열기 (2)', exact: true })).toBeVisible();
 
 	await subtreeButton.click();
 	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
@@ -516,9 +518,9 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	await card.locator('.card-text').click();
 	const modal = page.locator('.side-panel');
 	await expect(modal).toBeVisible();
-	await expect(modal.getByRole('button', { name: '체크리스트 링크 2개를 새 탭에서 모두 열기' })).toContainText('모두 열기 (2)');
-	const modalSubtree = modal.getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' });
-	await expect(modalSubtree).toContainText('하위 포함 모두 열기 (4)');
+	await expect(modal.getByRole('button', { name: '모두 열기 (2)', exact: true })).toBeVisible();
+	const modalSubtree = modal.getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true });
+	await expect(modalSubtree).toHaveAccessibleDescription('하위 작업 포함 링크 4개를 새 탭에서 모두 열기');
 	// They sit in the body, so the footer keeps its layout: on the 440px side
 	// panel they used to squeeze '작업 삭제' into a 3-line column, and on
 	// phones every footer button is its own full-width row.
@@ -537,7 +539,7 @@ test('falls back to a link list when the browser blocks pop-ups', async ({ page 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await linkParentCard(page).getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' }).click();
+	await linkParentCard(page).getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
 	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
 
 	const panel = page.locator('.link-open-panel');
@@ -568,7 +570,7 @@ test('lists every link when new tabs cannot be opened at all', async ({ page }) 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await linkParentCard(page).getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' }).click();
+	await linkParentCard(page).getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
 
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('이 환경에서는 새 탭을 자동으로 열 수 없습니다.');
@@ -585,7 +587,7 @@ test('drops a leftover link panel when another account signs in', async ({ page 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await linkParentCard(page).getByRole('button', { name: '하위 작업 포함 링크 4개를 새 탭에서 모두 열기' }).click();
+	await linkParentCard(page).getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('링크 4개 중 1개만 열렸습니다');
 
