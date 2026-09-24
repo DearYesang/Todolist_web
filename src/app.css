@@ -2293,7 +2293,7 @@ select {
 }
 
 .link-open-panel-hint {
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 12px;
     overflow-wrap: anywhere;
 }
@@ -2336,7 +2336,7 @@ select {
 }
 
 .link-open-panel-host {
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 12px;
 }
 
