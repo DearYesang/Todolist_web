@@ -267,12 +267,7 @@ function scheduleTaskSnapshotSync(taskId) {
             return;
         }
 
-        const knownVersion = latestServerVersions.get(taskId);
-        const patch = toServerTaskPatch(
-            typeof knownVersion === 'number' && (typeof current.version !== 'number' || knownVersion > current.version)
-                ? { ...current, version: knownVersion }
-                : current
-        );
+        const patch = toChainedServerTaskPatch(taskId, current);
         const result = await updateServerTask(taskId, patch);
         if (result.ok) {
             applyServerTaskResult(result.task);
@@ -292,18 +287,29 @@ function scheduleTaskSnapshotSync(taskId) {
             return null;
         }
 
-        const knownVersion = latestServerVersions.get(taskId);
         return {
             type: 'task.patch',
             taskId,
             localParentId: getLocalParentId(current),
-            patch: toServerTaskPatch(
-                typeof knownVersion === 'number' && (typeof current.version !== 'number' || knownVersion > current.version)
-                    ? { ...current, version: knownVersion }
-                    : current
-            )
+            patch: toChainedServerTaskPatch(taskId, current)
         };
     });
+}
+
+/**
+ * The snapshot patch for a chained sync. A response earlier in the chain may
+ * have reported a newer version than the store's copy holds; expectedVersion
+ * uses whichever is newer.
+ * @param {string} taskId
+ * @param {import('../../shared/task-domain.js').Task} current
+ */
+function toChainedServerTaskPatch(taskId, current) {
+    const knownVersion = latestServerVersions.get(taskId);
+    return toServerTaskPatch(
+        typeof knownVersion === 'number' && (typeof current.version !== 'number' || knownVersion > current.version)
+            ? { ...current, version: knownVersion }
+            : current
+    );
 }
 
 /**
