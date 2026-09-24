@@ -11,6 +11,7 @@
         listUserPasskeys,
         updateUserPasskeyName
     } from '$lib/client/passkey-management-api.js';
+    import { createPasskeySignupContext, getPasskeySignupError } from '$lib/client/passkey-signup.js';
     import { clearOfflineWriteQueue, getOfflineQueueSize } from '$lib/client/offline-write-queue.js';
     import { clearLocalTaskCache } from '$lib/client/task-store.js';
     import {
@@ -92,25 +93,19 @@
     async function registerPasskey() {
         if (isWorking) return;
 
-        const normalizedEmail = email.trim().toLowerCase();
-        if (!$session.data?.user && !normalizedEmail) {
-            authError = '이메일을 입력해 주세요.';
-            return;
-        }
-        if (!$session.data?.user && !isRecoveryMode && !emailVerificationCode.trim()) {
-            authError = '이메일 확인 코드를 입력해 주세요.';
-            return;
-        }
-        if (!$session.data?.user && !isRecoveryMode && verificationEmail && verificationEmail !== normalizedEmail) {
-            authError = '현재 이메일로 새 확인 코드를 받아 주세요.';
-            return;
-        }
-        if (!$session.data?.user && !isRecoveryMode && isExpiredVerificationCode()) {
-            authError = '확인 코드가 만료되었습니다. 새 코드를 받아 주세요.';
-            return;
-        }
-        if (!$session.data?.user && isRecoveryMode && !recoveryCode.trim()) {
-            authError = '복구 코드를 입력해 주세요.';
+        /** @type {import('$lib/client/passkey-signup.js').PasskeySignupInput} */
+        const signupInput = {
+            email: email.trim().toLowerCase(),
+            name,
+            isRecoveryMode,
+            emailVerificationCode,
+            verificationEmail,
+            verificationExpiresAt,
+            recoveryCode
+        };
+        const inputError = $session.data?.user ? null : getPasskeySignupError(signupInput);
+        if (inputError) {
+            authError = inputError;
             return;
         }
 
@@ -123,15 +118,7 @@
             const result = await authClient.passkey.addPasskey({
                 name: selectedPasskeyName,
                 authenticatorAttachment: 'platform',
-                context: $session.data?.user
-                    ? null
-                    : JSON.stringify({
-                        email: normalizedEmail,
-                        name: name.trim() || normalizedEmail,
-                        ...(isRecoveryMode
-                            ? { recoveryCode: recoveryCode.trim() }
-                            : { emailVerificationCode: emailVerificationCode.trim() })
-                    })
+                context: $session.data?.user ? null : createPasskeySignupContext(signupInput)
             });
 
             if (result.error) {
@@ -368,11 +355,6 @@
         emailVerificationCode = '';
         verificationEmail = '';
         verificationExpiresAt = '';
-    }
-
-    function isExpiredVerificationCode() {
-        const expiresAt = Date.parse(verificationExpiresAt);
-        return Number.isFinite(expiresAt) && expiresAt <= Date.now();
     }
 
     /**
