@@ -4,7 +4,8 @@ import {
 	GANTT_DAY_WIDTH,
 	getBarCoords,
 	getResizeDayOffset,
-	getResizePreview
+	getResizePreview,
+	ownsResizePointer
 } from './gantt-layout.js';
 import { normalizeTask } from './task-domain.js';
 
@@ -165,5 +166,18 @@ describe('getResizePreview', () => {
 	it('returns the origin date when the pointer has not moved a full day', () => {
 		expect(getResizePreview({ ...bar, edge: 'start' }, 0)).toEqual({ previewStartDate: '2026-09-20' });
 		expect(getResizePreview({ ...bar, edge: 'end' }, 0)).toEqual({ previewEndDate: '2026-09-22' });
+	});
+});
+
+describe('ownsResizePointer', () => {
+	it('accepts only the pointer that started the resize', () => {
+		expect(ownsResizePointer({ pointerId: 1 }, { pointerId: 1 })).toBe(true);
+		expect(ownsResizePointer({ pointerId: 1 }, { pointerId: 2 })).toBe(false);
+		expect(ownsResizePointer({ pointerId: 7 }, { pointerId: 1 })).toBe(false);
+	});
+
+	it('falls back to accepting events when either side has no pointer id', () => {
+		expect(ownsResizePointer({}, { pointerId: 2 })).toBe(true);
+		expect(ownsResizePointer({ pointerId: 1 }, {})).toBe(true);
 	});
 });

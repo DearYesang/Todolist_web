@@ -6,7 +6,8 @@
         GANTT_DAY_WIDTH,
         getBarCoords,
         getResizeDayOffset,
-        getResizePreview
+        getResizePreview,
+        ownsResizePointer
     } from '$lib/shared/gantt-layout.js';
     import { getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
 
@@ -23,6 +24,7 @@
     /** @type {null | {
      *   taskId: string;
      *   edge: 'start' | 'end';
+     *   pointerId: number;
      *   originX: number;
      *   originStartDate: string;
      *   originEndDate: string;
@@ -108,6 +110,7 @@
         resizeState = {
             taskId: task.id,
             edge,
+            pointerId: event.pointerId,
             originX: event.clientX,
             originStartDate: task.startDate,
             originEndDate: task.endDate,
@@ -125,7 +128,7 @@
      * @param {PointerEvent} event
      */
     function handleResizeMove(event) {
-        if (!resizeState) return;
+        if (!resizeState || !ownsResizePointer(resizeState, event)) return;
 
         const dayOffset = getResizeDayOffset(resizeState.originX, event.clientX, dayWidth);
         resizeState = {
@@ -134,8 +137,11 @@
         };
     }
 
-    function handleResizeEnd() {
-        if (!resizeState) return;
+    /**
+     * @param {PointerEvent} event
+     */
+    function handleResizeEnd(event) {
+        if (!resizeState || !ownsResizePointer(resizeState, event)) return;
 
         const { taskId, originStartDate, originEndDate, previewStartDate, previewEndDate } = resizeState;
         clearResizeListeners();

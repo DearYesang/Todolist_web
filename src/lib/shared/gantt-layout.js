@@ -169,3 +169,16 @@ export function getResizePreview(resize, dayOffset) {
 
 	return { previewEndDate: nextEndDate };
 }
+
+/**
+ * A resize belongs to the pointer that pressed the handle: a second finger
+ * or a resting palm must not move the edge or end the resize. This is the
+ * rule pointer-dnd applies to card drags.
+ * @param {{ pointerId?: number }} resize
+ * @param {{ pointerId?: number }} event
+ */
+export function ownsResizePointer(resize, event) {
+	return resize.pointerId === undefined
+		|| event.pointerId === undefined
+		|| event.pointerId === resize.pointerId;
+}

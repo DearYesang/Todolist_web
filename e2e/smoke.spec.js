@@ -159,6 +159,33 @@ test('resizes a Gantt bar by dragging its end handle', async ({ page }) => {
 	await expect(page.locator('.side-panel')).toHaveCount(0);
 });
 
+test('ignores a second pointer while a Gantt bar is being resized', async ({ page }) => {
+	await seedOfflineBoard(page);
+	await page.goto('/');
+	await page.getByRole('button', { name: /간트 뷰/ }).click();
+
+	const before = await readPersistedTask(page, 'local-e2e-task');
+	const { bar, x, y } = await pressGanttEndHandle(page, 'E2E cached task');
+	await page.mouse.move(x + 48, y, { steps: 4 });
+
+	// A second finger (or a resting palm) moves far right and lifts while the
+	// first pointer still holds the handle. The mouse is pointer 1.
+	await page.evaluate(({ foreignX, foreignY }) => {
+		const init = { pointerId: 99, pointerType: 'touch', isPrimary: false, clientX: foreignX, clientY: foreignY, bubbles: true };
+		window.dispatchEvent(new PointerEvent('pointermove', init));
+		window.dispatchEvent(new PointerEvent('pointerup', init));
+		window.dispatchEvent(new PointerEvent('pointercancel', init));
+	}, { foreignX: x + 480, foreignY: y });
+	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 1)})`);
+	expect((await readPersistedTask(page, 'local-e2e-task')).endDate).toBe(before.endDate);
+
+	// The resize still follows the first pointer and ends when it lifts.
+	await page.mouse.move(x + 96, y, { steps: 4 });
+	await page.mouse.up();
+	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+		.toBe(shiftDate(before.endDate, 2));
+});
+
 test('suggests categories and manages category names offline', async ({ page }) => {
 	await seedOfflineBoard(page);
 
