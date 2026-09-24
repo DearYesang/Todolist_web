@@ -14,11 +14,13 @@
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
+        getDirectChildren,
         getTaskDueStatus,
         PRIORITY_LABELS,
         STATUS_LABELS,
         URGENCY_LABELS
     } from '$lib/shared/task-domain.js';
+    import { splitTextIntoLinkParts } from '$lib/shared/task-links.js';
     import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
 
     /** @type {{
@@ -53,7 +55,7 @@
     let subtaskCompositionResetTimer = null;
 
     const children = $derived(childrenByParent[task.id] || []);
-    const directChildren = $derived(allTasks.filter((candidate) => candidate.parentId === task.id));
+    const directChildren = $derived(getDirectChildren(allTasks, task.id));
     const doneChildrenCount = $derived(directChildren.filter((candidate) => candidate.status === 'done').length);
     const dueStatus = $derived(getTaskDueStatus(task));
     const foreignParent = $derived.by(() => {
@@ -64,6 +66,10 @@
     const categoryColor = $derived(getCategoryColor(task.category, task.categoryMeta?.color));
     const completedSubtasks = $derived(task.subtasks.filter((subtask) => subtask.done).length);
     const subtaskProgress = $derived(task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100));
+    /** @type {Record<string, import('$lib/shared/task-links.js').LinkPart[]>} */
+    const subtaskParts = $derived(Object.fromEntries(
+        task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)])
+    ));
 
     /**
      * @param {MouseEvent} event
@@ -172,51 +178,6 @@
             renameSubtask(task.id, subtask.id, nextText);
         }
     }
-
-    /**
-     * @param {string} text
-     */
-    function getSubtaskParts(text) {
-        const urlPattern = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-        /** @type {{ type: 'text' | 'url'; value: string }[]} */
-        const parts = [];
-        let lastIndex = 0;
-
-        for (const match of text.matchAll(urlPattern)) {
-            const value = match[0];
-            const index = match.index ?? 0;
-
-            if (index > lastIndex) {
-                parts.push({
-                    type: 'text',
-                    value: text.slice(lastIndex, index)
-                });
-            }
-
-            parts.push({
-                type: 'url',
-                value
-            });
-
-            lastIndex = index + value.length;
-        }
-
-        if (lastIndex < text.length) {
-            parts.push({
-                type: 'text',
-                value: text.slice(lastIndex)
-            });
-        }
-
-        return parts.length > 0 ? parts : [{ type: 'text', value: text }];
-    }
-
-    /**
-     * @param {string} url
-     */
-    function getHref(url) {
-        return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
-    }
 </script>
 
 <div
@@ -256,6 +217,8 @@
                 class="collapse-toggle"
                 class:collapsed={task.collapsed}
                 title={task.collapsed ? '펼치기' : '접기'}
+                aria-label={task.collapsed ? `${task.text} 하위 작업 펼치기` : `${task.text} 하위 작업 접기`}
+                aria-expanded={!task.collapsed}
                 onclick={(event) => {
                     event.stopPropagation();
                     toggleCollapse(task.id);
@@ -300,11 +263,11 @@
                             onchange={() => toggleSubtask(task.id, subtask.id)}
                             onclick={(event) => event.stopPropagation()} />
                         <span class="subtask-text" class:done={subtask.done}>
-                            {#each getSubtaskParts(subtask.text) as part, index (`${subtask.id}-${index}`)}
+                            {#each subtaskParts[subtask.id] ?? [] as part, index (`${subtask.id}-${index}`)}
                                 {#if part.type === 'url'}
                                     <a
                                         class="subtask-link"
-                                        href={getHref(part.value)}
+                                        href={part.href}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onclick={(event) => event.stopPropagation()}>
@@ -315,8 +278,12 @@
                                 {/if}
                             {/each}
                         </span>
-                        <button class="subtask-action edit" onclick={(event) => handleRenameSubtask(subtask, event)}>✏️</button>
-                        <button class="subtask-action delete" onclick={(event) => {
+                        <button
+                            class="subtask-action edit"
+                            aria-label={`${subtask.text} 수정`}
+                            title="수정"
+                            onclick={(event) => handleRenameSubtask(subtask, event)}>✏️</button>
+                        <button class="subtask-action delete" aria-label={`${subtask.text} 삭제`} title="삭제" onclick={(event) => {
                             event.stopPropagation();
                             deleteSubtask(task.id, subtask.id);
                         }}>×</button>
@@ -353,7 +320,7 @@
 
         <div class="card-secondary-actions">
             <button class="btn btn-calendar btn-small" onclick={handleCalendarDownload}>📅 일정 추가</button>
-            <button class="btn btn-danger" onclick={handleDeleteTask}>🗑</button>
+            <button class="btn btn-danger" aria-label={`${task.text} 삭제`} title="작업 삭제" onclick={handleDeleteTask}>🗑</button>
         </div>
     </div>
 </div>
