@@ -1,3 +1,5 @@
+import { createErrorResult, readErrorMessage, readJsonBody } from './http.js';
+
 /**
  * @typedef {{
  *   id: string;
@@ -135,26 +137,6 @@ export async function syncCalendarProviders(fetcher = globalThis.fetch) {
 }
 
 /**
- * @param {number} status
- * @param {string} message
- * @returns {{ ok: false; status: number; message: string }}
- */
-function createErrorResult(status, message) {
-	return { ok: false, status, message };
-}
-
-/**
- * @param {Response} response
- */
-async function readJsonBody(response) {
-	try {
-		return await response.json();
-	} catch {
-		return null;
-	}
-}
-
-/**
  * @param {unknown} body
  * @returns {body is { providers: CalendarProviderRecord[]; connections: CalendarConnectionRecord[]; syncRuns?: CalendarSyncRunRecord[] }}
  */
@@ -179,16 +161,4 @@ function isSyncBody(body) {
 		&& typeof /** @type {{ tasks?: unknown }} */ (body).tasks === 'number'
 		&& Array.isArray(/** @type {{ summaries?: unknown }} */ (body).summaries)
 	);
-}
-
-/**
- * @param {unknown} body
- */
-function readErrorMessage(body) {
-	if (!body || typeof body !== 'object' || !('message' in body)) {
-		return null;
-	}
-
-	const message = /** @type {{ message?: unknown }} */ (body).message;
-	return typeof message === 'string' && message.trim() ? message : null;
 }

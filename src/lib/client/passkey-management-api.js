@@ -1,3 +1,12 @@
+import { createErrorResult, readErrorMessage, readJsonBody } from './http.js';
+
+/**
+ * Better Auth's passkey endpoints answer { message | error | code }; take the
+ * first string, even a blank one.
+ * @type {import('./http.js').ErrorMessageOptions}
+ */
+const BETTER_AUTH_ERROR_FIELDS = { fields: ['message', 'error', 'code'], allowBlank: true };
+
 /**
  * @typedef {{
  *   id: string;
@@ -66,7 +75,7 @@ export async function listUserPasskeys(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Passkey API request failed with status ${response.status}.`);
+		return createErrorResult(response.status, readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`);
 	} catch {
 		return createErrorResult(0, 'Passkey list request could not be completed.');
 	}
@@ -101,7 +110,7 @@ export async function updateUserPasskeyName(id, name, fetcher = globalThis.fetch
 			}
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Passkey API request failed with status ${response.status}.`);
+		return createErrorResult(response.status, readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`);
 	} catch {
 		return createErrorResult(0, 'Passkey update request could not be completed.');
 	}
@@ -132,7 +141,7 @@ export async function deleteUserPasskey(id, fetcher = globalThis.fetch) {
 			return { ok: true };
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Passkey API request failed with status ${response.status}.`);
+		return createErrorResult(response.status, readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`);
 	} catch {
 		return createErrorResult(0, 'Passkey delete request could not be completed.');
 	}
@@ -163,46 +172,4 @@ function normalizePasskey(value) {
 		...(typeof row.createdAt === 'string' ? { createdAt: row.createdAt } : {}),
 		...(typeof row.updatedAt === 'string' ? { updatedAt: row.updatedAt } : {})
 	};
-}
-
-/**
- * @param {Response} response
- */
-async function readJsonBody(response) {
-	try {
-		return await response.json();
-	} catch {
-		return null;
-	}
-}
-
-/**
- * @param {number} status
- * @param {string} message
- * @returns {{ ok: false; status: number; message: string }}
- */
-function createErrorResult(status, message) {
-	return { ok: false, status, message };
-}
-
-/**
- * @param {unknown} body
- */
-function readErrorMessage(body) {
-	if (!body || typeof body !== 'object') {
-		return null;
-	}
-
-	const error = /** @type {{ message?: unknown; error?: unknown; code?: unknown }} */ (body);
-	if (typeof error.message === 'string') {
-		return error.message;
-	}
-	if (typeof error.error === 'string') {
-		return error.error;
-	}
-	if (typeof error.code === 'string') {
-		return error.code;
-	}
-
-	return null;
 }

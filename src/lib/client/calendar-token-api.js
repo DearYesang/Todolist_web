@@ -1,3 +1,5 @@
+import { readErrorMessage, readJsonBody } from './http.js';
+
 /**
  * @typedef {{
  *   id: string;
@@ -111,17 +113,6 @@ export async function revokeCalendarToken(tokenId, fetcher = globalThis.fetch) {
 }
 
 /**
- * @param {Response} response
- */
-async function readJsonBody(response) {
-	try {
-		return await response.json();
-	} catch {
-		return null;
-	}
-}
-
-/**
  * @param {unknown} body
  * @returns {body is { tokens: CalendarTokenRecord[] }}
  */
@@ -152,16 +143,4 @@ function isTokenCreateResponse(body) {
  */
 function isTokenRevokeResponse(body) {
 	return Boolean(body && typeof body === 'object' && 'token' in body);
-}
-
-/**
- * @param {unknown} body
- */
-function readErrorMessage(body) {
-	if (!body || typeof body !== 'object' || !('message' in body)) {
-		return null;
-	}
-
-	const message = /** @type {{ message?: unknown }} */ (body).message;
-	return typeof message === 'string' && message.trim() ? message : null;
 }
