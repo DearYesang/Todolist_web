@@ -70,6 +70,124 @@ export function createOfflineConflictReport(conflicts) {
 }
 
 /**
+ * @typedef {{
+ *   action: 'patch';
+ *   taskId: string;
+ *   patch: Record<string, unknown>;
+ *   dismiss: true;
+ *   notice: string;
+ * } | {
+ *   action: 'delete';
+ *   taskId: string;
+ *   dismiss: true;
+ *   notice: string;
+ * } | {
+ *   action: 'none';
+ *   dismiss: boolean;
+ *   notice: string;
+ * }} LocalConflictResolution
+ */
+
+/**
+ * Only task edits and deletes can be re-applied on top of the server state;
+ * the other conflicts are safer to save and check by hand.
+ * @param {OfflineConflictSummary} conflict
+ */
+export function canApplyLocalConflict(conflict) {
+	return conflict.mutation.type === 'task.patch' || conflict.mutation.type === 'task.delete';
+}
+
+/**
+ * Decides what "내 변경 적용" does with a conflict, given the task list the
+ * server sync left behind. The caller runs the action (`patch` or `delete`
+ * on `taskId`), removes the conflict from the banner when `dismiss` is set,
+ * and shows `notice`.
+ * @param {OfflineConflictSummary} conflict
+ * @param {import('../shared/task-domain.js').Task[]} currentTasks
+ * @returns {LocalConflictResolution}
+ */
+export function resolveLocalConflict(conflict, currentTasks) {
+	const mutation = conflict.mutation;
+	if (mutation.type === 'task.patch') {
+		const { expectedVersion: _expectedVersion, ...patch } = mutation.patch;
+		if (!currentTasks.some((task) => task.id === mutation.taskId)) {
+			return {
+				action: 'none',
+				dismiss: false,
+				notice: '대상 작업을 찾지 못했습니다. 최신 상태를 확인해 주세요.'
+			};
+		}
+
+		return {
+			action: 'patch',
+			taskId: mutation.taskId,
+			patch,
+			dismiss: true,
+			notice: '내 변경을 최신 서버 상태 위에 다시 적용했습니다.'
+		};
+	}
+
+	if (mutation.type === 'task.delete') {
+		if (!currentTasks.some((task) => task.id === mutation.taskId)) {
+			return {
+				action: 'none',
+				dismiss: true,
+				notice: '대상 작업이 이미 없습니다. 서버 상태를 유지합니다.'
+			};
+		}
+
+		return {
+			action: 'delete',
+			taskId: mutation.taskId,
+			dismiss: true,
+			notice: '삭제 변경을 최신 서버 상태 위에 다시 적용했습니다.'
+		};
+	}
+
+	return {
+		action: 'none',
+		dismiss: false,
+		notice: '이 충돌은 자동 적용보다 내역 저장 후 수동 확인이 안전합니다.'
+	};
+}
+
+/**
+ * What the sync banner shows after a server sync. A key that is present
+ * replaces that part of the banner; a missing key leaves it as it was.
+ * `conflicts` with entries means the conflict details start closed.
+ * @param {Awaited<ReturnType<typeof import('./task-sync.js').syncServerTasks>>} result
+ * @param {import('../shared/task-domain.js').Task[]} currentTasks the list after the sync, for conflict targets
+ * @param {{ showSuccess?: boolean }} [options] true for a manual 새로고침
+ * @returns {{ conflicts?: OfflineConflictSummary[]; notice?: string | null }}
+ */
+export function describeServerSyncResult(result, currentTasks, { showSuccess = false } = {}) {
+	const conflicts = Array.isArray(result.offlineConflicts) ? result.offlineConflicts : [];
+	if (conflicts.length > 0) {
+		return {
+			conflicts: conflicts.map((conflict) => summarizeOfflineConflict(conflict, currentTasks)),
+			notice: null
+		};
+	}
+
+	if (result.ok) {
+		return {
+			conflicts: [],
+			notice: showSuccess ? '최신 작업 목록으로 새로고침했습니다.' : null
+		};
+	}
+
+	if (showSuccess) {
+		return {
+			notice: result.fallback
+				? '지금은 서버에 연결할 수 없어 이 기기의 작업 목록을 유지합니다.'
+				: result.message
+		};
+	}
+
+	return {};
+}
+
+/**
  * @param {import('./offline-write-queue.js').OfflineMutation} mutation
  */
 function getConflictTitle(mutation) {

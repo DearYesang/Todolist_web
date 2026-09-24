@@ -144,7 +144,13 @@ Imported data is normalized before it reaches the app store:
 - missing, self-referential, or cyclic parent links are removed
 - child status is aligned with the effective parent lane
 
-The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persistence, optimistic mutations, and fallback behavior live in `src/lib/client/task-store.js`.
+The domain rules are isolated in `src/lib/shared/task-domain.js`; browser persistence, optimistic mutations, and fallback behavior are imported from `src/lib/client/task-store.js`, which re-exports the modules in `src/lib/client/task-store/` (task cache, view preference, filters, categories, per-task sync engine, task edits and cross-tab sync).
+
+On the server, the API routes and the category and calendar services import the task data layer from `src/lib/server/tasks/repository.js`. It re-exports its sibling modules: `task-repository.js` (task reads, create, partial update and cascade delete), `checklist-repository.js`, `import-repository.js` (backup import and replace), `board-provisioning.js` (each user's Personal workspace and Inbox board, and the board's default view) and `task-rows.js` (the task authorization read and other helpers the writers share).
+
+In the browser, `src/lib/components/App.svelte` keeps the session-scoped storage owner, server sync and the online/offline state, and renders `AppHeader.svelte` (title, view toggle, account, refresh, calendar and backup controls) and `SyncNoticeBanner.svelte` (offline conflicts and sync notices). The banner's decisions live in `src/lib/client/offline-conflicts.js`, backup import and export in `src/lib/client/backup-transfer.js`, and the pagehide drain and service-worker update reload in `src/lib/client/page-lifecycle.js`. `AuthPanel.svelte` shows `AuthSignInControls.svelte` when signed out and `AuthAccountControls.svelte` (with `PasskeyManager.svelte`) when signed in; their pure helpers are in `src/lib/client/auth-labels.js` and `src/lib/client/passkey-signup.js`.
+
+The global stylesheet `src/app.css` is a list of `@import` lines for the partials in `src/styles/` (tokens and base, header and auth, buttons, the task form, filters, the board views and task cards, the Gantt chart, the detail panel, the link-open panel, and the breakpoint and touch overrides). The import order is the cascade order, so the breakpoint and touch partials stay last; add a rule to the partial that owns its component instead of reordering the imports. `src/app-css.test.js` fails if a partial is not imported exactly once or an override partial moves above a partial with base rules.
 
 ## Current Limits
 

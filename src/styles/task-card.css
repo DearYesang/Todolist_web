@@ -1,0 +1,150 @@
+.task-card {
+    position: relative;
+    padding: 14px;
+    border: 1px solid var(--border-light);
+    border-left: 3px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    transition: all var(--transition);
+    /* pan-y keeps one-finger scrolling; the pointer-DnD long-press owns the
+       gesture only after activation. Callout/selection suppression stops the
+       iOS long-press menu from racing the drag. */
+    touch-action: pan-y;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.task-card.dnd-source {
+    opacity: 0.35;
+}
+
+.dnd-ghost {
+    position: fixed;
+    z-index: 1000;
+    margin: 0;
+    pointer-events: none;
+    opacity: 0.92;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    transform: scale(1.02) rotate(1.5deg);
+    /* The card's own 'transition: all' would make the clone trail the pointer. */
+    transition: none;
+}
+
+/* Cards suppress selection for the drag long-press, but text fields inside
+   them must keep native caret/selection gestures. */
+.task-card input,
+.task-card textarea {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.task-card:hover {
+    border-color: #484f58;
+    background: var(--surface-hover);
+    transform: translateY(-1px);
+}
+
+.task-card[data-priority='high'] {
+    border-left-color: var(--priority-high);
+}
+
+.task-card[data-priority='medium'] {
+    border-left-color: var(--priority-medium);
+}
+
+.task-card[data-priority='low'] {
+    border-left-color: var(--priority-low);
+}
+
+.task-card.child-card::before {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: -24px;
+    width: 16px;
+    height: 1px;
+    background: var(--border);
+}
+
+.drag-over-card {
+    border: 2px dashed var(--accent) !important;
+    background: rgba(88, 166, 255, 0.08) !important;
+}
+
+.card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.priority-badge,
+.urgency-badge,
+.category-tag,
+.summary-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.priority-badge.high,
+.priority-chip.high {
+    background: var(--priority-high-bg);
+    color: var(--priority-high);
+}
+
+.priority-badge.medium,
+.priority-chip.medium {
+    background: var(--priority-medium-bg);
+    color: var(--priority-medium);
+}
+
+.priority-badge.low,
+.priority-chip.low {
+    background: var(--priority-low-bg);
+    color: var(--priority-low);
+}
+
+.urgency-badge.urgent,
+.urgency-chip.urgent {
+    background: var(--priority-high-bg);
+    color: var(--priority-high);
+}
+
+.urgency-badge.normal,
+.urgency-chip.normal {
+    background: rgba(110, 118, 129, 0.12);
+    color: var(--text-secondary);
+}
+
+.status-chip.todo {
+    background: rgba(88, 166, 255, 0.14);
+    color: var(--col-todo);
+}
+
+.status-chip.doing {
+    background: rgba(210, 153, 34, 0.14);
+    color: var(--col-doing);
+}
+
+.status-chip.done {
+    background: rgba(63, 185, 80, 0.14);
+    color: var(--col-done);
+}
+
+.category-tag {
+    background: transparent;
+}
+
+.category-tag.add-category {
+    border-style: dashed;
+    color: var(--text-muted);
+    cursor: pointer;
+}

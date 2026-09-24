@@ -1013,6 +1013,460 @@ test('drops a leftover link panel when another account signs in', async ({ page 
 });
 
 /**
+ * @param {Array<Record<string, unknown>> | Record<string, unknown> | string} content
+ */
+function backupFile(content) {
+	return {
+		name: 'kanban_backup.json',
+		mimeType: 'application/json',
+		buffer: Buffer.from(typeof content === 'string' ? content : JSON.stringify(content))
+	};
+}
+
+/**
+ * Records every alert/confirm text. Confirms take the next queued answer
+ * (dismissed when none is left); alerts are just closed.
+ * @param {import('@playwright/test').Page} page
+ * @param {boolean[]} [confirmAnswers]
+ */
+function recordDialogs(page, confirmAnswers = []) {
+	/** @type {string[]} */
+	const dialogs = [];
+	page.on('dialog', (dialog) => {
+		dialogs.push(`${dialog.type()}:${dialog.message()}`);
+		if (dialog.type() === 'confirm' && confirmAnswers.shift()) {
+			void dialog.accept();
+		} else {
+			void dialog.dismiss();
+		}
+	});
+	return dialogs;
+}
+
+test('imports a backup file by replacing or appending, and reports unreadable files', async ({ page }) => {
+	await seedOfflineBoard(page);
+	const dialogs = recordDialogs(page, [true, false]);
+	/** @type {string[]} */
+	const importRequests = [];
+	await page.route('**/api/import**', (route) => {
+		const url = new URL(route.request().url());
+		importRequests.push(`${url.pathname}${url.search}`);
+		if (url.searchParams.get('mode') === 'replace') {
+			return route.fulfill({
+				json: {
+					tasks: [{ id: '33333333-3333-4333-8333-333333333333', text: 'Server imported task', status: 'todo' }],
+					summary: {
+						receivedTasks: 1,
+						importedTasks: 1,
+						skippedTasks: 0,
+						importedChecklistItems: 0,
+						skippedChecklistItems: 0,
+						repairedParentLinks: 0,
+						replacedTasks: 7
+					}
+				}
+			});
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	await expect(page.getByText('E2E cached task')).toBeVisible();
+	const fileInput = page.locator('#import-file');
+
+	// Confirm accepted: replace through the server, which answers with its list.
+	await fileInput.setInputFiles(backupFile([{ id: 'backup-replaced', text: 'Backup replaced task' }]));
+	await expect.poll(() => dialogs).toEqual([
+		'confirm:현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.',
+		'alert:데이터를 성공적으로 불러왔습니다. 가져온 작업: 1개. 교체된 작업: 7개.'
+	]);
+	await expect(page.getByText('Server imported task')).toBeVisible();
+	await expect(page.getByText('E2E cached task')).toHaveCount(0);
+	await expect(fileInput).toHaveValue('');
+
+	// Confirm dismissed: append. The server is unavailable, so the file lands
+	// on this device first and is queued for the server.
+	await fileInput.setInputFiles(backupFile({ tasks: [{ id: 'backup-appended', text: 'Backup appended task' }] }));
+	await expect.poll(() => dialogs.length).toBe(4);
+	expect(dialogs.slice(2)).toEqual([
+		'confirm:현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.',
+		'alert:오프라인 상태라 이 기기에 먼저 불러왔습니다. 온라인이 되면 서버와 다른 기기에 자동 반영을 시도합니다.'
+	]);
+	await expect(page.getByText('Server imported task')).toBeVisible();
+	await expect(page.getByText('Backup appended task')).toBeVisible();
+	expect(importRequests).toEqual(['/api/import?mode=replace', '/api/import']);
+	const queued = await page.evaluate(() => JSON.parse(localStorage.getItem('kanbanOfflineWriteQueue:e2e-user') ?? '[]'));
+	expect(queued).toEqual([expect.objectContaining({ type: 'import.tasks', mode: 'append', localTaskIds: ['backup-appended'] })]);
+
+	// Not a backup shape, then not JSON at all: nothing is asked or sent.
+	await fileInput.setInputFiles(backupFile({ notTasks: true }));
+	await expect.poll(() => dialogs.length).toBe(5);
+	await fileInput.setInputFiles(backupFile('{ not json'));
+	await expect.poll(() => dialogs.length).toBe(6);
+	expect(dialogs.slice(4)).toEqual([
+		'alert:올바른 칸반 데이터 형식이 아닙니다.',
+		'alert:파일을 읽는 중 오류가 발생했습니다.'
+	]);
+	expect(importRequests).toHaveLength(2);
+	await expect(fileInput).toHaveValue('');
+});
+
+const CONFLICT_TASK_ID = '44444444-4444-4444-8444-444444444444';
+const CONFLICT_DELETE_TASK_ID = '55555555-5555-4555-8555-555555555555';
+
+test('lists offline conflicts and applies, keeps or saves them', async ({ page }) => {
+	await seedOfflineBoard(page);
+	// Three queued offline writes that the server rejects with 409.
+	await page.addInitScript(({ taskId, deleteTaskId }) => {
+		if (sessionStorage.getItem('e2e-conflicts-seeded')) {
+			return;
+		}
+		sessionStorage.setItem('e2e-conflicts-seeded', '1');
+		const base = { ownerUserId: 'e2e-user', createdAt: Date.now(), attempts: 0 };
+		localStorage.setItem('kanbanOfflineWriteQueue:e2e-user', JSON.stringify([
+			{ ...base, id: 'conflict-patch', type: 'task.patch', taskId, patch: { text: 'My offline title', expectedVersion: 2 } },
+			{ ...base, id: 'conflict-delete', type: 'task.delete', taskId: deleteTaskId, expectedVersion: 1 },
+			{ ...base, id: 'conflict-checklist', type: 'checklist.patch', taskId, itemId: '66666666-6666-4666-8666-666666666666', patch: { done: true } }
+		]));
+	}, { taskId: CONFLICT_TASK_ID, deleteTaskId: CONFLICT_DELETE_TASK_ID });
+
+	const serverTasks = [
+		{ id: CONFLICT_TASK_ID, text: 'Conflict server task', status: 'todo', version: 3 },
+		{ id: CONFLICT_DELETE_TASK_ID, text: 'Conflict kept task', status: 'todo', version: 2 }
+	];
+	/** @type {string[]} */
+	const writes = [];
+	await page.route('**/api/**', async (route) => {
+		const request = route.request();
+		const { pathname } = new URL(request.url());
+		if (pathname === '/api/auth/get-session') {
+			return route.fulfill({
+				json: {
+					session: { id: 'e2e-session', userId: 'e2e-user', expiresAt: '2099-01-01T00:00:00.000Z' },
+					user: { id: 'e2e-user', email: 'e2e@example.com', name: null }
+				}
+			});
+		}
+		if (pathname === '/api/tasks' && request.method() === 'GET') {
+			return route.fulfill({ json: { tasks: serverTasks } });
+		}
+		if (pathname.startsWith('/api/tasks/') && request.method() !== 'GET') {
+			writes.push(`${request.method()} ${pathname}`);
+			if (writes.length <= 3) {
+				return route.fulfill({ status: 409, json: { message: 'Version conflict.' } });
+			}
+			const patch = request.postDataJSON() ?? {};
+			return route.fulfill({ json: { task: { ...serverTasks[0], ...patch, version: 4 } } });
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	const banner = page.locator('.sync-notice.conflict-notice');
+	await expect(banner).toHaveAttribute('role', 'status');
+	await expect(banner).toContainText('오프라인 변경 3건이 서버의 최신 상태와 충돌했습니다.');
+	expect(writes).toEqual([
+		`PATCH /api/tasks/${CONFLICT_TASK_ID}`,
+		`DELETE /api/tasks/${CONFLICT_DELETE_TASK_ID}`,
+		`PATCH /api/tasks/${CONFLICT_TASK_ID}/checklist/66666666-6666-4666-8666-666666666666`
+	]);
+
+	const rows = banner.locator('.sync-conflict-row');
+	await expect(rows).toHaveCount(0);
+	await banner.getByRole('button', { name: '내역 보기' }).click();
+	await expect(banner.getByRole('button', { name: '내역 닫기' })).toBeVisible();
+	await expect(rows).toHaveCount(3);
+	await expect(rows.nth(0).locator('strong')).toHaveText('작업 수정');
+	await expect(rows.nth(0).locator('span')).toHaveText('Conflict server task');
+	await expect(rows.nth(0).locator('small')).toHaveText('충돌 필드: 작업명');
+	await expect(rows.nth(1).locator('strong')).toHaveText('작업 삭제');
+	await expect(rows.nth(1).locator('span')).toHaveText('Conflict kept task');
+	await expect(rows.nth(1).locator('small')).toHaveText('서버의 최신 버전과 맞지 않아 삭제가 적용되지 않았습니다.');
+	await expect(rows.nth(2).locator('strong')).toHaveText('체크리스트 수정');
+	await expect(rows.nth(2).locator('small')).toHaveText('체크리스트 변경을 서버에 적용하지 못했습니다.');
+	const applyButtons = banner.getByRole('button', { name: '내 변경 적용' });
+	await expect(applyButtons.nth(0)).toBeEnabled();
+	await expect(applyButtons.nth(0)).toHaveAttribute('title', '내 오프라인 변경을 최신 서버 상태 위에 다시 적용합니다.');
+	await expect(applyButtons.nth(1)).toBeEnabled();
+	await expect(applyButtons.nth(2)).toBeDisabled();
+	await expect(applyButtons.nth(2)).toHaveAttribute('title', '이 충돌은 내역 저장 후 수동 확인이 안전합니다.');
+
+	const downloadPromise = page.waitForEvent('download');
+	await banner.getByRole('button', { name: '내역 저장' }).click();
+	const download = await downloadPromise;
+	expect(download.suggestedFilename()).toMatch(/^offline_conflicts_\d{4}-\d{2}-\d{2}\.json$/);
+	const report = JSON.parse(await readFile(await download.path(), 'utf8'));
+	expect(report.conflicts.map((conflict) => [conflict.id, conflict.title, conflict.target])).toEqual([
+		['conflict-patch', '작업 수정', 'Conflict server task'],
+		['conflict-delete', '작업 삭제', 'Conflict kept task'],
+		['conflict-checklist', '체크리스트 수정', 'Conflict server task']
+	]);
+
+	// Apply my edit: it goes back onto the server task, and the row leaves.
+	await applyButtons.nth(0).click();
+	await expect(page.getByText('My offline title')).toBeVisible();
+	await expect(rows).toHaveCount(2);
+	await expect(banner).toContainText('오프라인 변경 2건이 서버의 최신 상태와 충돌했습니다.');
+
+	// Keep the server's version of the deleted task.
+	await rows.nth(0).getByRole('button', { name: '서버 유지' }).click();
+	await expect(rows).toHaveCount(1);
+	await expect(page.getByText('Conflict kept task')).toBeVisible();
+
+	// Dismissing the rest shows the last notice, which 확인 then clears.
+	await banner.getByRole('button', { name: '확인' }).click();
+	await expect(banner).toHaveCount(0);
+	const notice = page.locator('.sync-notice');
+	await expect(notice).toHaveText(/서버의 최신 상태를 유지했습니다\./);
+	await expect(notice).toHaveAttribute('role', 'status');
+	await notice.getByRole('button', { name: '확인' }).click();
+	await expect(notice).toHaveCount(0);
+});
+
+test('checks the email code and recovery code before creating a passkey', async ({ page, browserName }) => {
+	// Playwright's Linux WebKit build crashes ("Target crashed") or stops
+	// painting partway through this email-code flow on CI. It does so with the
+	// pre-split AuthPanel too: 7 of 20 repeated CI runs failed. macOS WebKit
+	// and Chromium pass it reliably, so CI keeps it on Chromium only.
+	test.skip(browserName === 'webkit' && Boolean(process.env.CI), 'Linux WebKit crashes on this flow on CI');
+	/** @type {Array<{ status?: number; expiresAt?: string; previewCode?: string }>} */
+	const codeAnswers = [
+		{ status: 503 },
+		{ expiresAt: '2099-01-01T00:00:00.000Z', previewCode: '123456' },
+		{ expiresAt: '2000-01-01T00:00:00.000Z' }
+	];
+	/** @type {unknown[]} */
+	const codeRequests = [];
+	await page.route('**/api/account/email-verifications', (route) => {
+		const body = route.request().postDataJSON();
+		codeRequests.push(body);
+		const answer = codeAnswers.shift() ?? {};
+		if (answer.status) {
+			return route.fulfill({ status: answer.status, json: { message: 'Database unavailable.' } });
+		}
+		return route.fulfill({ json: { email: body.email, expiresAt: answer.expiresAt, previewCode: answer.previewCode } });
+	});
+
+	await page.goto('/');
+	const panel = page.locator('.locked-app-state .auth-panel');
+	const status = panel.locator('.auth-status');
+	const email = panel.getByPlaceholder('email@example.com');
+	const sendCode = panel.getByRole('button', { name: '코드 받기' });
+	const createPasskey = panel.getByRole('button', { name: '패스키 만들기' });
+	const codeInput = panel.getByPlaceholder('확인 코드');
+
+	await sendCode.click();
+	await expect(status).toHaveText('이메일을 입력해 주세요.');
+	await expect(status).toHaveAttribute('role', 'alert');
+	expect(codeRequests).toEqual([]);
+
+	await email.fill('  New@Example.com ');
+	await createPasskey.click();
+	await expect(status).toHaveText('이메일 확인 코드를 입력해 주세요.');
+
+	await panel.getByPlaceholder('이름').fill('새 사용자');
+	await sendCode.click();
+	await expect(status).toHaveText('데이터베이스 설정 후 이용할 수 있습니다.');
+	await sendCode.click();
+	await expect(status).toHaveText('확인 코드: 123456');
+	await expect(status).not.toHaveAttribute('role', 'alert');
+	expect(codeRequests).toEqual([
+		{ email: 'new@example.com', name: '새 사용자' },
+		{ email: 'new@example.com', name: '새 사용자' }
+	]);
+
+	// The code belongs to the email it was sent to.
+	await codeInput.fill('123456');
+	await email.fill('other@example.com');
+	await createPasskey.click();
+	await expect(status).toHaveText('현재 이메일로 새 확인 코드를 받아 주세요.');
+
+	// A new code clears the typed one; an expired code is refused locally.
+	await panel.getByPlaceholder('이름').fill('');
+	await sendCode.click();
+	await expect(status).toHaveText('새 확인 코드를 보냈습니다. 가장 최근 코드만 사용할 수 있습니다.');
+	expect(codeRequests.at(-1)).toEqual({ email: 'other@example.com', name: 'other@example.com' });
+	await expect(codeInput).toHaveValue('');
+	await codeInput.fill('654321');
+	await createPasskey.click();
+	await expect(status).toHaveText('확인 코드가 만료되었습니다. 새 코드를 받아 주세요.');
+
+	// Recovery mode swaps the email-code input for a recovery-code input.
+	await panel.getByRole('button', { name: '복구 모드' }).click();
+	await expect(panel.getByRole('button', { name: '가입 모드' })).toBeVisible();
+	await expect(codeInput).toHaveCount(0);
+	await expect(sendCode).toHaveCount(0);
+	await expect(panel.getByPlaceholder('복구 코드')).toBeVisible();
+	await createPasskey.click();
+	await expect(status).toHaveText('복구 코드를 입력해 주세요.');
+	await panel.getByRole('button', { name: '가입 모드' }).click();
+	await expect(codeInput).toHaveValue('654321');
+	await expect(panel.getByRole('button', { name: '패스키 로그인' })).toBeEnabled();
+});
+
+test('manages passkeys, recovery codes and sign-out for a signed-in account', async ({ page }) => {
+	await page.addInitScript(() => {
+		if (sessionStorage.getItem('e2e-account-seeded')) {
+			return;
+		}
+		sessionStorage.setItem('e2e-account-seeded', '1');
+		localStorage.setItem('kanbanTasks:e2e-user', JSON.stringify([
+			{ id: 'account-cached-task', text: 'Account cached task', status: 'todo' }
+		]));
+		localStorage.setItem('kanbanOfflineWriteQueue:e2e-user', JSON.stringify([{
+			id: 'account-pending-patch',
+			type: 'task.patch',
+			taskId: '77777777-7777-4777-8777-777777777777',
+			patch: { text: 'Pending edit' },
+			ownerUserId: 'e2e-user',
+			createdAt: Date.now(),
+			attempts: 0
+		}]));
+	});
+	// Confirm answers: delete passkey (no, yes), then sign out (no, yes).
+	const dialogs = recordDialogs(page, [false, true, false, true]);
+	let signedIn = true;
+	let signOutFails = true;
+	let passkeys = [
+		{ id: 'passkey-mac', name: 'Mac 패스키', createdAt: '2026-05-01T12:00:00.000Z', backedUp: true },
+		{ id: 'passkey-old', name: null, createdAt: '2026-05-02T12:00:00.000Z', backedUp: false }
+	];
+	await page.route('**/api/**', (route) => {
+		const request = route.request();
+		const { pathname } = new URL(request.url());
+		const method = request.method();
+		if (pathname === '/api/auth/get-session') {
+			return route.fulfill({
+				json: signedIn
+					? {
+						session: { id: 'e2e-session', userId: 'e2e-user', expiresAt: '2099-01-01T00:00:00.000Z' },
+						user: { id: 'e2e-user', email: 'e2e@example.com', name: null }
+					}
+					: null
+			});
+		}
+		if (pathname === '/api/auth/passkey/list-user-passkeys') {
+			return route.fulfill({ json: passkeys });
+		}
+		if (pathname === '/api/auth/passkey/update-passkey') {
+			const { id, name } = request.postDataJSON();
+			passkeys = passkeys.map((passkey) => passkey.id === id ? { ...passkey, name } : passkey);
+			return route.fulfill({ json: { passkey: passkeys.find((passkey) => passkey.id === id) } });
+		}
+		if (pathname === '/api/auth/passkey/delete-passkey') {
+			const { id } = request.postDataJSON();
+			passkeys = passkeys.filter((passkey) => passkey.id !== id);
+			return route.fulfill({ json: { status: true } });
+		}
+		if (pathname === '/api/account/recovery-codes' && method === 'POST') {
+			return route.fulfill({
+				json: {
+					summary: { total: 10, available: 10, lastCreatedAt: '2026-05-03T12:00:00.000Z' },
+					codes: ['AAAA-1111', 'BBBB-2222']
+				}
+			});
+		}
+		if (pathname === '/api/account/recovery-codes' && method === 'DELETE') {
+			return route.fulfill({ json: { summary: { total: 0, available: 0, lastCreatedAt: null } } });
+		}
+		if (pathname === '/api/auth/sign-out') {
+			if (signOutFails) {
+				return route.fulfill({ status: 500, json: { message: 'Sign-out failed.' } });
+			}
+			signedIn = false;
+			return route.fulfill({ json: { success: true } });
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	const panel = page.locator('.header .auth-panel');
+	await expect(panel.locator('.auth-identity')).toHaveText('e2e@example.com');
+	await expect(panel.locator('input.auth-input-small')).toHaveValue(/^(Windows PC|Mac|iPhone|iPad|Android|내 기기) 패스키 - \d{4}-\d{2}-\d{2}$/);
+	await expect(panel.locator('input.auth-input-small')).toHaveAttribute('aria-label', '패스키 이름');
+	const status = panel.locator('.auth-status');
+
+	// Passkey management.
+	const manager = panel.getByLabel('등록된 패스키 관리');
+	await expect(manager).toHaveCount(0);
+	await panel.getByRole('button', { name: '패스키 관리' }).click();
+	await expect(panel.getByRole('button', { name: '관리 닫기' })).toBeVisible();
+	const rows = manager.locator('.passkey-row');
+	await expect(rows).toHaveCount(2);
+	await expect(rows.nth(0).locator('input')).toHaveValue('Mac 패스키');
+	await expect(rows.nth(0).locator('small')).toHaveText('등록 2026-05-01 · 동기화됨');
+	await expect(rows.nth(1).locator('input')).toHaveValue('패스키 2026-05-02');
+	await expect(rows.nth(1).locator('small')).toHaveText('등록 2026-05-02 · 이 기기');
+	await expect(manager).toContainText('Apple 패스키 선택 화면의 기존 이름은 기기 캐시 때문에 그대로 보일 수 있습니다.');
+
+	await rows.nth(1).locator('input').fill('   ');
+	await rows.nth(1).getByRole('button', { name: '저장' }).click();
+	await expect(panel.locator('.auth-error')).toHaveText('패스키 이름을 입력해 주세요.');
+	await rows.nth(1).locator('input').fill('iPhone 패스키');
+	await rows.nth(1).getByRole('button', { name: '저장' }).click();
+	await expect(status.first()).toHaveText('패스키 이름을 저장했습니다. Apple 선택 화면은 기존 이름을 계속 표시할 수 있습니다.');
+	await expect(rows.nth(1).locator('input')).toHaveValue('iPhone 패스키');
+
+	// The first delete is cancelled at the question, the second goes through.
+	await rows.nth(0).getByRole('button', { name: '삭제' }).click();
+	await expect.poll(() => dialogs.length).toBe(1);
+	await expect(rows).toHaveCount(2);
+	await rows.nth(0).getByRole('button', { name: '삭제' }).click();
+	await expect.poll(() => dialogs.length).toBe(2);
+	expect(dialogs).toEqual([
+		'confirm:Mac 패스키 패스키를 삭제하시겠습니까? 이 기기로는 다시 로그인할 수 없을 수 있습니다.',
+		'confirm:Mac 패스키 패스키를 삭제하시겠습니까? 이 기기로는 다시 로그인할 수 없을 수 있습니다.'
+	]);
+	await expect(status.first()).toHaveText('패스키를 삭제했습니다.');
+	await expect(rows).toHaveCount(1);
+	await expect(rows.nth(0).getByRole('button', { name: '삭제' })).toBeDisabled();
+	await expect(rows.nth(0).getByRole('button', { name: '삭제' })).toHaveAttribute('title', '마지막 패스키는 삭제하지 않는 것이 안전합니다.');
+	await manager.getByRole('button', { name: '다시 불러오기' }).click();
+	await expect(rows).toHaveCount(1);
+	await expect(rows.nth(0).locator('input')).toHaveValue('iPhone 패스키');
+	await panel.getByRole('button', { name: '관리 닫기' }).click();
+	await expect(manager).toHaveCount(0);
+
+	// Recovery codes.
+	const codeList = panel.getByLabel('새 복구 코드');
+	await panel.getByRole('button', { name: '복구 코드', exact: true }).click();
+	await expect(status.first()).toHaveText('새 복구 코드가 생성되었습니다.');
+	await expect(status.nth(1)).toHaveText('복구 코드 10/10');
+	await expect(codeList.locator('code')).toHaveText(['AAAA-1111', 'BBBB-2222']);
+	await panel.getByRole('button', { name: '복구 폐기' }).click();
+	await expect(status.first()).toHaveText('복구 코드가 폐기되었습니다.');
+	await expect(status.nth(1)).toHaveText('복구 코드 0/0');
+	await expect(codeList).toHaveCount(0);
+
+	// Sign-out. Without the cache option there is no question.
+	const clearCache = panel.getByRole('checkbox', { name: '캐시 삭제' });
+	await expect(clearCache).toBeChecked();
+	await clearCache.uncheck();
+	await panel.getByRole('button', { name: '로그아웃' }).click();
+	await expect(panel.locator('.auth-error')).toHaveText('Sign-out failed.');
+	expect(dialogs).toHaveLength(2);
+
+	// With it, pending offline changes are asked about first.
+	signOutFails = false;
+	await clearCache.check();
+	await panel.getByRole('button', { name: '로그아웃' }).click();
+	await expect.poll(() => dialogs.length).toBe(3);
+	expect(dialogs[2]).toBe('confirm:아직 동기화되지 않은 오프라인 변경 1건이 있습니다. 로그아웃하면서 이 기기 캐시를 삭제할까요?');
+	await expect(status.first()).toHaveText('로그아웃을 취소했습니다. 먼저 Sync로 오프라인 변경을 동기화해 주세요.');
+	await expect(panel.locator('.auth-identity')).toHaveText('e2e@example.com');
+
+	await panel.getByRole('button', { name: '로그아웃' }).click();
+	await expect(page.locator('.locked-app-state .auth-panel')).toBeVisible();
+	expect(dialogs).toHaveLength(4);
+	// The queue is dropped and the cached list emptied (the store writes the
+	// empty list back under the same key).
+	expect(await page.evaluate(() => [
+		localStorage.getItem('kanbanOfflineWriteQueue:e2e-user'),
+		localStorage.getItem('kanbanTasks:e2e-user')
+	])).toEqual([null, '[]']);
+});
+
+/**
  * @param {import('@playwright/test').Page} page
  * @param {{ extraTasks?: Array<Record<string, unknown>> }} [options]
  */

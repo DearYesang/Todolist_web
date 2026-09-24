@@ -1,0 +1,113 @@
+import { get } from 'svelte/store';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { normalizeTask } from '../../shared/task-domain.js';
+import {
+    mergeTasks,
+    replaceTasks,
+    setTaskStorageOwner,
+    tasks
+} from './task-cache.js';
+import { resetFilters } from './filters.js';
+
+describe('task data normalization', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 4, 3, 12));
+        replaceTasks([]);
+        resetFilters();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('routes replaceTasks through the same normalization boundary', () => {
+        replaceTasks([
+            { id: 'a', text: 'A', status: 'done', startDate: '2026-05-10', endDate: '2026-05-01' },
+            { id: 'a', text: 'Duplicate A', parentId: 'missing', priority: 'urgent' }
+        ]);
+
+        const value = get(tasks);
+        expect(value).toHaveLength(2);
+        expect(new Set(value.map((task) => task.id)).size).toBe(2);
+        expect(value[0].endDate).toBe('2026-05-10');
+        expect(value[1].parentId).toBeNull();
+        expect(value[1].priority).toBe('medium');
+    });
+});
+
+describe('client task creation', () => {
+    it('merges server tasks without dropping local-only tasks', () => {
+        replaceTasks([
+            { id: 'local-only', text: 'Local only', status: 'todo' },
+            { id: 'shared-id', text: 'Old local value', status: 'todo' }
+        ]);
+
+        mergeTasks([
+            { id: 'shared-id', text: 'Server value', status: 'doing' },
+            { id: 'server-only', text: 'Server only', status: 'done' }
+        ]);
+
+        expect(get(tasks).map((task) => ({
+            id: task.id,
+            text: task.text,
+            status: task.status
+        }))).toEqual([
+            { id: 'local-only', text: 'Local only', status: 'todo' },
+            { id: 'shared-id', text: 'Server value', status: 'doing' },
+            { id: 'server-only', text: 'Server only', status: 'done' }
+        ]);
+    });
+});
+
+describe('task storage owner scope', () => {
+    /** @type {Map<string, string>} */
+    let storage;
+
+    beforeEach(() => {
+        storage = new Map();
+        Object.defineProperty(globalThis, 'localStorage', {
+            configurable: true,
+            value: {
+                getItem: vi.fn((key) => storage.get(key) ?? null),
+                setItem: vi.fn((key, value) => {
+                    storage.set(key, String(value));
+                }),
+                removeItem: vi.fn((key) => {
+                    storage.delete(key);
+                })
+            }
+        });
+        setTaskStorageOwner(null);
+        replaceTasks([]);
+    });
+
+    afterEach(() => {
+        setTaskStorageOwner(null);
+        replaceTasks([]);
+        Reflect.deleteProperty(globalThis, 'localStorage');
+    });
+
+    it('keeps cached task lists scoped by user', () => {
+        const taskA = normalizeTask({
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            text: 'User A task'
+        });
+        const taskB = normalizeTask({
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            text: 'User B task'
+        });
+
+        setTaskStorageOwner('user-a');
+        replaceTasks([taskA]);
+        expect(JSON.parse(storage.get('kanbanTasks:user-a') ?? '[]')).toHaveLength(1);
+
+        setTaskStorageOwner('user-b');
+        expect(get(tasks)).toEqual([]);
+        replaceTasks([taskB]);
+        expect(JSON.parse(storage.get('kanbanTasks:user-b') ?? '[]')).toHaveLength(1);
+
+        setTaskStorageOwner('user-a');
+        expect(get(tasks)).toEqual([taskA]);
+    });
+});
