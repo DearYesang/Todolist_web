@@ -1,6 +1,7 @@
 <script>
     import { getContext } from 'svelte';
     import TaskTreeCard from './TaskTreeCard.svelte';
+    import OpenLinksButton from './OpenLinksButton.svelte';
     import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import {
         addSubtask,
@@ -20,7 +21,7 @@
         STATUS_LABELS,
         URGENCY_LABELS
     } from '$lib/shared/task-domain.js';
-    import { splitTextIntoLinkParts } from '$lib/shared/task-links.js';
+    import { collectSubtreeLinks, extractTaskLinks, splitTextIntoLinkParts } from '$lib/shared/task-links.js';
     import { shouldIgnoreImeSubmit } from '$lib/client/ime-keyboard.js';
 
     /** @type {{
@@ -70,6 +71,10 @@
     const subtaskParts = $derived(Object.fromEntries(
         task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)])
     ));
+    const ownLinks = $derived(extractTaskLinks(task));
+    // Walks allTasks, not the column-filtered childrenByParent, so collapsed,
+    // filtered and other-column descendants still count.
+    const subtreeLinks = $derived(directChildren.length > 0 ? collectSubtreeLinks(allTasks, task.id) : ownLinks);
 
     /**
      * @param {MouseEvent} event
@@ -242,7 +247,14 @@
 
     {#if directChildren.length > 0}
         <div class="children-info">
-            📎 하위 작업 {directChildren.length}개 (완료 {doneChildrenCount}/{directChildren.length})
+            <span>📎 하위 작업 {directChildren.length}개 (완료 {doneChildrenCount}/{directChildren.length})</span>
+            {#if subtreeLinks.length > ownLinks.length}
+                <OpenLinksButton
+                    links={subtreeLinks}
+                    title={`${task.text} (하위 포함)`}
+                    label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
+                    ariaLabel={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
+            {/if}
         </div>
     {/if}
 
@@ -250,6 +262,11 @@
         {#if task.subtasks.length > 0}
             <div class="subtask-header">
                 <span class="subtask-progress-info">체크리스트 {completedSubtasks}/{task.subtasks.length}</span>
+                <OpenLinksButton
+                    links={ownLinks}
+                    title={task.text}
+                    label={`모두 열기 (${ownLinks.length})`}
+                    ariaLabel={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
             </div>
             <div class="progress-bar-container">
                 <div class="progress-bar-fill" style={`width:${subtaskProgress}%`}></div>

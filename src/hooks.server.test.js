@@ -55,6 +55,37 @@ describe('server hook API write guard', () => {
 	});
 });
 
+describe('open-all links isolation headers', () => {
+	// "Open all links" calls window.open without 'noopener' so blocked tabs
+	// stay detectable; COOP same-origin and no-referrer are what keep the
+	// opened tabs cut off from the app. Pin both.
+	/** @type {Array<{ name: string; method: string; pathname: string; headers: Record<string, string>; production: boolean }>} */
+	const cases = [
+		{ name: 'app page', method: 'GET', pathname: '/', headers: {}, production: false },
+		{ name: 'production app page', method: 'GET', pathname: '/', headers: {}, production: true },
+		{
+			name: 'rejected cross-site API write',
+			method: 'POST',
+			pathname: '/api/tasks',
+			headers: { origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' },
+			production: false
+		}
+	];
+
+	it.each(cases)('sends COOP same-origin and no-referrer on $name responses', async ({ method, pathname, headers, production }) => {
+		if (production) {
+			process.env.NODE_ENV = 'production';
+		}
+		const response = await handle({
+			event: /** @type {any} */ (createEvent(method, pathname, headers)),
+			resolve: vi.fn(async () => new Response('ok'))
+		});
+
+		expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+	});
+});
+
 /**
  * @param {string} method
  * @param {string} pathname

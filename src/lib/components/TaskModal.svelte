@@ -2,9 +2,11 @@
     import { categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import { getCategoryColor } from '$lib/shared/task-domain.js';
+    import { collectSubtreeLinks, extractTaskLinks } from '$lib/shared/task-links.js';
     import { fade, fly } from 'svelte/transition';
     import CategoryInput from './CategoryInput.svelte';
     import DateRangePicker from './DateRangePicker.svelte';
+    import OpenLinksButton from './OpenLinksButton.svelte';
 
     let { taskId, onclose } = $props();
     let categoryDraft = $state('');
@@ -13,6 +15,8 @@
     const parentTask = $derived(task?.parentId ? $tasks.find((candidate) => candidate.id === task.parentId) || null : null);
     const childCount = $derived(task ? $tasks.filter((candidate) => candidate.parentId === task.id).length : 0);
     const categoryColor = $derived(task ? getCategoryColor(task.category, task.categoryMeta?.color) : null);
+    const ownLinks = $derived(task ? extractTaskLinks(task) : []);
+    const subtreeLinks = $derived(task && childCount > 0 ? collectSubtreeLinks($tasks, task.id) : ownLinks);
 
     $effect(() => {
         if (task && categoryDraft !== task.category) {
@@ -206,6 +210,18 @@
             <div class="panel-footer">
                 <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
                 <div class="panel-footer-actions">
+                    <OpenLinksButton
+                        links={ownLinks}
+                        title={task.text}
+                        label={`모두 열기 (${ownLinks.length})`}
+                        ariaLabel={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
+                    {#if subtreeLinks.length > ownLinks.length}
+                        <OpenLinksButton
+                            links={subtreeLinks}
+                            title={`${task.text} (하위 포함)`}
+                            label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
+                            ariaLabel={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
+                    {/if}
                     <button class="btn btn-calendar" onclick={downloadCalendar}>📅 일정 추가(.ics)</button>
                     <button class="btn btn-primary" onclick={onclose}>완료</button>
                 </div>

@@ -38,6 +38,7 @@
     import FilterBar from './FilterBar.svelte';
     import GanttTimeline from './GanttTimeline.svelte';
     import KanbanBoard from './KanbanBoard.svelte';
+    import LinkOpenPanel from './LinkOpenPanel.svelte';
     import TaskForm from './TaskForm.svelte';
     import TaskModal from './TaskModal.svelte';
 
@@ -528,6 +529,8 @@
     {#if selectedTaskId}
         <TaskModal taskId={selectedTaskId} onclose={() => selectedTaskId = null} />
     {/if}
+
+    <LinkOpenPanel />
 {:else}
     <main class="locked-app-state">
         <AuthPanel />
