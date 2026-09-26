@@ -298,14 +298,16 @@ describe('offline write queue conflict behavior', () => {
 		enqueueOfflineMutation({ type: 'task.patch', taskId: childId, localParentId: 'local-parent', patch: { text: 'B' } });
 		enqueueOfflineMutation({ type: 'checklist.patch', taskId, itemId: renamedItem, patch: { text: 'Old', done: true } });
 		enqueueOfflineMutation({ type: 'checklist.patch', taskId, itemId: checkedItem, patch: { done: true } });
+		const [taskEdit, childEdit, renamed, checked] = loadOfflineQueue();
 		setOfflineQueueOwner('user-b');
 		expect(hasQueuedTaskMutation(taskId)).toBe(false);
 		expect(hasQueuedTaskMutation(taskId, { ownerId: 'user-a' })).toBe(true);
 
-		dropQueuedTaskPatch(taskId, { ownerId: 'user-a' });
-		dropQueuedTaskPatch(childId, { ownerId: 'user-a' });
-		dropQueuedChecklistFields(taskId, renamedItem, ['text'], { ownerId: 'user-a' });
-		dropQueuedChecklistFields(taskId, checkedItem, ['done'], { ownerId: 'user-a' });
+		// The version the edit expects may have moved since.
+		dropQueuedTaskPatch(taskId, { id: taskEdit.id, patch: { text: 'A', expectedVersion: 0 } }, { ownerId: 'user-a' });
+		dropQueuedTaskPatch(childId, { id: childEdit.id, patch: { text: 'B' } }, { ownerId: 'user-a' });
+		dropQueuedChecklistFields(taskId, renamedItem, { id: renamed.id, patch: { text: 'Old' } }, { ownerId: 'user-a' });
+		dropQueuedChecklistFields(taskId, checkedItem, { id: checked.id, patch: { done: true } }, { ownerId: 'user-a' });
 
 		setOfflineQueueOwner('user-a');
 		expect(loadOfflineQueue()).toEqual([
@@ -314,6 +316,35 @@ describe('offline write queue conflict behavior', () => {
 		]);
 		expect(hasQueuedTaskMutation(taskId)).toBe(true);
 		expect(hasQueuedTaskMutation('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBe(false);
+	});
+
+	// Another tab, or a later write, may have put a newer edit in the queue
+	// since the landed edit noted the older one.
+	it('keeps a queued edit that is no longer the one a landed edit covers', () => {
+		const taskId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+		const otherTaskId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+		const renamedItem = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+		const checkedItem = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({ type: 'task.patch', taskId, patch: { text: 'Newer', expectedVersion: 1 } });
+		enqueueOfflineMutation({ type: 'task.patch', taskId: otherTaskId, patch: { text: 'B', expectedVersion: 1 } });
+		enqueueOfflineMutation({ type: 'checklist.patch', taskId, itemId: renamedItem, patch: { text: 'Newer', done: false } });
+		enqueueOfflineMutation({ type: 'checklist.patch', taskId, itemId: checkedItem, patch: { done: true } });
+		const [taskEdit, otherTaskEdit, renamed] = loadOfflineQueue();
+
+		dropQueuedTaskPatch(taskId, { id: taskEdit.id, patch: { text: 'Older', expectedVersion: 1 } });
+		dropQueuedTaskPatch(taskId, { id: taskEdit.id, patch: { text: 'Newer', priority: 'high', expectedVersion: 1 } });
+		dropQueuedTaskPatch(otherTaskId, { id: 'another-edit', patch: otherTaskEdit.type === 'task.patch' ? otherTaskEdit.patch : {} });
+		// The text changed since; the checked state did not.
+		dropQueuedChecklistFields(taskId, renamedItem, { id: renamed.id, patch: { text: 'Older', done: false } });
+		dropQueuedChecklistFields(taskId, checkedItem, { id: 'another-edit', patch: { done: true } });
+
+		expect(loadOfflineQueue().map((mutation) => 'patch' in mutation ? mutation.patch : null)).toEqual([
+			{ text: 'Newer', expectedVersion: 1 },
+			{ text: 'B', expectedVersion: 1 },
+			{ text: 'Newer' },
+			{ done: true }
+		]);
 	});
 
 	it('turns a queued checklist create into an edit of the item made meanwhile, in its place', () => {

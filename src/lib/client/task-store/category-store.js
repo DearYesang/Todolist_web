@@ -282,6 +282,8 @@ export function assignTaskCategory(taskId, name) {
 
     /** @type {import('../../shared/task-domain.js').Task | null} */
     let changedTask = null;
+    /** @type {import('../../shared/task-domain.js').Task | null} */
+    let previousTask = null;
     tasks.update((current) => {
         const task = current.find((candidate) => candidate.id === taskId);
         // The same name is a no-op, and keeps the task's own id when the
@@ -290,6 +292,7 @@ export function assignTaskCategory(taskId, name) {
             return current;
         }
 
+        previousTask = task;
         const next = normalizeTaskList(current.map((candidate) => candidate.id === taskId
             ? {
                 ...candidate,
@@ -301,7 +304,7 @@ export function assignTaskCategory(taskId, name) {
         changedTask = next.find((candidate) => candidate.id === taskId) ?? null;
         return next;
     });
-    syncTaskSnapshot(changedTask);
+    syncTaskSnapshot(changedTask, previousTask);
 }
 
 /**
@@ -321,7 +324,7 @@ function rewriteLocalCategory(source, target, options) {
         return 0;
     }
 
-    /** @type {import('../../shared/task-domain.js').Task[]} */
+    /** @type {{ previous: import('../../shared/task-domain.js').Task; task: import('../../shared/task-domain.js').Task }[]} */
     let changedTasks = [];
     tasks.update((current) => {
         const next = current.map((task) => {
@@ -338,7 +341,7 @@ function rewriteLocalCategory(source, target, options) {
                 categoryId: target?.id || null,
                 categoryMeta: target ? toCategoryMeta(target) : null
             };
-            changedTasks.push(nextTask);
+            changedTasks.push({ previous: task, task: nextTask });
             return nextTask;
         });
 
@@ -347,7 +350,7 @@ function rewriteLocalCategory(source, target, options) {
 
     renameCategoryFilter({ id: source.id ?? null, name: sourceName }, target && { id: target.id, name: targetName });
     if (options.sync) {
-        changedTasks.forEach((task) => syncTaskSnapshot(task));
+        changedTasks.forEach(({ previous, task }) => syncTaskSnapshot(task, previous));
     }
     return changedTasks.length;
 }

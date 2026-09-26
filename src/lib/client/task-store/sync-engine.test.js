@@ -563,6 +563,30 @@ describe('an edit that lands after an older edit of its task was queued', () => 
         }).toEqual({ queue: [], board: [['Edit 3', 3]] });
     });
 
+    // The first edit fails while the second waits behind it; the second
+    // is built from the board after the first, and holds it.
+    it('retires a failed task edit once the edit that waited behind it lands', async () => {
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        updateTask(TASK_ID, { priority: 'high' });
+        await answer(0, unavailable());
+        expect(bodies[1]).toMatchObject({ text: 'Edit 1', priority: 'high', expectedVersion: 1 });
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', priority: 'high', version: 2 } }));
+
+        expect(loadOfflineQueue()).toEqual([]);
+    });
+
+    it('retires a failed rename of a checklist item once the rename that waited behind it lands', async () => {
+        renameSubtask(TASK_ID, ITEM.id, 'First');
+        await vi.advanceTimersByTimeAsync(0);
+        renameSubtask(TASK_ID, ITEM.id, 'Last');
+        await answer(0, unavailable());
+        expect(bodies[1]).toEqual({ text: 'Last' });
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ ...ITEM, text: 'Last' }] } }));
+
+        expect(loadOfflineQueue()).toEqual([]);
+    });
+
     // A checklist patch carries no version, so the queued older rename
     // lands at the next sync over the newer one, with no conflict to show.
     it('retires the fields of a queued checklist edit that a later edit of the item set once it lands', async () => {
@@ -606,7 +630,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
     // which the user can apply.
     const queuedTexts = () => loadOfflineQueue().map((mutation) => mutation.type === 'task.patch' ? mutation.patch.text : mutation.type);
 
-    it.fails('keeps a queued task edit that a server snapshot took off the board when the next edit lands', async () => {
+    it('keeps a queued task edit that a server snapshot took off the board when the next edit lands', async () => {
         updateTask(TASK_ID, { text: 'Edit 1' });
         await vi.advanceTimersByTimeAsync(0);
         await answer(0, unavailable());
@@ -622,7 +646,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
         expect(queuedTexts()).toEqual(['Edit 1']);
     });
 
-    it.fails('keeps a queued task edit that a queue sync\'s answer took off the board when the next edit lands', async () => {
+    it('keeps a queued task edit that a queue sync\'s answer took off the board when the next edit lands', async () => {
         updateTask(TASK_ID, { text: 'Edit 1' });
         await vi.advanceTimersByTimeAsync(0);
         await answer(0, unavailable());
@@ -639,7 +663,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
         expect(queuedTexts()).toEqual(['Edit 1']);
     });
 
-    it.fails('keeps an edit of the task that another tab queued while this tab\'s edit was out', async () => {
+    it('keeps an edit of the task that another tab queued while this tab\'s edit was out', async () => {
         updateTask(TASK_ID, { priority: 'high' });
         await vi.advanceTimersByTimeAsync(0);
         // The other tab's edit failed, and went to the queue every tab of
@@ -652,7 +676,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
 
     // Here the other tab's edit sets the task back to what this tab's edit
     // started from, field for field.
-    it.fails('keeps another tab\'s edit that sets the task back to the copy this tab\'s edit was made on', async () => {
+    it('keeps another tab\'s edit that sets the task back to the copy this tab\'s edit was made on', async () => {
         const { priority } = get(tasks)[0];
         updateTask(TASK_ID, { priority: 'high' });
         await vi.advanceTimersByTimeAsync(0);
@@ -666,7 +690,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
 
     // A checklist edit carries no version: the other tab's uncheck, made
     // after this tab's check, is the item's last state.
-    it.fails('keeps a checklist edit that another tab queued while this tab\'s edit of the item was out', async () => {
+    it('keeps a checklist edit that another tab queued while this tab\'s edit of the item was out', async () => {
         toggleSubtask(TASK_ID, ITEM.id);
         await vi.advanceTimersByTimeAsync(0);
         expect(bodies[0]).toEqual({ done: true });

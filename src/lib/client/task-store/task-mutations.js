@@ -32,12 +32,15 @@ import {
 export function moveTask(taskId, nextStatus) {
     /** @type {import('../../shared/task-domain.js').Task | null} */
     let syncedTask = null;
+    /** @type {import('../../shared/task-domain.js').Task | null} */
+    let previousTask = null;
     tasks.update((current) => {
+        previousTask = current.find((task) => task.id === taskId) ?? null;
         const next = moveTaskInList(current, taskId, nextStatus);
         syncedTask = next.find((task) => task.id === taskId) ?? null;
         return next;
     });
-    syncTaskSnapshot(syncedTask);
+    syncTaskSnapshot(syncedTask, previousTask);
 }
 
 /**
@@ -47,12 +50,15 @@ export function moveTask(taskId, nextStatus) {
 export function assignParent(taskId, nextParentId) {
     /** @type {import('../../shared/task-domain.js').Task | null} */
     let syncedTask = null;
+    /** @type {import('../../shared/task-domain.js').Task | null} */
+    let previousTask = null;
     tasks.update((current) => {
+        previousTask = current.find((task) => task.id === taskId) ?? null;
         const next = assignParentInList(current, taskId, nextParentId);
         syncedTask = next.find((task) => task.id === taskId) ?? null;
         return next;
     });
-    syncTaskSnapshot(syncedTask);
+    syncTaskSnapshot(syncedTask, previousTask);
 }
 
 /**
@@ -62,12 +68,15 @@ export function assignParent(taskId, nextParentId) {
 export function updateTask(taskId, patch) {
     /** @type {import('../../shared/task-domain.js').Task | null} */
     let syncedTask = null;
+    /** @type {import('../../shared/task-domain.js').Task | null} */
+    let previousTask = null;
     tasks.update((current) => {
+        previousTask = current.find((task) => task.id === taskId) ?? null;
         const next = updateTaskInList(current, taskId, patch);
         syncedTask = next.find((task) => task.id === taskId) ?? null;
         return next;
     });
-    syncTaskSnapshot(syncedTask);
+    syncTaskSnapshot(syncedTask, previousTask);
 }
 
 /**

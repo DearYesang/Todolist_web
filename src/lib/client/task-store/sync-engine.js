@@ -48,8 +48,21 @@ import { getTaskStorageOwner, mergeTasks, tasks, updateCachedTaskOf } from './ta
  *   this write queues nothing they cover when it fails, and a create that
  *   lands hands them the item it made (see syncChecklistCreate).
  *
- * When either of the last two holds, the board is newer than the
- * request's answer, and the answer moves only the task's version there.
+ * When either of those two holds, the board is newer than the request's
+ * answer, and the answer moves only the task's version there.
+ *
+ * - olderQueuedEdit: for a snapshot sync or a checklist edit, the user's
+ *   queued edit of the task or of the item that this write is newer than,
+ *   as the queue held it then: queued before the user made the edit this
+ *   write sends (for a snapshot sync, the board held it then, so the
+ *   patch holds its fields), or by an earlier write of the task in this
+ *   chain that failed while this one waited. Once this write lands, what
+ *   it covers of that edit goes from the queue, if the queue still holds
+ *   it so (see dropQueuedTaskPatch and dropQueuedChecklistFields). The
+ *   queue is shared by every tab of the user, so an edit queued after
+ *   that, or changed since, can be newer, and stays.
+ * - boardBeforeEdit: for a snapshot sync, the task as the board held it
+ *   just before the first edit this write sends, as a snapshot patch.
  * @typedef {{
  *   taskId: string;
  *   item: ChecklistWriteItem | null;
@@ -59,6 +72,8 @@ import { getTaskStorageOwner, mergeTasks, tasks, updateCachedTaskOf } from './ta
  *   discarded: boolean;
  *   taskStateQueued: boolean;
  *   queuedItemEdits: Map<string, { deleted: boolean; fields: Set<string> }>;
+ *   olderQueuedEdit: import('../offline-write-queue.js').QueuedEdit | null;
+ *   boardBeforeEdit: Record<string, unknown> | null;
  * }} TaskSyncWrite
  *
  * @typedef {{ id: string; change: 'create' | 'patch' | 'delete'; fields: string[] }} ChecklistWriteItem
@@ -73,11 +88,12 @@ import { getTaskStorageOwner, mergeTasks, tasks, updateCachedTaskOf } from './ta
 const taskSyncChains = new Map();
 
 /**
- * Tasks with a queued-but-unstarted snapshot sync. A queued sync reads the
- * store when it runs, so scheduling a second one would only duplicate work.
- * @type {Set<string>}
+ * Tasks with a queued-but-unstarted snapshot sync, and its write. A queued
+ * sync reads the store when it runs, so scheduling a second one would only
+ * duplicate work.
+ * @type {Map<string, TaskSyncWrite>}
  */
-const queuedSnapshotSyncs = new Set();
+const queuedSnapshotSyncs = new Map();
 
 /**
  * Local checklist item ids resolved to server ids by an in-flight create,
@@ -224,7 +240,9 @@ function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null, 
         drained: false,
         discarded: false,
         taskStateQueued: false,
-        queuedItemEdits: new Map()
+        queuedItemEdits: new Map(),
+        olderQueuedEdit: null,
+        boardBeforeEdit: null
     };
     if (buildDrainMutation) {
         pendingChainOpDescriptors.set(write, buildDrainMutation);
@@ -260,7 +278,7 @@ function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null, 
             }
         }
     });
-    return next;
+    return write;
 }
 
 /**
@@ -506,8 +524,10 @@ function advanceToServerTask(task, serverTask) {
 
 /**
  * @param {import('../../shared/task-domain.js').Task | null} task
+ * @param {import('../../shared/task-domain.js').Task | null} [previous] the
+ *   task as the board held it just before this edit
  */
-export function syncTaskSnapshot(task) {
+export function syncTaskSnapshot(task, previous = null) {
     if (!task || typeof window === 'undefined') {
         return;
     }
@@ -522,19 +542,35 @@ export function syncTaskSnapshot(task) {
         return;
     }
 
-    scheduleTaskSnapshotSync(task.id);
+    scheduleTaskSnapshotSync(task.id, previous);
 }
 
 /**
  * @param {string} taskId
+ * @param {import('../../shared/task-domain.js').Task | null} previous the
+ *   task as the board held it just before the edit to send
  */
-function scheduleTaskSnapshotSync(taskId) {
-    if (queuedSnapshotSyncs.has(taskId)) {
+function scheduleTaskSnapshotSync(taskId, previous) {
+    const write = queuedSnapshotSyncs.get(taskId) ?? queueTaskSnapshotSync(taskId);
+    if (!previous) {
         return;
     }
 
-    queuedSnapshotSyncs.add(taskId);
-    enqueueTaskSyncOperation(taskId, async (write) => {
+    // The patch is built from the board after this edit, and the task
+    // stays as the board has it until then (hasPendingTaskSync), so it
+    // holds the queued edit of the task if the board did just before.
+    const boardBeforeEdit = toServerTaskPatch(previous);
+    write.boardBeforeEdit ??= boardBeforeEdit;
+    write.olderQueuedEdit = findQueuedTaskPatchHeldBy(taskId, boardBeforeEdit, write.queueOwnerId) ?? write.olderQueuedEdit;
+}
+
+/**
+ * Chains a snapshot sync of the task, which waits in queuedSnapshotSyncs
+ * until it starts.
+ * @param {string} taskId
+ */
+function queueTaskSnapshotSync(taskId) {
+    const snapshotWrite = enqueueTaskSyncOperation(taskId, async (write) => {
         queuedSnapshotSyncs.delete(taskId);
         const current = get(tasks).find((item) => item.id === taskId);
         if (!current) {
@@ -544,15 +580,14 @@ function scheduleTaskSnapshotSync(taskId) {
         const patch = toChainedServerTaskPatch(taskId, current);
         const result = await updateServerTask(taskId, patch);
         if (result.ok) {
-            // The patch was built from the board, which holds every edit of
-            // the task queued before this request started (applyWriteResult
-            // keeps them there). Such an edit is in this one, older: sent at
-            // the next sync, it would meet a 409 on the version this one
-            // moved past, or put its older values back. An edit queued
-            // while this request was out (taskStateQueued) is newer, and
-            // moves to this one's version instead.
-            if (!write.discarded && !write.taskStateQueued) {
-                dropQueuedTaskPatch(taskId, { ownerId: write.queueOwnerId });
+            // The patch holds the fields of the older queued edit this
+            // write noted (olderQueuedEdit). Sent at the next sync, that
+            // edit would meet a 409 on the version this one moved past, or
+            // put its older values back. An edit queued while this request
+            // was out (taskStateQueued) is newer, and moves to this one's
+            // version instead.
+            if (!write.discarded && !write.taskStateQueued && write.olderQueuedEdit) {
+                dropQueuedTaskPatch(taskId, write.olderQueuedEdit, { ownerId: write.queueOwnerId });
             }
             applyWriteResult(write, result.task);
             return;
@@ -561,12 +596,15 @@ function scheduleTaskSnapshotSync(taskId) {
         // The queue merges a task's patches with the later one on top.
         // Queued after the newer edit already there, this patch would put
         // its older values back over it.
-        reportSyncFailure(write, result, write.taskStateQueued ? null : {
+        const queued = reportSyncFailure(write, result, write.taskStateQueued ? null : {
             type: 'task.patch',
             taskId,
             localParentId: getLocalParentId(current),
             patch
         });
+        if (queued) {
+            handQueuedPatchToWaitingSnapshot(write);
+        }
     }, () => {
         queuedSnapshotSyncs.delete(taskId);
         const current = get(tasks).find((item) => item.id === taskId);
@@ -581,6 +619,49 @@ function scheduleTaskSnapshotSync(taskId) {
             patch: toChainedServerTaskPatch(taskId, current)
         };
     });
+    queuedSnapshotSyncs.set(taskId, snapshotWrite);
+    return snapshotWrite;
+}
+
+/**
+ * The user's queued edit of a task, when every field it sets but the
+ * version it expects has the value `boardPatch` gives: a copy of the task
+ * that `boardPatch` was made from held it.
+ * @param {string} taskId
+ * @param {Record<string, unknown>} boardPatch
+ * @param {string} ownerId
+ * @returns {import('../offline-write-queue.js').QueuedEdit | null}
+ */
+function findQueuedTaskPatchHeldBy(taskId, boardPatch, ownerId) {
+    const queued = loadOfflineQueue({ ownerId }).find((mutation) =>
+        mutation.type === 'task.patch' && mutation.taskId === taskId
+    );
+    if (queued?.type !== 'task.patch') {
+        return null;
+    }
+
+    const held = Object.entries(queued.patch).every(([field, value]) =>
+        field === 'expectedVersion' || boardPatch[field] === value
+    );
+    return held ? { id: queued.id, patch: queued.patch } : null;
+}
+
+/**
+ * A snapshot sync failed and queued its patch while the task's next
+ * snapshot sync waited behind it. The waiting one is built from the board
+ * after the user's later edit, so it holds that patch's fields, newer, if
+ * the board held them just before that edit; it then retires the patch
+ * once it lands (olderQueuedEdit).
+ * @param {TaskSyncWrite} failed
+ */
+function handQueuedPatchToWaitingSnapshot(failed) {
+    const waiting = queuedSnapshotSyncs.get(failed.taskId);
+    if (!waiting?.boardBeforeEdit || waiting.queueOwnerId !== failed.queueOwnerId) {
+        return;
+    }
+
+    waiting.olderQueuedEdit = findQueuedTaskPatchHeldBy(failed.taskId, waiting.boardBeforeEdit, failed.queueOwnerId)
+        ?? waiting.olderQueuedEdit;
 }
 
 /**
@@ -805,7 +886,11 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
         return;
     }
 
-    enqueueTaskSyncOperation(taskId, async (write) => {
+    // An edit of the item already queued is older than this one. An item
+    // whose create has not landed has no edit in the queue under its id.
+    const serverItemId = isServerId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
+    const olderQueuedEdit = serverItemId ? findQueuedChecklistPatch(taskId, serverItemId, getOfflineQueueOwner()) : null;
+    const write = enqueueTaskSyncOperation(taskId, async (write) => {
         const itemId = isServerId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
         if (!itemId) {
             queueWrite(write, {
@@ -828,38 +913,95 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
         // one. Queued after a later edit that moved there while this
         // request was out, this edit's older values would win.
         const unqueuedPatch = withoutFieldsQueuedLater(write, patch);
-        reportSyncFailure(write, result, unqueuedPatch && {
+        const queued = reportSyncFailure(write, result, unqueuedPatch && {
             type: 'checklist.patch',
             taskId,
             itemId,
             patch: unqueuedPatch
         });
+        if (queued && unqueuedPatch) {
+            handQueuedFieldsToWaitingEdits(write, itemId, unqueuedPatch);
+        }
     }, () => buildChecklistDrainMutation(taskId, subtaskId, patch), {
         id: subtaskId,
         change: 'patch',
         fields: Object.keys(patch)
     });
+    write.olderQueuedEdit = olderQueuedEdit;
 }
 
 /**
- * A checklist edit landed. A queued edit of its item from before this
- * request started is older in the fields this one set: a checklist patch
- * carries no version, so sent at the next sync, it would put them back
- * without a conflict. Those fields leave the queued edit, except any that
- * a later edit, queued while this request was out, set.
+ * The user's queued edit of a checklist item, with the fields it sets.
+ * @param {string} taskId
+ * @param {string} itemId the item's server id
+ * @param {string} ownerId
+ * @returns {import('../offline-write-queue.js').QueuedEdit | null}
+ */
+function findQueuedChecklistPatch(taskId, itemId, ownerId) {
+    const queued = loadOfflineQueue({ ownerId }).find((mutation) =>
+        mutation.type === 'checklist.patch' && mutation.taskId === taskId && mutation.itemId === itemId
+    );
+    return queued?.type === 'checklist.patch' ? { id: queued.id, patch: { ...queued.patch } } : null;
+}
+
+/**
+ * A checklist edit failed and queued `queuedPatch` while later edits of
+ * the same item waited behind it. Those edits are newer: once one lands,
+ * the fields it set go from the queue, if they still hold these values
+ * (olderQueuedEdit).
+ * @param {TaskSyncWrite} failed
+ * @param {string} itemId the item's server id
+ * @param {{ text?: string; done?: boolean }} queuedPatch
+ */
+function handQueuedFieldsToWaitingEdits(failed, itemId, queuedPatch) {
+    const queued = findQueuedChecklistPatch(failed.taskId, itemId, failed.queueOwnerId);
+    if (!queued) {
+        return;
+    }
+
+    pendingChainOpDescriptors.forEach((_, waiting) => {
+        if (
+            waiting.taskId !== failed.taskId
+            || waiting.queueOwnerId !== failed.queueOwnerId
+            || waiting.item?.change !== 'patch'
+            || resolveChecklistItemId(waiting.item.id) !== itemId
+        ) {
+            return;
+        }
+
+        const known = waiting.olderQueuedEdit?.id === queued.id ? waiting.olderQueuedEdit.patch : {};
+        waiting.olderQueuedEdit = { id: queued.id, patch: { ...known, ...queuedPatch } };
+    });
+}
+
+/**
+ * A checklist edit landed. The queued edit of its item this write is
+ * newer than (olderQueuedEdit) is older in the fields this one set: a
+ * checklist patch carries no version, so sent at the next sync, it would
+ * put them back without a conflict. Those fields leave the queued edit
+ * while they hold its values, except any that a later edit, queued while
+ * this request was out, set.
  * @param {TaskSyncWrite} write
  * @param {string} itemId the item's server id
  * @param {{ text?: string; done?: boolean }} patch
  */
 function dropQueuedFieldsThisEditSet(write, itemId, patch) {
-    if (write.discarded) {
+    const older = write.olderQueuedEdit;
+    if (write.discarded || !older) {
         return;
     }
 
     const queuedEdits = getQueuedEditsOfItem(write);
-    const fields = Object.keys(patch).filter((field) => !queuedEdits?.fields.has(field));
-    if (fields.length > 0) {
-        dropQueuedChecklistFields(write.taskId, itemId, fields, { ownerId: write.queueOwnerId });
+    /** @type {{ text?: string; done?: boolean }} */
+    const covered = {};
+    if (patch.text !== undefined && typeof older.patch.text === 'string' && !queuedEdits?.fields.has('text')) {
+        covered.text = older.patch.text;
+    }
+    if (patch.done !== undefined && typeof older.patch.done === 'boolean' && !queuedEdits?.fields.has('done')) {
+        covered.done = older.patch.done;
+    }
+    if (Object.keys(covered).length > 0) {
+        dropQueuedChecklistFields(write.taskId, itemId, { id: older.id, patch: covered }, { ownerId: write.queueOwnerId });
     }
 }
 
@@ -1069,13 +1211,15 @@ function applyWriteResult(write, serverTask) {
  * data meanwhile.
  * @param {TaskSyncWrite} write
  * @param {import('../offline-write-queue.js').OfflineMutationInput} mutation
+ * @returns {boolean} whether it queued the mutation
  */
 function queueWrite(write, mutation) {
     if (write.discarded) {
-        return;
+        return false;
     }
 
     enqueueOfflineMutation(mutation, { ownerId: write.queueOwnerId });
+    return true;
 }
 
 /**
@@ -1083,14 +1227,13 @@ function queueWrite(write, mutation) {
  * @param {{ ok: true } | { ok: false; fallback: boolean; message: string; status?: number }} result
  * @param {import('../offline-write-queue.js').OfflineMutationInput | null} [mutation]
  *   what to queue on a failure worth retrying; null queues nothing
+ * @returns {boolean} whether it queued `mutation`
  */
 function reportSyncFailure(write, result, mutation) {
     if (!result.ok && !result.fallback) {
         console.error('Failed to sync task mutation', result.message);
-        return;
+        return false;
     }
 
-    if (!result.ok && result.fallback && mutation) {
-        queueWrite(write, mutation);
-    }
+    return !result.ok && result.fallback && mutation ? queueWrite(write, mutation) : false;
 }

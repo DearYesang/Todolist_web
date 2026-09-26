@@ -68,6 +68,10 @@ let queueClears = 0;
  *   attempts: number;
  * }} OfflineMutation
  *
+ * A queued edit of a task or a checklist item as the queue held it: its
+ * id, and the fields it sets.
+ * @typedef {{ id: string; patch: Record<string, unknown> }} QueuedEdit
+ *
  * @typedef {{
  *   flushed: number;
  *   remaining: number;
@@ -201,19 +205,29 @@ export function hasQueuedTaskMutation(taskId, { ownerId = queueOwnerId } = {}) {
 }
 
 /**
- * Drops the queued edit of task `taskId` from `ownerId`'s queue (the
- * current owner's by default), for a newer edit of the task that landed
- * and holds all of its fields. An edit that also sets a parent the server
- * does not have yet (localParentId) stays: the landed edit could not send
- * that parent.
+ * Drops `older`, the queued edit of task `taskId` in `ownerId`'s queue
+ * (the current owner's by default), for a newer edit of the task that
+ * landed and holds every field it sets: that edit was made on a copy of
+ * the task that held them. The queued edit stays when the queue no longer
+ * holds it as `older` gives it (another id, or other fields: another tab
+ * or a later write put a newer edit there since; the version it expects
+ * may have moved), and when it also sets a parent the server does not
+ * have yet (localParentId), which the landed edit could not send.
  * @param {string} taskId
+ * @param {QueuedEdit} older
  * @param {{ ownerId?: string }} [options]
  */
-export function dropQueuedTaskPatch(taskId, { ownerId = queueOwnerId } = {}) {
+export function dropQueuedTaskPatch(taskId, older, { ownerId = queueOwnerId } = {}) {
 	const owner = normalizeQueueOwner(ownerId);
 	const queue = loadOwnerQueue(owner);
 	const nextQueue = queue.filter((mutation) =>
-		!(mutation.type === 'task.patch' && mutation.taskId === taskId && !mutation.localParentId)
+		!(
+			mutation.type === 'task.patch'
+			&& mutation.taskId === taskId
+			&& mutation.id === older.id
+			&& !mutation.localParentId
+			&& setsSameFields(mutation.patch, older.patch)
+		)
 	);
 	if (nextQueue.length !== queue.length) {
 		saveOfflineQueue(nextQueue, owner);
@@ -221,33 +235,51 @@ export function dropQueuedTaskPatch(taskId, { ownerId = queueOwnerId } = {}) {
 }
 
 /**
- * Drops `fields` from the queued edit of checklist item `itemId` of
- * `taskId` in `ownerId`'s queue (the current owner's by default), and the
- * edit once none are left: for a newer edit of the item that landed and
- * set those fields.
+ * Whether two task patches set the same fields to the same values, apart
+ * from the version they expect.
+ * @param {Record<string, unknown>} patch
+ * @param {Record<string, unknown>} other
+ */
+function setsSameFields(patch, other) {
+	const fields = Object.keys(patch).filter((field) => field !== 'expectedVersion');
+	return fields.length === Object.keys(other).filter((field) => field !== 'expectedVersion').length
+		&& fields.every((field) => field in other && patch[field] === other[field]);
+}
+
+/**
+ * Drops from `older`, the queued edit of checklist item `itemId` of
+ * `taskId` in `ownerId`'s queue (the current owner's by default), the
+ * fields it gives, and the edit once none are left: for a newer edit of
+ * the item that landed and set those fields. A field the queue holds
+ * with another value stays: another tab or a later write set it since,
+ * newer. So does an edit the queue holds under another id.
  * @param {string} taskId
  * @param {string} itemId
- * @param {string[]} fields
+ * @param {{ id: string; patch: { text?: string; done?: boolean } }} older
  * @param {{ ownerId?: string }} [options]
  */
-export function dropQueuedChecklistFields(taskId, itemId, fields, { ownerId = queueOwnerId } = {}) {
+export function dropQueuedChecklistFields(taskId, itemId, older, { ownerId = queueOwnerId } = {}) {
 	const owner = normalizeQueueOwner(ownerId);
 	const queue = loadOwnerQueue(owner);
 	const queuedEdit = queue.find((mutation) =>
 		mutation.type === 'checklist.patch' && mutation.taskId === taskId && mutation.itemId === itemId
 	);
-	if (!queuedEdit || queuedEdit.type !== 'checklist.patch' || !fields.some((field) => field in queuedEdit.patch)) {
+	if (!queuedEdit || queuedEdit.type !== 'checklist.patch' || queuedEdit.id !== older.id) {
 		return;
 	}
 
 	/** @type {{ text?: string; done?: boolean }} */
 	const patch = { ...queuedEdit.patch };
-	if (fields.includes('text')) {
+	if (older.patch.text !== undefined && patch.text === older.patch.text) {
 		delete patch.text;
 	}
-	if (fields.includes('done')) {
+	if (older.patch.done !== undefined && patch.done === older.patch.done) {
 		delete patch.done;
 	}
+	if (Object.keys(patch).length === Object.keys(queuedEdit.patch).length) {
+		return;
+	}
+
 	saveOfflineQueue(
 		Object.keys(patch).length === 0
 			? queue.filter((mutation) => mutation !== queuedEdit)
@@ -867,10 +899,12 @@ function shouldKeepForRetry(result) {
 }
 
 /**
+ * The current owner's queue, or `ownerId`'s.
+ * @param {{ ownerId?: string }} [options] ownerId: an owner from getOfflineQueueOwner
  * @returns {OfflineMutation[]}
  */
-export function loadOfflineQueue() {
-	return loadOwnerQueue(queueOwnerId);
+export function loadOfflineQueue({ ownerId = queueOwnerId } = {}) {
+	return loadOwnerQueue(normalizeQueueOwner(ownerId));
 }
 
 /**
