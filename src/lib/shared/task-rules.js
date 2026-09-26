@@ -1,9 +1,11 @@
 /**
  * The task rules the browser, the API and the database share: which ids the
- * server issued, the values a task's status, priority and urgency and a
- * board's view can take, and how long the texts a write carries may be. The
- * database CHECK constraints in server/db/schema.js repeat the enums;
- * task-rules.test.js holds them equal.
+ * server issued, and the values a task's status, priority and urgency and a
+ * board's view can take. The database CHECK constraints in
+ * server/db/schema.js repeat the enums; task-rules.test.js holds them equal.
+ * The module also holds the text length limits the API enforces (LIMITS);
+ * the browser does not check them and the database has no matching
+ * constraint.
  */
 
 /** A UUID, the shape of every id the server issues. */
@@ -15,7 +17,7 @@ export const TASK_URGENCIES = /** @type {const} */ (['urgent', 'normal']);
 export const APP_VIEWS = /** @type {const} */ (['kanban', 'gantt', 'matrix']);
 
 /**
- * The most characters a task write accepts in a title, a category name and
+ * The most characters the API accepts in a task title, a category name and
  * a checklist item's text, after trimming.
  */
 export const LIMITS = /** @type {const} */ ({
