@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { schema } from '$lib/server/db/index.js';
 import { normalizeCategoryKey, normalizeCategoryName } from '$lib/shared/category-suggestions.js';
-import { TaskWriteError } from '$lib/server/tasks/validation.js';
+import { ApiError } from '$lib/server/http/api-error.js';
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
@@ -138,12 +138,12 @@ export function parseCategoryName(value) {
 		return '';
 	}
 	if (typeof value !== 'string') {
-		throw new TaskWriteError('Category name must be a string.');
+		throw new ApiError('Category name must be a string.');
 	}
 
 	const name = normalizeCategoryName(value);
 	if (name.length > 80) {
-		throw new TaskWriteError('Category name must be 80 characters or less.');
+		throw new ApiError('Category name must be 80 characters or less.');
 	}
 	return name;
 }
@@ -159,7 +159,7 @@ export function parseCategoryColor(value) {
 		return null;
 	}
 	if (typeof value !== 'string' || !HEX_COLOR_PATTERN.test(value)) {
-		throw new TaskWriteError('Category color must be a #RRGGBB hex color.');
+		throw new ApiError('Category color must be a #RRGGBB hex color.');
 	}
 	return value.toLowerCase();
 }

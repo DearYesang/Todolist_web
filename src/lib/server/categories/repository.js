@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 import { ensurePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
-import { TaskWriteError } from '$lib/server/tasks/validation.js';
+import { ApiError } from '$lib/server/http/api-error.js';
 import {
 	findOrCreateCategoryRow,
 	getCategoryRowForBoard,
@@ -45,7 +45,7 @@ export async function createCategoryForUser(userId, payload) {
 		name: input.name
 	});
 	if (!category) {
-		throw new TaskWriteError('Category name is required.');
+		throw new ApiError('Category name is required.');
 	}
 
 	if (input.color !== undefined || input.hidden !== undefined) {
@@ -76,7 +76,7 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 	const board = await ensurePersonalBoardForUser(userId);
 	const existing = await getCategoryRowForBoard(db, board.id, id);
 	if (!existing) {
-		throw new TaskWriteError('Category was not found.', 404);
+		throw new ApiError('Category was not found.', 404);
 	}
 
 	const now = new Date();
@@ -120,7 +120,7 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 		]);
 
 		if (!updatedCategory[0]) {
-			throw new TaskWriteError('Category could not be updated.', 500);
+			throw new ApiError('Category could not be updated.', 500);
 		}
 
 		return {
@@ -130,7 +130,7 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 		};
 	} catch (error) {
 		if (isUniqueConstraintError(error)) {
-			throw new TaskWriteError('A category with that name already exists.', 409);
+			throw new ApiError('A category with that name already exists.', 409);
 		}
 		throw error;
 	}
@@ -145,7 +145,7 @@ export async function mergeCategoryForUser(userId, sourceCategoryId, payload) {
 	const sourceId = parseCategoryId(sourceCategoryId);
 	const targetId = parseCategoryId(readPayloadObject(payload).targetCategoryId);
 	if (sourceId === targetId) {
-		throw new TaskWriteError('Source and target categories must be different.');
+		throw new ApiError('Source and target categories must be different.');
 	}
 
 	const db = getDb();
@@ -155,7 +155,7 @@ export async function mergeCategoryForUser(userId, sourceCategoryId, payload) {
 		getCategoryRowForBoard(db, board.id, targetId)
 	]);
 	if (!source || !target) {
-		throw new TaskWriteError('Category was not found.', 404);
+		throw new ApiError('Category was not found.', 404);
 	}
 
 	const now = new Date();
@@ -203,7 +203,7 @@ export async function deleteCategoryForUser(userId, categoryId) {
 	const board = await ensurePersonalBoardForUser(userId);
 	const category = await getCategoryRowForBoard(db, board.id, id);
 	if (!category) {
-		throw new TaskWriteError('Category was not found.', 404);
+		throw new ApiError('Category was not found.', 404);
 	}
 
 	const now = new Date();
@@ -250,7 +250,7 @@ export async function reorderCategoriesForUser(userId, payload) {
 		? source.categoryIds.map(parseCategoryId)
 		: null;
 	if (!categoryIds || categoryIds.length === 0) {
-		throw new TaskWriteError('categoryIds must be a non-empty array.');
+		throw new ApiError('categoryIds must be a non-empty array.');
 	}
 
 	const uniqueIds = [...new Set(categoryIds)];
@@ -265,7 +265,7 @@ export async function reorderCategoriesForUser(userId, payload) {
 			isNull(schema.categories.archivedAt)
 		));
 	if (existingRows.length !== uniqueIds.length) {
-		throw new TaskWriteError('One or more categories were not found.', 404);
+		throw new ApiError('One or more categories were not found.', 404);
 	}
 
 	const now = new Date();
@@ -287,7 +287,7 @@ function parseCategoryCreatePayload(payload) {
 	const source = readPayloadObject(payload);
 	const name = parseCategoryName(source.name);
 	if (!name) {
-		throw new TaskWriteError('Category name is required.');
+		throw new ApiError('Category name is required.');
 	}
 
 	return {
@@ -307,7 +307,7 @@ function parseCategoryPatchPayload(payload) {
 	if (Object.prototype.hasOwnProperty.call(source, 'name')) {
 		const name = parseCategoryName(source.name);
 		if (!name) {
-			throw new TaskWriteError('Category name is required.');
+			throw new ApiError('Category name is required.');
 		}
 		patch.name = name;
 	}
@@ -321,7 +321,7 @@ function parseCategoryPatchPayload(payload) {
 		patch.archived = parseOptionalBoolean(source.archived, 'archived') ?? false;
 	}
 	if (Object.keys(patch).length === 0) {
-		throw new TaskWriteError('At least one category field is required.');
+		throw new ApiError('At least one category field is required.');
 	}
 	return patch;
 }
@@ -333,7 +333,7 @@ function parseCategoryPatchPayload(payload) {
 function readPayloadObject(payload) {
 	const source = /** @type {Record<string, unknown> | null} */ (payload);
 	if (!source || typeof source !== 'object' || Array.isArray(source)) {
-		throw new TaskWriteError('Category payload must be an object.');
+		throw new ApiError('Category payload must be an object.');
 	}
 	return source;
 }
@@ -343,7 +343,7 @@ function readPayloadObject(payload) {
  */
 function parseCategoryId(value) {
 	if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-		throw new TaskWriteError('Invalid categoryId.');
+		throw new ApiError('Invalid categoryId.');
 	}
 	return value;
 }
@@ -357,7 +357,7 @@ function parseOptionalBoolean(value, label) {
 		return undefined;
 	}
 	if (typeof value !== 'boolean') {
-		throw new TaskWriteError(`${label} must be a boolean.`);
+		throw new ApiError(`${label} must be a boolean.`);
 	}
 	return value;
 }
