@@ -77,10 +77,9 @@ describe('runtime config report', () => {
 
 		expect(report.ok).toBe(false);
 		expect(report.emailDeliveryReady).toBe(false);
-		expect(report.blocking.map((check) => check.key)).toEqual(expect.arrayContaining([
-			'EMAIL_VERIFICATION_DEV_CODES',
-			'RESEND_API_KEY'
-		]));
+		expect(report.blocking.map((check) => check.key)).toEqual(
+			expect.arrayContaining(['EMAIL_VERIFICATION_DEV_CODES', 'RESEND_API_KEY'])
+		);
 	});
 
 	it('blocks production health when the current origin does not match auth and passkey origins', () => {
@@ -100,12 +99,14 @@ describe('runtime config report', () => {
 		const report = getRuntimeConfigReport({ currentOrigin: 'https://todokanban-alpha.vercel.app' });
 
 		expect(report.ok).toBe(false);
-		expect(report.blocking.map((check) => check.key)).toEqual(expect.arrayContaining([
-			'BETTER_AUTH_URL_CURRENT_ORIGIN',
-			'BETTER_AUTH_TRUSTED_ORIGINS_CURRENT_ORIGIN',
-			'PASSKEY_ORIGIN_CURRENT_ORIGIN',
-			'PASSKEY_RP_ID_CURRENT_HOST'
-		]));
+		expect(report.blocking.map((check) => check.key)).toEqual(
+			expect.arrayContaining([
+				'BETTER_AUTH_URL_CURRENT_ORIGIN',
+				'BETTER_AUTH_TRUSTED_ORIGINS_CURRENT_ORIGIN',
+				'PASSKEY_ORIGIN_CURRENT_ORIGIN',
+				'PASSKEY_RP_ID_CURRENT_HOST'
+			])
+		);
 	});
 
 	it('accepts the deployed alpha origin for production passkeys', () => {

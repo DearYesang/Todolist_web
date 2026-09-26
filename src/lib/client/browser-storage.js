@@ -4,12 +4,10 @@
  * @returns {Storage | null}
  */
 export function getStorage() {
-    try {
-        const storage = globalThis.localStorage;
-        return storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
-            ? storage
-            : null;
-    } catch {
-        return null;
-    }
+	try {
+		const storage = globalThis.localStorage;
+		return storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function' ? storage : null;
+	} catch {
+		return null;
+	}
 }

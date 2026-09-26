@@ -4,6 +4,7 @@
 
 ## Verification
 
+- [ ] `npm run format:check`
 - [ ] `npm audit --audit-level=low`
 - [ ] `npm test`
 - [ ] `npm run check`

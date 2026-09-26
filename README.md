@@ -61,6 +61,26 @@ npm test
 npm run test:e2e
 ```
 
+Format with Prettier (options in `.prettierrc`, skipped paths in `.prettierignore`):
+
+```bash
+npm run format
+npm run format:check
+```
+
+Format on save is an editor setting, and `.vscode/settings.json` is not tracked. In VS Code, install the recommended Prettier extension and add this to your user or workspace settings:
+
+```json
+{
+  "editor.formatOnSave": true,
+  "[javascript][svelte][css][html][json][jsonc][markdown][yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}
+```
+
+Without it, run `npm run format` before committing; CI runs `npm run format:check`.
+
 Run the production readiness check:
 
 ```bash

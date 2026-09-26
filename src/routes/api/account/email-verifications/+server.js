@@ -82,13 +82,16 @@ export async function POST(event) {
 
 /** @param {string} email */
 function createGenericAcceptedResponse(email) {
-	return json({
-		email: normalizeAccountEmail(email),
-		expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS).toISOString()
-	}, {
-		status: 201,
-		headers: {
-			'cache-control': 'private, no-store'
+	return json(
+		{
+			email: normalizeAccountEmail(email),
+			expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS).toISOString()
+		},
+		{
+			status: 201,
+			headers: {
+				'cache-control': 'private, no-store'
+			}
 		}
-	});
+	);
 }

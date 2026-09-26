@@ -66,10 +66,12 @@ test('imports a backup file by replacing or appending, and reports unreadable fi
 
 	// Confirm accepted: replace through the server, which answers with its list.
 	await fileInput.setInputFiles(backupFile([{ id: 'backup-replaced', text: 'Backup replaced task' }]));
-	await expect.poll(() => dialogs).toEqual([
-		'confirm:현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.',
-		'alert:데이터를 성공적으로 불러왔습니다. 가져온 작업: 1개. 교체된 작업: 7개.'
-	]);
+	await expect
+		.poll(() => dialogs)
+		.toEqual([
+			'confirm:현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.',
+			'alert:데이터를 성공적으로 불러왔습니다. 가져온 작업: 1개. 교체된 작업: 7개.'
+		]);
 	await expect(page.getByText('Server imported task')).toBeVisible();
 	await expect(page.getByText('E2E cached task')).toHaveCount(0);
 	await expect(fileInput).toHaveValue('');
@@ -85,8 +87,12 @@ test('imports a backup file by replacing or appending, and reports unreadable fi
 	await expect(page.getByText('Server imported task')).toBeVisible();
 	await expect(page.getByText('Backup appended task')).toBeVisible();
 	expect(importRequests).toEqual(['/api/import?mode=replace', '/api/import']);
-	const queued = await page.evaluate(() => JSON.parse(localStorage.getItem('kanbanOfflineWriteQueue:e2e-user') ?? '[]'));
-	expect(queued).toEqual([expect.objectContaining({ type: 'import.tasks', mode: 'append', localTaskIds: ['backup-appended'] })]);
+	const queued = await page.evaluate(() =>
+		JSON.parse(localStorage.getItem('kanbanOfflineWriteQueue:e2e-user') ?? '[]')
+	);
+	expect(queued).toEqual([
+		expect.objectContaining({ type: 'import.tasks', mode: 'append', localTaskIds: ['backup-appended'] })
+	]);
 
 	// Not a backup shape, then not JSON at all: nothing is asked or sent.
 	await fileInput.setInputFiles(backupFile({ notTasks: true }));
@@ -107,18 +113,37 @@ const CONFLICT_DELETE_TASK_ID = '55555555-5555-4555-8555-555555555555';
 test('lists offline conflicts and applies, keeps or saves them', async ({ page }) => {
 	await seedOfflineBoard(page);
 	// Three queued offline writes that the server rejects with 409.
-	await page.addInitScript(({ taskId, deleteTaskId }) => {
-		if (sessionStorage.getItem('e2e-conflicts-seeded')) {
-			return;
-		}
-		sessionStorage.setItem('e2e-conflicts-seeded', '1');
-		const base = { ownerUserId: 'e2e-user', createdAt: Date.now(), attempts: 0 };
-		localStorage.setItem('kanbanOfflineWriteQueue:e2e-user', JSON.stringify([
-			{ ...base, id: 'conflict-patch', type: 'task.patch', taskId, patch: { text: 'My offline title', expectedVersion: 2 } },
-			{ ...base, id: 'conflict-delete', type: 'task.delete', taskId: deleteTaskId, expectedVersion: 1 },
-			{ ...base, id: 'conflict-checklist', type: 'checklist.patch', taskId, itemId: '66666666-6666-4666-8666-666666666666', patch: { done: true } }
-		]));
-	}, { taskId: CONFLICT_TASK_ID, deleteTaskId: CONFLICT_DELETE_TASK_ID });
+	await page.addInitScript(
+		({ taskId, deleteTaskId }) => {
+			if (sessionStorage.getItem('e2e-conflicts-seeded')) {
+				return;
+			}
+			sessionStorage.setItem('e2e-conflicts-seeded', '1');
+			const base = { ownerUserId: 'e2e-user', createdAt: Date.now(), attempts: 0 };
+			localStorage.setItem(
+				'kanbanOfflineWriteQueue:e2e-user',
+				JSON.stringify([
+					{
+						...base,
+						id: 'conflict-patch',
+						type: 'task.patch',
+						taskId,
+						patch: { text: 'My offline title', expectedVersion: 2 }
+					},
+					{ ...base, id: 'conflict-delete', type: 'task.delete', taskId: deleteTaskId, expectedVersion: 1 },
+					{
+						...base,
+						id: 'conflict-checklist',
+						type: 'checklist.patch',
+						taskId,
+						itemId: '66666666-6666-4666-8666-666666666666',
+						patch: { done: true }
+					}
+				])
+			);
+		},
+		{ taskId: CONFLICT_TASK_ID, deleteTaskId: CONFLICT_DELETE_TASK_ID }
+	);
 
 	const serverTasks = [
 		{ id: CONFLICT_TASK_ID, text: 'Conflict server task', status: 'todo', version: 3 },

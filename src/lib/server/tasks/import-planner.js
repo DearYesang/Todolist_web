@@ -56,9 +56,8 @@ export function planTaskImport(payload, options = {}) {
 	let skippedChecklistItems = 0;
 
 	const plans = orderedTasks.map((task) => {
-		const parentTaskId = task.parentId && importedTaskIds.has(task.parentId)
-			? idMap.get(task.parentId) ?? null
-			: null;
+		const parentTaskId =
+			task.parentId && importedTaskIds.has(task.parentId) ? (idMap.get(task.parentId) ?? null) : null;
 		if (task.parentId && !parentTaskId) {
 			repairedParentLinks += 1;
 		}

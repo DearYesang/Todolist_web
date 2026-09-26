@@ -1,13 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-	APP_VIEWS,
-	isAppView,
-	isServerId,
-	TASK_PRIORITIES,
-	TASK_STATUSES,
-	TASK_URGENCIES
-} from './task-rules.js';
+import { APP_VIEWS, isAppView, isServerId, TASK_PRIORITIES, TASK_STATUSES, TASK_URGENCIES } from './task-rules.js';
 
 // The schema is read as text: importing it would load drizzle-orm's
 // Postgres column builders into a shared test.

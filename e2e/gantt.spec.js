@@ -106,7 +106,8 @@ test('resizes a Gantt bar by dragging its end handle', async ({ page }) => {
 	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 2)})`);
 	await page.mouse.up();
 
-	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+	await expect
+		.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
 		.toBe(shiftDate(before.endDate, 2));
 	expect((await readPersistedTask(page, 'local-e2e-task')).startDate).toBe(before.startDate);
 	// Letting go of a resize is not a click on the bar: no detail panel.
@@ -124,19 +125,30 @@ test('ignores a second pointer while a Gantt bar is being resized', async ({ pag
 
 	// A second finger (or a resting palm) moves far right and lifts while the
 	// first pointer still holds the handle. The mouse is pointer 1.
-	await page.evaluate(({ foreignX, foreignY }) => {
-		const init = { pointerId: 99, pointerType: 'touch', isPrimary: false, clientX: foreignX, clientY: foreignY, bubbles: true };
-		window.dispatchEvent(new PointerEvent('pointermove', init));
-		window.dispatchEvent(new PointerEvent('pointerup', init));
-		window.dispatchEvent(new PointerEvent('pointercancel', init));
-	}, { foreignX: x + 480, foreignY: y });
+	await page.evaluate(
+		({ foreignX, foreignY }) => {
+			const init = {
+				pointerId: 99,
+				pointerType: 'touch',
+				isPrimary: false,
+				clientX: foreignX,
+				clientY: foreignY,
+				bubbles: true
+			};
+			window.dispatchEvent(new PointerEvent('pointermove', init));
+			window.dispatchEvent(new PointerEvent('pointerup', init));
+			window.dispatchEvent(new PointerEvent('pointercancel', init));
+		},
+		{ foreignX: x + 480, foreignY: y }
+	);
 	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 1)})`);
 	expect((await readPersistedTask(page, 'local-e2e-task')).endDate).toBe(before.endDate);
 
 	// The resize still follows the first pointer and ends when it lifts.
 	await page.mouse.move(x + 96, y, { steps: 4 });
 	await page.mouse.up();
-	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+	await expect
+		.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
 		.toBe(shiftDate(before.endDate, 2));
 });
 
@@ -154,12 +166,23 @@ test('ignores a second pointer pressing a handle while a Gantt bar is being resi
 	const startHandle = bar.locator('.resize-handle.start');
 	const startBox = await startHandle.boundingBox();
 	expect(startBox).toBeTruthy();
-	await startHandle.evaluate((handle, { sx, sy }) => {
-		const init = { pointerId: 99, pointerType: 'touch', isPrimary: false, clientX: sx, clientY: sy, bubbles: true, cancelable: true };
-		handle.dispatchEvent(new PointerEvent('pointerdown', init));
-		window.dispatchEvent(new PointerEvent('pointermove', { ...init, clientX: sx - 480 }));
-		window.dispatchEvent(new PointerEvent('pointerup', { ...init, clientX: sx - 480 }));
-	}, { sx: startBox.x + startBox.width / 2, sy: startBox.y + startBox.height / 2 });
+	await startHandle.evaluate(
+		(handle, { sx, sy }) => {
+			const init = {
+				pointerId: 99,
+				pointerType: 'touch',
+				isPrimary: false,
+				clientX: sx,
+				clientY: sy,
+				bubbles: true,
+				cancelable: true
+			};
+			handle.dispatchEvent(new PointerEvent('pointerdown', init));
+			window.dispatchEvent(new PointerEvent('pointermove', { ...init, clientX: sx - 480 }));
+			window.dispatchEvent(new PointerEvent('pointerup', { ...init, clientX: sx - 480 }));
+		},
+		{ sx: startBox.x + startBox.width / 2, sy: startBox.y + startBox.height / 2 }
+	);
 	await expect(bar).toHaveAttribute('title', `E2E cached task (${before.startDate} ~ ${shiftDate(before.endDate, 1)})`);
 	expect(await readPersistedTask(page, 'local-e2e-task')).toMatchObject({
 		startDate: before.startDate,
@@ -169,7 +192,8 @@ test('ignores a second pointer pressing a handle while a Gantt bar is being resi
 	// The mouse still owns the resize and commits only its own edge.
 	await page.mouse.move(x + 96, y, { steps: 4 });
 	await page.mouse.up();
-	await expect.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
+	await expect
+		.poll(async () => (await readPersistedTask(page, 'local-e2e-task')).endDate)
 		.toBe(shiftDate(before.endDate, 2));
 	expect((await readPersistedTask(page, 'local-e2e-task')).startDate).toBe(before.startDate);
 });

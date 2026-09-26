@@ -35,7 +35,8 @@ const LINK_CONFIRM_THRESHOLD = 10;
 export const LINK_OPEN_BATCH_LIMIT = 20;
 export const LINK_RESULT_AUTO_HIDE_MS = 5000;
 
-export const POPUP_PERMISSION_HINT = '한 번만 허용하면 다음부터 한 번에 모두 열립니다: 주소창(설치한 앱은 창 위쪽 제목 표시줄)의 ‘팝업 차단됨’ 아이콘 → ‘항상 허용’을 고른 뒤 다시 눌러 주세요. (Brave 설정: brave://settings/content/popups)';
+export const POPUP_PERMISSION_HINT =
+	'한 번만 허용하면 다음부터 한 번에 모두 열립니다: 주소창(설치한 앱은 창 위쪽 제목 표시줄)의 ‘팝업 차단됨’ 아이콘 → ‘항상 허용’을 고른 뒤 다시 눌러 주세요. (Brave 설정: brave://settings/content/popups)';
 
 /** @type {import('svelte/store').Writable<LinkOpenState | null>} */
 export const linkOpenState = writable(null);
@@ -112,7 +113,10 @@ function uniqueLinks(links) {
  * @param {OpenFn | undefined} openFn
  */
 function openBatch(batch, openFn) {
-	const result = openInNewTabs(batch.map((link) => link.href), openFn);
+	const result = openInNewTabs(
+		batch.map((link) => link.href),
+		openFn
+	);
 	const openedHrefs = new Set(result.opened);
 	return {
 		opened: batch.filter((link) => openedHrefs.has(link.href)),
@@ -149,9 +153,7 @@ function commit(next) {
  * @param {LinkOpenState} state
  */
 function isFullyOpened(state) {
-	return state.phase === 'result'
-		&& state.pending.length === 0
-		&& state.cursor >= state.blocked.length;
+	return state.phase === 'result' && state.pending.length === 0 && state.cursor >= state.blocked.length;
 }
 
 /**
@@ -274,9 +276,7 @@ export function summarizeLinkOpenState(state) {
 		return {
 			tone: 'confirm',
 			message: `링크 ${state.links.length}개를 새 탭으로 엽니다.`,
-			hint: state.links.length > LINK_OPEN_BATCH_LIMIT
-				? `한 번에 최대 ${LINK_OPEN_BATCH_LIMIT}개씩 엽니다.`
-				: null,
+			hint: state.links.length > LINK_OPEN_BATCH_LIMIT ? `한 번에 최대 ${LINK_OPEN_BATCH_LIMIT}개씩 엽니다.` : null,
 			unopened: [],
 			stepLabel: null,
 			remainingLabel: null
@@ -285,9 +285,10 @@ export function summarizeLinkOpenState(state) {
 
 	const stillBlocked = state.blocked.slice(state.cursor);
 	const remainingLabel = state.pending.length > 0 ? `나머지 ${state.pending.length}개 열기` : null;
-	const stepLabel = stillBlocked.length > 0 && !state.stepFailed
-		? `다음 링크 열기 (${state.cursor + 1}/${state.blocked.length})`
-		: null;
+	const stepLabel =
+		stillBlocked.length > 0 && !state.stepFailed
+			? `다음 링크 열기 (${state.cursor + 1}/${state.blocked.length})`
+			: null;
 
 	if (stillBlocked.length === 0) {
 		return {

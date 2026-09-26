@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	getDeleteTaskConfirmMessage,
-	PRIORITY_LABELS,
-	STATUS_LABELS,
-	URGENCY_LABELS
-} from './task-domain.js';
+import { getDeleteTaskConfirmMessage, PRIORITY_LABELS, STATUS_LABELS, URGENCY_LABELS } from './task-domain.js';
 
 describe('delete confirmation', () => {
 	it('asks a plain question for a task without children', () => {
@@ -20,8 +15,19 @@ describe('delete confirmation', () => {
 describe('display labels', () => {
 	// The cards, the task form and the detail panel all render these, in this order.
 	it('keeps the status, priority and urgency wording', () => {
-		expect(Object.entries(STATUS_LABELS)).toEqual([['todo', '할 일'], ['doing', '진행 중'], ['done', '완료']]);
-		expect(Object.entries(PRIORITY_LABELS)).toEqual([['high', '🔴 높음'], ['medium', '🟡 보통'], ['low', '🟢 낮음']]);
-		expect(Object.entries(URGENCY_LABELS)).toEqual([['urgent', '🔥 시급'], ['normal', '⏳ 여유']]);
+		expect(Object.entries(STATUS_LABELS)).toEqual([
+			['todo', '할 일'],
+			['doing', '진행 중'],
+			['done', '완료']
+		]);
+		expect(Object.entries(PRIORITY_LABELS)).toEqual([
+			['high', '🔴 높음'],
+			['medium', '🟡 보통'],
+			['low', '🟢 낮음']
+		]);
+		expect(Object.entries(URGENCY_LABELS)).toEqual([
+			['urgent', '🔥 시급'],
+			['normal', '⏳ 여유']
+		]);
 	});
 });

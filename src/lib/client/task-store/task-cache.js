@@ -11,19 +11,19 @@ let taskStorageOwner = DEFAULT_STORAGE_OWNER;
  * @returns {import('../../shared/task-domain.js').Task[]}
  */
 function loadInitialTasks() {
-    try {
-        const storage = getStorage();
-        if (!storage) return [];
+	try {
+		const storage = getStorage();
+		if (!storage) return [];
 
-        const raw = storage.getItem(getTaskStorageKey()) ?? readLegacyTasks(storage);
-        if (!raw) return [];
+		const raw = storage.getItem(getTaskStorageKey()) ?? readLegacyTasks(storage);
+		if (!raw) return [];
 
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? normalizeTaskList(parsed) : [];
-    } catch (error) {
-        console.error('Failed to load kanban tasks', error);
-        return [];
-    }
+		const parsed = JSON.parse(raw);
+		return Array.isArray(parsed) ? normalizeTaskList(parsed) : [];
+	} catch (error) {
+		console.error('Failed to load kanban tasks', error);
+		return [];
+	}
 }
 
 /** @type {import('svelte/store').Writable<import('../../shared/task-domain.js').Task[]>} */
@@ -40,38 +40,38 @@ export const taskIndex = derived(tasks, (taskList) => buildTaskIndex(taskList));
 let isInitialTaskEmission = true;
 let isApplyingExternalTaskUpdate = false;
 tasks.subscribe((value) => {
-    if (isInitialTaskEmission) {
-        isInitialTaskEmission = false;
-        return;
-    }
-    if (isApplyingExternalTaskUpdate) {
-        return;
-    }
+	if (isInitialTaskEmission) {
+		isInitialTaskEmission = false;
+		return;
+	}
+	if (isApplyingExternalTaskUpdate) {
+		return;
+	}
 
-    try {
-        const storage = getStorage();
-        if (!storage) return;
+	try {
+		const storage = getStorage();
+		if (!storage) return;
 
-        storage.setItem(getTaskStorageKey(), JSON.stringify(value));
-        if (taskStorageOwner === DEFAULT_STORAGE_OWNER) {
-            storage.removeItem(STORAGE_KEY);
-        }
-    } catch (error) {
-        console.error('Failed to persist kanban tasks', error);
-    }
+		storage.setItem(getTaskStorageKey(), JSON.stringify(value));
+		if (taskStorageOwner === DEFAULT_STORAGE_OWNER) {
+			storage.removeItem(STORAGE_KEY);
+		}
+	} catch (error) {
+		console.error('Failed to persist kanban tasks', error);
+	}
 });
 
 /**
  * @param {string | null | undefined} ownerId
  */
 export function setTaskStorageOwner(ownerId) {
-    const nextOwner = normalizeStorageOwner(ownerId);
-    if (nextOwner === taskStorageOwner) {
-        return;
-    }
+	const nextOwner = normalizeStorageOwner(ownerId);
+	if (nextOwner === taskStorageOwner) {
+		return;
+	}
 
-    taskStorageOwner = nextOwner;
-    tasks.set(loadInitialTasks());
+	taskStorageOwner = nextOwner;
+	tasks.set(loadInitialTasks());
 }
 
 /**
@@ -80,26 +80,26 @@ export function setTaskStorageOwner(ownerId) {
  * @returns {string | null}
  */
 export function getTaskStorageOwner() {
-    return taskStorageOwner === DEFAULT_STORAGE_OWNER ? null : taskStorageOwner;
+	return taskStorageOwner === DEFAULT_STORAGE_OWNER ? null : taskStorageOwner;
 }
 
 export function clearLocalTaskCache() {
-    try {
-        const storage = getStorage();
-        if (!storage) return;
+	try {
+		const storage = getStorage();
+		if (!storage) return;
 
-        storage.removeItem(getTaskStorageKey());
-        if (taskStorageOwner === DEFAULT_STORAGE_OWNER) {
-            storage.removeItem(STORAGE_KEY);
-        }
-        tasks.set([]);
-    } catch (error) {
-        console.error('Failed to clear local task cache', error);
-    }
+		storage.removeItem(getTaskStorageKey());
+		if (taskStorageOwner === DEFAULT_STORAGE_OWNER) {
+			storage.removeItem(STORAGE_KEY);
+		}
+		tasks.set([]);
+	} catch (error) {
+		console.error('Failed to clear local task cache', error);
+	}
 }
 
 export function getTaskStorageKey() {
-    return `${STORAGE_KEY}:${taskStorageOwner}`;
+	return `${STORAGE_KEY}:${taskStorageOwner}`;
 }
 
 /**
@@ -108,34 +108,34 @@ export function getTaskStorageKey() {
  * @param {() => void} run
  */
 export function runWithoutPersisting(run) {
-    isApplyingExternalTaskUpdate = true;
-    try {
-        run();
-    } finally {
-        isApplyingExternalTaskUpdate = false;
-    }
+	isApplyingExternalTaskUpdate = true;
+	try {
+		run();
+	} finally {
+		isApplyingExternalTaskUpdate = false;
+	}
 }
 
 /**
  * @param {Storage} storage
  */
 function readLegacyTasks(storage) {
-    return taskStorageOwner === DEFAULT_STORAGE_OWNER ? storage.getItem(STORAGE_KEY) : null;
+	return taskStorageOwner === DEFAULT_STORAGE_OWNER ? storage.getItem(STORAGE_KEY) : null;
 }
 
 /**
  * @param {string | null | undefined} ownerId
  */
 function normalizeStorageOwner(ownerId) {
-    const trimmed = ownerId?.trim();
-    return trimmed || DEFAULT_STORAGE_OWNER;
+	const trimmed = ownerId?.trim();
+	return trimmed || DEFAULT_STORAGE_OWNER;
 }
 
 /**
  * @param {unknown[]} nextTasks
  */
 export function replaceTasks(nextTasks) {
-    tasks.set(normalizeTaskList(nextTasks));
+	tasks.set(normalizeTaskList(nextTasks));
 }
 
 /**
@@ -149,19 +149,15 @@ export function replaceTasks(nextTasks) {
  * @param {import('../../shared/task-domain.js').Task} task
  */
 export function insertTask(task) {
-    const existing = get(tasks).find((current) => current.id === task.id);
-    if (existing) {
-        if (
-            typeof existing.version === 'number'
-            && typeof task.version === 'number'
-            && task.version > existing.version
-        ) {
-            mergeTasks([task]);
-        }
-        return;
-    }
+	const existing = get(tasks).find((current) => current.id === task.id);
+	if (existing) {
+		if (typeof existing.version === 'number' && typeof task.version === 'number' && task.version > existing.version) {
+			mergeTasks([task]);
+		}
+		return;
+	}
 
-    tasks.update((current) => normalizeTaskList([...current, task]));
+	tasks.update((current) => normalizeTaskList([...current, task]));
 }
 
 /**
@@ -170,42 +166,38 @@ export function insertTask(task) {
  *   insertMissing: false keeps responses for locally deleted tasks from resurrecting them.
  */
 export function mergeTasks(nextTasks, options = {}) {
-    const { insertMissing = true } = options;
-    const incoming = nextTasks.map((task) => normalizeTask(task));
-    tasks.update((current) => {
-        const merged = new Map(current.map((task) => [task.id, task]));
-        incoming.forEach((task) => {
-            const existing = merged.get(task.id);
-            if (!existing) {
-                if (insertMissing) {
-                    merged.set(task.id, task);
-                }
-                return;
-            }
+	const { insertMissing = true } = options;
+	const incoming = nextTasks.map((task) => normalizeTask(task));
+	tasks.update((current) => {
+		const merged = new Map(current.map((task) => [task.id, task]));
+		incoming.forEach((task) => {
+			const existing = merged.get(task.id);
+			if (!existing) {
+				if (insertMissing) {
+					merged.set(task.id, task);
+				}
+				return;
+			}
 
-            if (
-                typeof existing.version === 'number'
-                && typeof task.version === 'number'
-                && task.version < existing.version
-            ) {
-                return;
-            }
+			if (typeof existing.version === 'number' && typeof task.version === 'number' && task.version < existing.version) {
+				return;
+			}
 
-            merged.set(task.id, { ...task, collapsed: existing.collapsed });
-        });
+			merged.set(task.id, { ...task, collapsed: existing.collapsed });
+		});
 
-        return normalizeTaskList([...merged.values()]);
-    });
+		return normalizeTaskList([...merged.values()]);
+	});
 }
 
 /**
  * @param {string[]} taskIds
  */
 export function removeTasksByIds(taskIds) {
-    const ids = new Set(taskIds);
-    if (ids.size === 0) return;
+	const ids = new Set(taskIds);
+	if (ids.size === 0) return;
 
-    tasks.update((current) => normalizeTaskList(current.filter((task) => !ids.has(task.id))));
+	tasks.update((current) => normalizeTaskList(current.filter((task) => !ids.has(task.id))));
 }
 
 /**
@@ -213,16 +205,18 @@ export function removeTasksByIds(taskIds) {
  * @param {import('../../shared/task-domain.js').Task} serverTask
  */
 export function replaceLocalTaskWithServerTask(localTaskId, serverTask) {
-    tasks.update((current) =>
-        normalizeTaskList(current.map((task) => {
-            if (task.id === localTaskId) {
-                return {
-                    ...serverTask,
-                    collapsed: task.collapsed
-                };
-            }
+	tasks.update((current) =>
+		normalizeTaskList(
+			current.map((task) => {
+				if (task.id === localTaskId) {
+					return {
+						...serverTask,
+						collapsed: task.collapsed
+					};
+				}
 
-            return task.parentId === localTaskId ? { ...task, parentId: serverTask.id } : task;
-        }))
-    );
+				return task.parentId === localTaskId ? { ...task, parentId: serverTask.id } : task;
+			})
+		)
+	);
 }

@@ -49,9 +49,7 @@
         }
 
         busy = true;
-        const result = target
-            ? await mergeCategory(category, target)
-            : await renameCategory(category, nextName);
+        const result = target ? await mergeCategory(category, target) : await renameCategory(category, nextName);
         message = result.message;
         busy = false;
         cancelRename();
@@ -119,9 +117,7 @@
      * @param {-1 | 1} direction
      */
     async function moveCategory(index, direction) {
-        const ordered = $categorySummaries
-            .map((category) => category.id)
-            .filter((id) => typeof id === 'string');
+        const ordered = $categorySummaries.map((category) => category.id).filter((id) => typeof id === 'string');
         const current = $categorySummaries[index];
         if (!current?.id) return;
         const currentIndex = ordered.indexOf(current.id);
@@ -156,7 +152,12 @@
     }
 </script>
 
-<div class="modal-backdrop category-manager-backdrop" role="button" tabindex="-1" onclick={onclose} onkeydown={handleKeydown}>
+<div
+    class="modal-backdrop category-manager-backdrop"
+    role="button"
+    tabindex="-1"
+    onclick={onclose}
+    onkeydown={handleKeydown}>
     <div
         class="category-manager"
         role="dialog"
@@ -213,23 +214,49 @@
                                 {:else}
                                     <div class="category-manager-name">
                                         <strong>{category.name}</strong>
-                                        <span>{category.active} 진행 · {category.done} 완료 · {category.total} 전체</span>
+                                        <span
+                                            >{category.active} 진행 · {category.done} 완료 · {category.total} 전체</span>
                                     </div>
                                 {/if}
                             </div>
 
                             <div class="category-manager-actions">
                                 {#if editingCategory === category.name}
-                                    <button class="btn btn-small btn-primary" type="button" disabled={busy} onclick={() => saveRename(category)}>저장</button>
-                                    <button class="btn btn-small" type="button" disabled={busy} onclick={cancelRename}>취소</button>
+                                    <button
+                                        class="btn btn-small btn-primary"
+                                        type="button"
+                                        disabled={busy}
+                                        onclick={() => saveRename(category)}>저장</button>
+                                    <button class="btn btn-small" type="button" disabled={busy} onclick={cancelRename}
+                                        >취소</button>
                                 {:else}
-                                    <button class="btn btn-small" type="button" disabled={busy || !category.id} onclick={() => moveCategory(index, -1)}>위</button>
-                                    <button class="btn btn-small" type="button" disabled={busy || !category.id} onclick={() => moveCategory(index, 1)}>아래</button>
-                                    <button class="btn btn-small" type="button" disabled={busy || !category.id} onclick={() => handleToggleHidden(category)}>
+                                    <button
+                                        class="btn btn-small"
+                                        type="button"
+                                        disabled={busy || !category.id}
+                                        onclick={() => moveCategory(index, -1)}>위</button>
+                                    <button
+                                        class="btn btn-small"
+                                        type="button"
+                                        disabled={busy || !category.id}
+                                        onclick={() => moveCategory(index, 1)}>아래</button>
+                                    <button
+                                        class="btn btn-small"
+                                        type="button"
+                                        disabled={busy || !category.id}
+                                        onclick={() => handleToggleHidden(category)}>
                                         {category.hiddenAt ? '표시' : '숨김'}
                                     </button>
-                                    <button class="btn btn-small" type="button" disabled={busy} onclick={() => startRename(category.name)}>이름 변경</button>
-                                    <button class="btn btn-small btn-danger" type="button" disabled={busy} onclick={() => handleClearCategory(category)}>삭제</button>
+                                    <button
+                                        class="btn btn-small"
+                                        type="button"
+                                        disabled={busy}
+                                        onclick={() => startRename(category.name)}>이름 변경</button>
+                                    <button
+                                        class="btn btn-small btn-danger"
+                                        type="button"
+                                        disabled={busy}
+                                        onclick={() => handleClearCategory(category)}>삭제</button>
                                 {/if}
                             </div>
                         </div>
@@ -247,13 +274,21 @@
                                 {/each}
                             </select>
                             <span class="merge-arrow">→</span>
-                            <select class="form-select" bind:value={mergeTarget} disabled={!mergeSource} aria-label="대상 카테고리">
+                            <select
+                                class="form-select"
+                                bind:value={mergeTarget}
+                                disabled={!mergeSource}
+                                aria-label="대상 카테고리">
                                 <option value="">대상 카테고리</option>
                                 {#each mergeTargets as category}
                                     <option value={getCategoryValue(category)}>{category.name}</option>
                                 {/each}
                             </select>
-                            <button class="btn btn-primary" type="button" onclick={handleMerge} disabled={busy || !mergeSource || !mergeTarget}>병합</button>
+                            <button
+                                class="btn btn-primary"
+                                type="button"
+                                onclick={handleMerge}
+                                disabled={busy || !mergeSource || !mergeTarget}>병합</button>
                         </div>
                     </div>
                 {/if}

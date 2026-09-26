@@ -17,7 +17,9 @@
     let isWorking = $state(false);
     let authMessage = $state('');
     let authError = $state('');
-    let recoverySummary = $state(/** @type {import('$lib/client/account-security-api.js').RecoveryCodeSummary | null} */ (null));
+    let recoverySummary = $state(
+        /** @type {import('$lib/client/account-security-api.js').RecoveryCodeSummary | null} */ (null)
+    );
     let newRecoveryCodes = $state(/** @type {string[]} */ ([]));
     let passkeyManagerOpen = $state(false);
     /** @type {{ loadPasskeys: () => Promise<void> } | undefined} */
@@ -185,9 +187,9 @@
 <PasskeyManager
     bind:this={passkeyManager}
     open={passkeyManagerOpen}
-    bind:isWorking
-    bind:authMessage
-    bind:authError />
+    bind:isWorking={isWorking}
+    bind:authMessage={authMessage}
+    bind:authError={authError} />
 
 {#if newRecoveryCodes.length > 0}
     <div class="recovery-code-list" aria-label="새 복구 코드">

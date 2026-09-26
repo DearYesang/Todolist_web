@@ -24,13 +24,8 @@ export async function importTasksForUser(userId, payload) {
 	const taskValues = createImportTaskValues(plans, board.id, userId, now, categoriesByKey);
 	const checklistValues = createImportChecklistValues(plans, now);
 	const [createdTaskRows, createdChecklistRows = []] = await db.batch([
-		db
-			.insert(schema.tasks)
-			.values(taskValues)
-			.returning(),
-		...(checklistValues.length > 0
-			? [db.insert(schema.checklistItems).values(checklistValues).returning()]
-			: [])
+		db.insert(schema.tasks).values(taskValues).returning(),
+		...(checklistValues.length > 0 ? [db.insert(schema.checklistItems).values(checklistValues).returning()] : [])
 	]);
 
 	return {
@@ -74,13 +69,8 @@ export async function replaceTasksForUser(userId, payload) {
 	const checklistValues = createImportChecklistValues(plans, now);
 	const [retiredRows, createdTaskRows, createdChecklistRows = []] = await db.batch([
 		retireExistingTasks,
-		db
-			.insert(schema.tasks)
-			.values(taskValues)
-			.returning(),
-		...(checklistValues.length > 0
-			? [db.insert(schema.checklistItems).values(checklistValues).returning()]
-			: [])
+		db.insert(schema.tasks).values(taskValues).returning(),
+		...(checklistValues.length > 0 ? [db.insert(schema.checklistItems).values(checklistValues).returning()] : [])
 	]);
 
 	return {
@@ -102,10 +92,14 @@ export async function replaceTasksForUser(userId, payload) {
 async function ensureCategoriesForImportPlans(db, boardId, userId, plans) {
 	/** @type {Map<string, typeof schema.categories.$inferSelect>} */
 	const categoriesByKey = new Map();
-	const categoryNames = [...new Set(plans
-		.map((plan) => plan.task.category)
-		.filter((category) => category.trim())
-		.map((category) => normalizeCategoryKey(category)))];
+	const categoryNames = [
+		...new Set(
+			plans
+				.map((plan) => plan.task.category)
+				.filter((category) => category.trim())
+				.map((category) => normalizeCategoryKey(category))
+		)
+	];
 
 	for (const key of categoryNames) {
 		const sourceName = plans.find((plan) => normalizeCategoryKey(plan.task.category) === key)?.task.category ?? key;
@@ -124,7 +118,9 @@ async function ensureCategoriesForImportPlans(db, boardId, userId, plans) {
  */
 function attachImportCategoryRows(taskRows, categoriesByKey) {
 	const categoriesById = new Map([...categoriesByKey.values()].map((category) => [category.id, category]));
-	return taskRows.map((task) => attachCategoryMetaToTaskRow(task, task.categoryId ? categoriesById.get(task.categoryId) ?? null : null));
+	return taskRows.map((task) =>
+		attachCategoryMetaToTaskRow(task, task.categoryId ? (categoriesById.get(task.categoryId) ?? null) : null)
+	);
 }
 
 /**

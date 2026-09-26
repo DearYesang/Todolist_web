@@ -37,12 +37,15 @@ test('suggests categories and manages category names offline', async ({ page }) 
  */
 async function pressEnterThroughImeComposition(input) {
 	await input.evaluate((node) => {
-		const enter = (init = {}) => node.dispatchEvent(new KeyboardEvent('keydown', {
-			key: 'Enter',
-			bubbles: true,
-			cancelable: true,
-			...init
-		}));
+		const enter = (init = {}) =>
+			node.dispatchEvent(
+				new KeyboardEvent('keydown', {
+					key: 'Enter',
+					bubbles: true,
+					cancelable: true,
+					...init
+				})
+			);
 		node.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
 		enter({ isComposing: true });
 		// Some engines report the composing Enter without isComposing.
@@ -132,7 +135,9 @@ test('asks the same delete question on a card and in the detail panel', async ({
 
 test('shows the card labels for status, priority and urgency in the detail panel', async ({ page }) => {
 	await seedOfflineBoard(page, {
-		extraTasks: [{ id: 'local-low-done', text: 'Low priority finished task', status: 'done', priority: 'low', urgency: 'normal' }]
+		extraTasks: [
+			{ id: 'local-low-done', text: 'Low priority finished task', status: 'done', priority: 'low', urgency: 'normal' }
+		]
 	});
 	await page.goto('/');
 
@@ -152,22 +157,41 @@ test('shows the card labels for status, priority and urgency in the detail panel
 
 		await card.locator('.card-text').click();
 		await expect(modal).toBeVisible();
-		expect(await modal.locator('.summary-row .summary-chip').evaluateAll((chips) =>
-			chips.slice(0, 3).map((chip) => chip.textContent)
-		)).toEqual([status, priority, urgency]);
+		expect(
+			await modal
+				.locator('.summary-row .summary-chip')
+				.evaluateAll((chips) => chips.slice(0, 3).map((chip) => chip.textContent))
+		).toEqual([status, priority, urgency]);
 		await expect(modal.locator('#modal-status')).toHaveValue(statusValue);
 		await expect(modal.locator('#modal-priority')).toHaveValue(priorityValue);
 		await expect(modal.locator('#modal-urgency')).toHaveValue(urgencyValue);
 
-		expect(await modal.locator('#modal-status option').evaluateAll((options) =>
-			options.map((option) => [option.getAttribute('value'), option.textContent])
-		)).toEqual([['todo', '할 일'], ['doing', '진행 중'], ['done', '완료']]);
-		expect(await modal.locator('#modal-priority option').evaluateAll((options) =>
-			options.map((option) => [option.getAttribute('value'), option.textContent])
-		)).toEqual([['high', '🔴 높음'], ['medium', '🟡 보통'], ['low', '🟢 낮음']]);
-		expect(await modal.locator('#modal-urgency option').evaluateAll((options) =>
-			options.map((option) => [option.getAttribute('value'), option.textContent])
-		)).toEqual([['urgent', '🔥 시급'], ['normal', '⏳ 여유']]);
+		expect(
+			await modal
+				.locator('#modal-status option')
+				.evaluateAll((options) => options.map((option) => [option.getAttribute('value'), option.textContent]))
+		).toEqual([
+			['todo', '할 일'],
+			['doing', '진행 중'],
+			['done', '완료']
+		]);
+		expect(
+			await modal
+				.locator('#modal-priority option')
+				.evaluateAll((options) => options.map((option) => [option.getAttribute('value'), option.textContent]))
+		).toEqual([
+			['high', '🔴 높음'],
+			['medium', '🟡 보통'],
+			['low', '🟢 낮음']
+		]);
+		expect(
+			await modal
+				.locator('#modal-urgency option')
+				.evaluateAll((options) => options.map((option) => [option.getAttribute('value'), option.textContent]))
+		).toEqual([
+			['urgent', '🔥 시급'],
+			['normal', '⏳ 여유']
+		]);
 
 		await modal.locator('.close-btn').click();
 		await expect(modal).toHaveCount(0);
@@ -187,13 +211,15 @@ test('shows the card labels for status, priority and urgency in the detail panel
 test('saves a category typed in the detail panel when the field is left or Enter is pressed', async ({ page }) => {
 	const categoryId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 	await seedOfflineBoard(page, {
-		extraTasks: [{
-			id: 'local-categorized-task',
-			text: 'Categorized task',
-			category: '개발',
-			categoryId,
-			categoryMeta: { id: categoryId, name: '개발', color: '#ff0000', sortOrder: 0, hiddenAt: null, archivedAt: null }
-		}]
+		extraTasks: [
+			{
+				id: 'local-categorized-task',
+				text: 'Categorized task',
+				category: '개발',
+				categoryId,
+				categoryMeta: { id: categoryId, name: '개발', color: '#ff0000', sortOrder: 0, hiddenAt: null, archivedAt: null }
+			}
+		]
 	});
 	await page.goto('/');
 
@@ -246,7 +272,10 @@ test('saves a category typed in the detail panel when the panel is closed with E
 
 	const modal = page.locator('.side-panel');
 	const input = modal.locator('#modal-category');
-	for (const [title, category] of [['Task in a category', '프로브'], ['Task without a category', '리서치']]) {
+	for (const [title, category] of [
+		['Task in a category', '프로브'],
+		['Task without a category', '리서치']
+	]) {
 		const card = cardByTitle(page, title);
 		await card.locator('.card-text').click();
 		await input.fill('');

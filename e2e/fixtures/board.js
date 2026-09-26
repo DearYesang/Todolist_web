@@ -22,7 +22,13 @@ const BASE_TASKS = [
 	},
 	{ id: 'local-parent-task', text: 'Nested parent task' },
 	{ id: 'local-child-task', text: 'Nested child task', parentId: 'local-parent-task' },
-	{ id: 'local-completed-matrix-task', text: 'Completed matrix task', status: 'done', priority: 'high', urgency: 'urgent' }
+	{
+		id: 'local-completed-matrix-task',
+		text: 'Completed matrix task',
+		status: 'done',
+		priority: 'high',
+		urgency: 'urgent'
+	}
 ];
 
 /**
@@ -30,47 +36,53 @@ const BASE_TASKS = [
  * @param {{ extraTasks?: Array<Record<string, unknown>> }} [options]
  */
 export async function seedOfflineBoard(page, { extraTasks = [] } = {}) {
-	await page.addInitScript(({ user, tasksKey, seedTasks }) => {
-		Object.defineProperty(navigator, 'onLine', {
-			configurable: true,
-			get: () => false
-		});
-		const today = new Date();
-		const formatDate = (date) => {
-			const year = date.getFullYear();
-			const month = `${date.getMonth() + 1}`.padStart(2, '0');
-			const day = `${date.getDate()}`.padStart(2, '0');
-			return `${year}-${month}-${day}`;
-		};
-		const past = new Date(today);
-		past.setDate(past.getDate() - 16);
-		// Dates and createdAt come from the page's clock, so a test that fixes
-		// the clock or the time zone seeds tasks for that day.
-		/** @param {Record<string, unknown>} task */
-		const seedTask = (task) => ({
-			status: 'todo',
-			startDate: formatDate(past),
-			endDate: formatDate(past),
-			priority: 'medium',
-			urgency: 'normal',
-			category: '',
-			parentId: null,
-			subtasks: [],
-			collapsed: false,
-			createdAt: Date.now(),
-			...task
-		});
+	await page.addInitScript(
+		({ user, tasksKey, seedTasks }) => {
+			Object.defineProperty(navigator, 'onLine', {
+				configurable: true,
+				get: () => false
+			});
+			const today = new Date();
+			const formatDate = (date) => {
+				const year = date.getFullYear();
+				const month = `${date.getMonth() + 1}`.padStart(2, '0');
+				const day = `${date.getDate()}`.padStart(2, '0');
+				return `${year}-${month}-${day}`;
+			};
+			const past = new Date(today);
+			past.setDate(past.getDate() - 16);
+			// Dates and createdAt come from the page's clock, so a test that fixes
+			// the clock or the time zone seeds tasks for that day.
+			/** @param {Record<string, unknown>} task */
+			const seedTask = (task) => ({
+				status: 'todo',
+				startDate: formatDate(past),
+				endDate: formatDate(past),
+				priority: 'medium',
+				urgency: 'normal',
+				category: '',
+				parentId: null,
+				subtasks: [],
+				collapsed: false,
+				createdAt: Date.now(),
+				...task
+			});
 
-		localStorage.setItem('todokanbanAuthScope', JSON.stringify({
-			...user,
-			cachedAt: Date.now()
-		}));
-		if (localStorage.getItem(tasksKey)) {
-			return;
-		}
+			localStorage.setItem(
+				'todokanbanAuthScope',
+				JSON.stringify({
+					...user,
+					cachedAt: Date.now()
+				})
+			);
+			if (localStorage.getItem(tasksKey)) {
+				return;
+			}
 
-		localStorage.setItem(tasksKey, JSON.stringify(seedTasks.map(seedTask)));
-	}, { user: E2E_USER, tasksKey: TASKS_STORAGE_KEY, seedTasks: [...BASE_TASKS, ...extraTasks] });
+			localStorage.setItem(tasksKey, JSON.stringify(seedTasks.map(seedTask)));
+		},
+		{ user: E2E_USER, tasksKey: TASKS_STORAGE_KEY, seedTasks: [...BASE_TASKS, ...extraTasks] }
+	);
 }
 
 /**

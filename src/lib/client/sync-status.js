@@ -1,17 +1,7 @@
 import { get, readonly, writable } from 'svelte/store';
 import { createDatedFilename, downloadJson } from './download.js';
-import {
-	createOfflineConflictReport,
-	describeServerSyncResult,
-	resolveLocalConflict
-} from './offline-conflicts.js';
-import {
-	deleteTaskCascade,
-	flushPendingViewPreference,
-	syncServerTasks,
-	tasks,
-	updateTask
-} from './task-store.js';
+import { createOfflineConflictReport, describeServerSyncResult, resolveLocalConflict } from './offline-conflicts.js';
+import { deleteTaskCascade, flushPendingViewPreference, syncServerTasks, tasks, updateTask } from './task-store.js';
 
 /**
  * Server sync as the app starts it, and what the sync banner shows about

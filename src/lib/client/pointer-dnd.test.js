@@ -205,7 +205,7 @@ describe('pointer drag activation', () => {
 });
 
 describe('multi-pointer isolation', () => {
-	it('ignores a second pointer\'s movement and release during an active drag', () => {
+	it("ignores a second pointer's movement and release during an active drag", () => {
 		const harness = createHarness({ zones: { '50,50': 'column:doing', '200,200': 'column:done' } });
 		harness.attach('task-1');
 

@@ -32,7 +32,7 @@ const FIELD_LABELS = {
  */
 export function summarizeOfflineConflict(mutation, serverTasks = []) {
 	const taskId = 'taskId' in mutation ? mutation.taskId : null;
-	const serverTask = taskId ? serverTasks.find((task) => task.id === taskId) ?? null : null;
+	const serverTask = taskId ? (serverTasks.find((task) => task.id === taskId) ?? null) : null;
 	const target = getConflictTarget(mutation, serverTask);
 	const fields = getConflictFields(mutation);
 
@@ -178,9 +178,7 @@ export function describeServerSyncResult(result, currentTasks, { showSuccess = f
 
 	if (showSuccess) {
 		return {
-			notice: result.fallback
-				? '지금은 서버에 연결할 수 없어 이 기기의 작업 목록을 유지합니다.'
-				: result.message
+			notice: result.fallback ? '지금은 서버에 연결할 수 없어 이 기기의 작업 목록을 유지합니다.' : result.message
 		};
 	}
 
@@ -259,9 +257,7 @@ function getConflictFields(mutation) {
  */
 function getConflictDetail(mutation, fields) {
 	if (mutation.type === 'task.patch') {
-		return fields.length > 0
-			? `충돌 필드: ${fields.join(', ')}`
-			: '서버 버전과 맞지 않아 수정이 적용되지 않았습니다.';
+		return fields.length > 0 ? `충돌 필드: ${fields.join(', ')}` : '서버 버전과 맞지 않아 수정이 적용되지 않았습니다.';
 	}
 
 	if (mutation.type === 'task.delete') {

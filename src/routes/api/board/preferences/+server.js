@@ -1,9 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
-import {
-	getBoardPreferencesForUser,
-	updateBoardPreferencesForUser
-} from '$lib/server/boards/board-provisioning.js';
+import { getBoardPreferencesForUser, updateBoardPreferencesForUser } from '$lib/server/boards/board-provisioning.js';
 import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */

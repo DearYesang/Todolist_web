@@ -260,6 +260,6 @@ function isCategoryMergeResponse(body) {
 		&& 'source' in body
 		&& 'target' in body
 		&& 'updatedTasks' in body
-		&& typeof /** @type {{ updatedTasks?: unknown }} */ (body).updatedTasks === 'number'
+		&& typeof (/** @type {{ updatedTasks?: unknown }} */ (body).updatedTasks) === 'number'
 	);
 }

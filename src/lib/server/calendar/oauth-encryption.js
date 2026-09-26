@@ -48,10 +48,7 @@ export function decryptCalendarToken(value, associatedData) {
 	const decipher = createDecipheriv('aes-256-gcm', key, fromBase64Url(encodedIv));
 	decipher.setAAD(Buffer.from(associatedData));
 	decipher.setAuthTag(fromBase64Url(encodedTag));
-	return Buffer.concat([
-		decipher.update(fromBase64Url(encodedCiphertext)),
-		decipher.final()
-	]).toString('utf8');
+	return Buffer.concat([decipher.update(fromBase64Url(encodedCiphertext)), decipher.final()]).toString('utf8');
 }
 
 export function assertCalendarOauthEncryptionConfigured() {
@@ -61,7 +58,9 @@ export function assertCalendarOauthEncryptionConfigured() {
 function getCalendarOauthKey() {
 	const raw = process.env.CALENDAR_OAUTH_ENCRYPTION_KEY;
 	if (!raw || raw.includes('replace-with')) {
-		throw new CalendarTokenEncryptionError('CALENDAR_OAUTH_ENCRYPTION_KEY must be configured before calendar provider sync can be used.');
+		throw new CalendarTokenEncryptionError(
+			'CALENDAR_OAUTH_ENCRYPTION_KEY must be configured before calendar provider sync can be used.'
+		);
 	}
 
 	const decoded = tryDecodeBase64(raw);

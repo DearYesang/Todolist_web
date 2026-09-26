@@ -40,10 +40,13 @@ describe('offline write queue', () => {
 		});
 
 		const serverTask = normalizeTask({ id: taskId, text: 'First', status: 'doing' });
-		const fetcher = vi.fn(async () => new Response(JSON.stringify({ task: serverTask }), {
-			status: 200,
-			headers: { 'content-type': 'application/json' }
-		}));
+		const fetcher = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ task: serverTask }), {
+					status: 200,
+					headers: { 'content-type': 'application/json' }
+				})
+		);
 
 		await expect(flushOfflineWriteQueue(fetcher)).resolves.toMatchObject({
 			flushed: 1,
@@ -51,10 +54,13 @@ describe('offline write queue', () => {
 			blocked: false,
 			syncedTasks: [serverTask]
 		});
-		expect(fetcher).toHaveBeenCalledWith(`/api/tasks/${taskId}`, expect.objectContaining({
-			method: 'PATCH',
-			body: JSON.stringify({ text: 'First', status: 'doing' })
-		}));
+		expect(fetcher).toHaveBeenCalledWith(
+			`/api/tasks/${taskId}`,
+			expect.objectContaining({
+				method: 'PATCH',
+				body: JSON.stringify({ text: 'First', status: 'doing' })
+			})
+		);
 		expect(loadOfflineQueue()).toEqual([]);
 	});
 
@@ -65,9 +71,11 @@ describe('offline write queue', () => {
 			taskId
 		});
 
-		await expect(flushOfflineWriteQueue(async () => {
-			throw new Error('offline');
-		})).resolves.toMatchObject({
+		await expect(
+			flushOfflineWriteQueue(async () => {
+				throw new Error('offline');
+			})
+		).resolves.toMatchObject({
 			flushed: 0,
 			remaining: 1,
 			blocked: true
@@ -88,12 +96,18 @@ describe('offline write queue conflict behavior', () => {
 			patch: { text: 'Stale write' }
 		});
 
-		const result = await flushOfflineWriteQueue(async () => new Response(JSON.stringify({
-			message: 'Conflict.'
-		}), {
-			status: 409,
-			headers: { 'content-type': 'application/json' }
-		}));
+		const result = await flushOfflineWriteQueue(
+			async () =>
+				new Response(
+					JSON.stringify({
+						message: 'Conflict.'
+					}),
+					{
+						status: 409,
+						headers: { 'content-type': 'application/json' }
+					}
+				)
+		);
 
 		expect(result).toMatchObject({
 			flushed: 1,
@@ -128,11 +142,14 @@ describe('offline write queue conflict behavior', () => {
 			patch: { text: 'Later' }
 		});
 
-		const fetcher = vi.fn()
-			.mockResolvedValueOnce(new Response(JSON.stringify({ task: firstTask }), {
-				status: 200,
-				headers: { 'content-type': 'application/json' }
-			}))
+		const fetcher = vi
+			.fn()
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ task: firstTask }), {
+					status: 200,
+					headers: { 'content-type': 'application/json' }
+				})
+			)
 			.mockRejectedValueOnce(new Error('offline'));
 
 		const result = await flushOfflineWriteQueue(fetcher);
@@ -154,12 +171,18 @@ describe('offline write queue conflict behavior', () => {
 			patch: { text: 'Throttled write' }
 		});
 
-		const result = await flushOfflineWriteQueue(async () => new Response(JSON.stringify({
-			message: 'Too many task changes.'
-		}), {
-			status: 429,
-			headers: { 'content-type': 'application/json', 'retry-after': '30' }
-		}));
+		const result = await flushOfflineWriteQueue(
+			async () =>
+				new Response(
+					JSON.stringify({
+						message: 'Too many task changes.'
+					}),
+					{
+						status: 429,
+						headers: { 'content-type': 'application/json', 'retry-after': '30' }
+					}
+				)
+		);
 
 		expect(result).toMatchObject({
 			flushed: 0,
@@ -227,15 +250,20 @@ describe('offline write queue conflict behavior', () => {
 			payload: { text: 'Child', parentId: null }
 		});
 
-		const fetcher = vi.fn()
-			.mockResolvedValueOnce(new Response(JSON.stringify({ task: serverParent }), {
-				status: 201,
-				headers: { 'content-type': 'application/json' }
-			}))
-			.mockResolvedValueOnce(new Response(JSON.stringify({ task: serverChild }), {
-				status: 201,
-				headers: { 'content-type': 'application/json' }
-			}));
+		const fetcher = vi
+			.fn()
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ task: serverParent }), {
+					status: 201,
+					headers: { 'content-type': 'application/json' }
+				})
+			)
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ task: serverChild }), {
+					status: 201,
+					headers: { 'content-type': 'application/json' }
+				})
+			);
 
 		const result = await flushOfflineWriteQueue(fetcher);
 
@@ -244,10 +272,14 @@ describe('offline write queue conflict behavior', () => {
 			remaining: 0,
 			blocked: false
 		});
-		expect(fetcher).toHaveBeenNthCalledWith(2, '/api/tasks', expect.objectContaining({
-			method: 'POST',
-			body: JSON.stringify({ text: 'Child', parentId: serverParent.id })
-		}));
+		expect(fetcher).toHaveBeenNthCalledWith(
+			2,
+			'/api/tasks',
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({ text: 'Child', parentId: serverParent.id })
+			})
+		);
 		expect(result.createdTasks).toEqual([
 			{ localTaskId: localParentId, task: serverParent },
 			{ localTaskId: localChildId, task: serverChild }
@@ -290,10 +322,13 @@ describe('offline write queue conflict behavior', () => {
 			}
 		});
 
-		const fetcher = vi.fn(async () => new Response(JSON.stringify({ task: serverTask }), {
-			status: 201,
-			headers: { 'content-type': 'application/json' }
-		}));
+		const fetcher = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ task: serverTask }), {
+					status: 201,
+					headers: { 'content-type': 'application/json' }
+				})
+		);
 
 		await expect(flushOfflineWriteQueue(fetcher)).resolves.toMatchObject({
 			flushed: 1,
@@ -301,14 +336,17 @@ describe('offline write queue conflict behavior', () => {
 			blocked: false,
 			createdTasks: [{ localTaskId, task: serverTask }]
 		});
-		expect(fetcher).toHaveBeenCalledWith('/api/tasks', expect.objectContaining({
-			method: 'POST',
-			body: JSON.stringify({
-				text: 'Edited task',
-				status: 'doing',
-				parentId: null
+		expect(fetcher).toHaveBeenCalledWith(
+			'/api/tasks',
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({
+					text: 'Edited task',
+					status: 'doing',
+					parentId: null
+				})
 			})
-		}));
+		);
 	});
 
 	it('replays queued offline imports when connectivity returns', async () => {
@@ -323,20 +361,26 @@ describe('offline write queue conflict behavior', () => {
 			payload: [{ text: 'Imported offline' }]
 		});
 
-		const fetcher = vi.fn(async () => new Response(JSON.stringify({
-			tasks: [importedTask],
-			summary: {
-				receivedTasks: 1,
-				importedTasks: 1,
-				skippedTasks: 0,
-				importedChecklistItems: 0,
-				skippedChecklistItems: 0,
-				repairedParentLinks: 0
-			}
-		}), {
-			status: 201,
-			headers: { 'content-type': 'application/json' }
-		}));
+		const fetcher = vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						tasks: [importedTask],
+						summary: {
+							receivedTasks: 1,
+							importedTasks: 1,
+							skippedTasks: 0,
+							importedChecklistItems: 0,
+							skippedChecklistItems: 0,
+							repairedParentLinks: 0
+						}
+					}),
+					{
+						status: 201,
+						headers: { 'content-type': 'application/json' }
+					}
+				)
+		);
 
 		const result = await flushOfflineWriteQueue(fetcher);
 
@@ -344,16 +388,21 @@ describe('offline write queue conflict behavior', () => {
 			flushed: 1,
 			remaining: 0,
 			blocked: false,
-			completedImports: [{
-				mode: 'append',
-				tasks: [importedTask],
-				localTaskIds: []
-			}]
+			completedImports: [
+				{
+					mode: 'append',
+					tasks: [importedTask],
+					localTaskIds: []
+				}
+			]
 		});
-		expect(fetcher).toHaveBeenCalledWith('/api/import', expect.objectContaining({
-			method: 'POST',
-			body: JSON.stringify([{ text: 'Imported offline' }])
-		}));
+		expect(fetcher).toHaveBeenCalledWith(
+			'/api/import',
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify([{ text: 'Imported offline' }])
+			})
+		);
 	});
 
 	it('treats replace imports as a new offline baseline', () => {
@@ -417,15 +466,20 @@ describe('offline write queue conflict behavior', () => {
 			done: true
 		});
 
-		const fetcher = vi.fn()
-			.mockResolvedValueOnce(new Response(JSON.stringify({ task: createdTask }), {
-				status: 201,
-				headers: { 'content-type': 'application/json' }
-			}))
-			.mockResolvedValueOnce(new Response(JSON.stringify({ task: updatedTask }), {
-				status: 200,
-				headers: { 'content-type': 'application/json' }
-			}));
+		const fetcher = vi
+			.fn()
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ task: createdTask }), {
+					status: 201,
+					headers: { 'content-type': 'application/json' }
+				})
+			)
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ task: updatedTask }), {
+					status: 200,
+					headers: { 'content-type': 'application/json' }
+				})
+			);
 
 		await expect(flushOfflineWriteQueue(fetcher)).resolves.toMatchObject({
 			flushed: 1,
@@ -433,14 +487,22 @@ describe('offline write queue conflict behavior', () => {
 			blocked: false,
 			syncedTasks: [updatedTask]
 		});
-		expect(fetcher).toHaveBeenNthCalledWith(1, `/api/tasks/${taskId}/checklist`, expect.objectContaining({
-			method: 'POST',
-			body: JSON.stringify({ text: 'Renamed checklist' })
-		}));
-		expect(fetcher).toHaveBeenNthCalledWith(2, `/api/tasks/${taskId}/checklist/${serverItemId}`, expect.objectContaining({
-			method: 'PATCH',
-			body: JSON.stringify({ done: true })
-		}));
+		expect(fetcher).toHaveBeenNthCalledWith(
+			1,
+			`/api/tasks/${taskId}/checklist`,
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({ text: 'Renamed checklist' })
+			})
+		);
+		expect(fetcher).toHaveBeenNthCalledWith(
+			2,
+			`/api/tasks/${taskId}/checklist/${serverItemId}`,
+			expect.objectContaining({
+				method: 'PATCH',
+				body: JSON.stringify({ done: true })
+			})
+		);
 	});
 
 	it('keeps the checked state of an offline create whose follow-up patch was throttled', async () => {
@@ -460,15 +522,20 @@ describe('offline write queue conflict behavior', () => {
 			done: true
 		});
 
-		const fetcher = vi.fn()
-			.mockResolvedValueOnce(new Response(JSON.stringify({ task: createdTask }), {
-				status: 201,
-				headers: { 'content-type': 'application/json' }
-			}))
-			.mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Too many task changes.' }), {
-				status: 429,
-				headers: { 'content-type': 'application/json', 'retry-after': '30' }
-			}));
+		const fetcher = vi
+			.fn()
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ task: createdTask }), {
+					status: 201,
+					headers: { 'content-type': 'application/json' }
+				})
+			)
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ message: 'Too many task changes.' }), {
+					status: 429,
+					headers: { 'content-type': 'application/json', 'retry-after': '30' }
+				})
+			);
 
 		const result = await flushOfflineWriteQueue(fetcher);
 
@@ -503,14 +570,19 @@ describe('offline write queue conflict behavior', () => {
 
 	it('ignores corrupted queue records from another owner', () => {
 		setOfflineQueueOwner('user-a');
-		storage.set('kanbanOfflineWriteQueue:user-a', JSON.stringify([{
-			id: 'mutation-id',
-			ownerUserId: 'user-b',
-			type: 'task.delete',
-			taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-			createdAt: Date.now(),
-			attempts: 0
-		}]));
+		storage.set(
+			'kanbanOfflineWriteQueue:user-a',
+			JSON.stringify([
+				{
+					id: 'mutation-id',
+					ownerUserId: 'user-b',
+					type: 'task.delete',
+					taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+					createdAt: Date.now(),
+					attempts: 0
+				}
+			])
+		);
 
 		expect(loadOfflineQueue()).toEqual([]);
 	});

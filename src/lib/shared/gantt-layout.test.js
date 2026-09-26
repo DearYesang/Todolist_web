@@ -67,10 +67,10 @@ describe('buildGanttLayout', () => {
 	});
 
 	it('pads long tasks 3 days before the start and 5 days after the end', () => {
-		const layout = buildGanttLayout([
-			createTask('long', '2026-08-01', '2026-11-30'),
-			createTask('short', '2026-09-24', '2026-09-24')
-		], { now: NOW });
+		const layout = buildGanttLayout(
+			[createTask('long', '2026-08-01', '2026-11-30'), createTask('short', '2026-09-24', '2026-09-24')],
+			{ now: NOW }
+		);
 
 		expect(headerLabels(layout)[0]).toBe('7/29');
 		expect(headerLabels(layout).at(-1)).toBe('12/5');
@@ -78,14 +78,17 @@ describe('buildGanttLayout', () => {
 	});
 
 	it('lists rows in hierarchy order and hides the children of collapsed tasks', () => {
-		const layout = buildGanttLayout([
-			createTask('parent', '2026-09-20', '2026-09-25'),
-			createTask('collapsed', '2026-09-21', '2026-09-22', { collapsed: true }),
-			createTask('child', '2026-09-21', '2026-09-22', { parentId: 'parent' }),
-			createTask('hidden-child', '2026-09-21', '2026-09-22', { parentId: 'collapsed' }),
-			createTask('grandchild', '2026-09-21', '2026-09-22', { parentId: 'child' }),
-			createTask('orphan', '2026-09-21', '2026-09-22', { parentId: 'filtered-out' })
-		], { now: NOW });
+		const layout = buildGanttLayout(
+			[
+				createTask('parent', '2026-09-20', '2026-09-25'),
+				createTask('collapsed', '2026-09-21', '2026-09-22', { collapsed: true }),
+				createTask('child', '2026-09-21', '2026-09-22', { parentId: 'parent' }),
+				createTask('hidden-child', '2026-09-21', '2026-09-22', { parentId: 'collapsed' }),
+				createTask('grandchild', '2026-09-21', '2026-09-22', { parentId: 'child' }),
+				createTask('orphan', '2026-09-21', '2026-09-22', { parentId: 'filtered-out' })
+			],
+			{ now: NOW }
+		);
 
 		expect(layout.displayList.map((row) => [row.task.id, row.depth])).toEqual([
 			['parent', 0],

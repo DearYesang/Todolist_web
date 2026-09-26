@@ -29,13 +29,15 @@ describe('/api/import route', () => {
 			response: Response.json({ message: 'Authentication required.' }, { status: 401 })
 		});
 
-		const response = await POST(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/import', {
-				method: 'POST',
-				body: '[]'
-			}),
-			url: new URL('https://todo.example.com/api/import')
-		}));
+		const response = await POST(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/import', {
+					method: 'POST',
+					body: '[]'
+				}),
+				url: new URL('https://todo.example.com/api/import')
+			})
+		);
 
 		expect(response.status).toBe(401);
 		expect(importTasksForUser).not.toHaveBeenCalled();
@@ -43,23 +45,27 @@ describe('/api/import route', () => {
 	});
 
 	it('rejects malformed or oversized payloads before touching the repository', async () => {
-		const malformed = await POST(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/import', {
-				method: 'POST',
-				body: '{'
-			}),
-			url: new URL('https://todo.example.com/api/import')
-		}));
+		const malformed = await POST(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/import', {
+					method: 'POST',
+					body: '{'
+				}),
+				url: new URL('https://todo.example.com/api/import')
+			})
+		);
 		expect(malformed.status).toBe(400);
 
-		const oversized = await POST(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/import', {
-				method: 'POST',
-				headers: { 'content-length': String(6 * 1024 * 1024) },
-				body: '[]'
-			}),
-			url: new URL('https://todo.example.com/api/import')
-		}));
+		const oversized = await POST(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/import', {
+					method: 'POST',
+					headers: { 'content-length': String(6 * 1024 * 1024) },
+					body: '[]'
+				}),
+				url: new URL('https://todo.example.com/api/import')
+			})
+		);
 		expect(oversized.status).toBe(413);
 		expect(importTasksForUser).not.toHaveBeenCalled();
 	});
@@ -79,14 +85,16 @@ describe('/api/import route', () => {
 			}
 		});
 
-		const response = await POST(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/import?mode=replace', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify([{ text: 'Imported' }])
-			}),
-			url: new URL('https://todo.example.com/api/import?mode=replace')
-		}));
+		const response = await POST(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/import?mode=replace', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify([{ text: 'Imported' }])
+				}),
+				url: new URL('https://todo.example.com/api/import?mode=replace')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(201);

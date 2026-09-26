@@ -15,9 +15,9 @@ export const currentView = writable(readInitialView());
  * @param {unknown} value
  */
 export function setCurrentView(value) {
-    if (isAppView(value)) {
-        currentView.set(value);
-    }
+	if (isAppView(value)) {
+		currentView.set(value);
+	}
 }
 
 /**
@@ -31,26 +31,26 @@ export function setCurrentView(value) {
  * @returns {Promise<string | null>}
  */
 export async function selectView(view, { signedIn, fetcher }) {
-    setCurrentView(view);
+	setCurrentView(view);
 
-    if (!signedIn) {
-        return null;
-    }
+	if (!signedIn) {
+		return null;
+	}
 
-    if (!navigator.onLine) {
-        markPendingDefaultView(view);
-        return null;
-    }
+	if (!navigator.onLine) {
+		markPendingDefaultView(view);
+		return null;
+	}
 
-    const result = await updateBoardPreferences({ defaultView: view }, fetcher);
-    if (result.ok) {
-        clearPendingDefaultView();
-    } else if (result.fallback) {
-        markPendingDefaultView(view);
-    } else {
-        return result.message;
-    }
-    return null;
+	const result = await updateBoardPreferences({ defaultView: view }, fetcher);
+	if (result.ok) {
+		clearPendingDefaultView();
+	} else if (result.fallback) {
+		markPendingDefaultView(view);
+	} else {
+		return result.message;
+	}
+	return null;
 }
 
 /**
@@ -59,68 +59,68 @@ export async function selectView(view, { signedIn, fetcher }) {
  * @param {{ signedIn: boolean; fetcher?: typeof fetch }} options
  */
 export async function flushPendingViewPreference({ signedIn, fetcher }) {
-    const pendingView = readPendingDefaultView();
-    if (!pendingView || !signedIn || !navigator.onLine) {
-        return;
-    }
+	const pendingView = readPendingDefaultView();
+	if (!pendingView || !signedIn || !navigator.onLine) {
+		return;
+	}
 
-    const result = await updateBoardPreferences({ defaultView: pendingView }, fetcher);
-    if (result.ok) {
-        clearPendingDefaultView();
-    }
+	const result = await updateBoardPreferences({ defaultView: pendingView }, fetcher);
+	if (result.ok) {
+		clearPendingDefaultView();
+	}
 }
 
 /**
  * @param {unknown} value
  */
 export function markPendingDefaultView(value) {
-    if (!isAppView(value)) return;
+	if (!isAppView(value)) return;
 
-    try {
-        const storage = getStorage();
-        storage?.setItem(PENDING_VIEW_STORAGE_KEY, value);
-    } catch (error) {
-        console.error('Failed to persist pending default view', error);
-    }
+	try {
+		const storage = getStorage();
+		storage?.setItem(PENDING_VIEW_STORAGE_KEY, value);
+	} catch (error) {
+		console.error('Failed to persist pending default view', error);
+	}
 }
 
 /** @returns {AppView | null} */
 export function readPendingDefaultView() {
-    try {
-        const storage = getStorage();
-        const stored = storage?.getItem(PENDING_VIEW_STORAGE_KEY);
-        return isAppView(stored) ? stored : null;
-    } catch {
-        return null;
-    }
+	try {
+		const storage = getStorage();
+		const stored = storage?.getItem(PENDING_VIEW_STORAGE_KEY);
+		return isAppView(stored) ? stored : null;
+	} catch {
+		return null;
+	}
 }
 
 export function clearPendingDefaultView() {
-    try {
-        getStorage()?.removeItem(PENDING_VIEW_STORAGE_KEY);
-    } catch (error) {
-        console.error('Failed to clear pending default view', error);
-    }
+	try {
+		getStorage()?.removeItem(PENDING_VIEW_STORAGE_KEY);
+	} catch (error) {
+		console.error('Failed to clear pending default view', error);
+	}
 }
 
 currentView.subscribe((value) => {
-    try {
-        const storage = getStorage();
-        if (!storage || !isAppView(value)) return;
+	try {
+		const storage = getStorage();
+		if (!storage || !isAppView(value)) return;
 
-        storage.setItem(VIEW_STORAGE_KEY, value);
-    } catch (error) {
-        console.error('Failed to persist current view', error);
-    }
+		storage.setItem(VIEW_STORAGE_KEY, value);
+	} catch (error) {
+		console.error('Failed to persist current view', error);
+	}
 });
 
 /** @returns {AppView} */
 function readInitialView() {
-    try {
-        const storage = getStorage();
-        const stored = storage?.getItem(VIEW_STORAGE_KEY);
-        return isAppView(stored) ? stored : 'kanban';
-    } catch {
-        return 'kanban';
-    }
+	try {
+		const storage = getStorage();
+		const stored = storage?.getItem(VIEW_STORAGE_KEY);
+		return isAppView(stored) ? stored : 'kanban';
+	} catch {
+		return 'kanban';
+	}
 }

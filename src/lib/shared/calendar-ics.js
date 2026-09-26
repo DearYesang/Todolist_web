@@ -71,7 +71,9 @@ function createDescription(task) {
 		`Urgency: ${task.urgency}`,
 		task.category ? `Category: ${task.category}` : '',
 		checklist
-	].filter(Boolean).join('\n');
+	]
+		.filter(Boolean)
+		.join('\n');
 }
 
 /**
@@ -85,7 +87,10 @@ function formatIcsDate(value) {
  * @param {Date} value
  */
 function formatIcsTimestamp(value) {
-	return value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+	return value
+		.toISOString()
+		.replace(/[-:]/g, '')
+		.replace(/\.\d{3}Z$/, 'Z');
 }
 
 /**
@@ -105,11 +110,7 @@ function addDays(value, days) {
  * @param {string} value
  */
 function escapeIcsText(value) {
-	return value
-		.replace(/\\/g, '\\\\')
-		.replace(/\r?\n/g, '\\n')
-		.replace(/;/g, '\\;')
-		.replace(/,/g, '\\,');
+	return value.replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/;/g, '\\;').replace(/,/g, '\\,');
 }
 
 /**

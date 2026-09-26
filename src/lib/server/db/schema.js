@@ -47,10 +47,7 @@ export const session = pgTable(
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' })
 	},
-	(table) => [
-		uniqueIndex('session_token_uidx').on(table.token),
-		index('session_user_id_idx').on(table.userId)
-	]
+	(table) => [uniqueIndex('session_token_uidx').on(table.token), index('session_user_id_idx').on(table.userId)]
 );
 
 export const account = pgTable(
@@ -350,10 +347,7 @@ export const calendarEventLinks = pgTable(
 	},
 	(table) => [
 		index('calendar_event_links_task_id_idx').on(table.taskId),
-		uniqueIndex('calendar_event_links_connection_task_uidx').on(
-			table.connectionId,
-			table.taskId
-		),
+		uniqueIndex('calendar_event_links_connection_task_uidx').on(table.connectionId, table.taskId),
 		uniqueIndex('calendar_event_links_external_event_uidx').on(
 			table.connectionId,
 			table.externalCalendarId,
@@ -401,7 +395,5 @@ export const syncCursors = pgTable(
 		cursor: text('cursor').notNull(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 	},
-	(table) => [
-		uniqueIndex('sync_cursors_connection_resource_uidx').on(table.connectionId, table.resource)
-	]
+	(table) => [uniqueIndex('sync_cursors_connection_resource_uidx').on(table.connectionId, table.resource)]
 );

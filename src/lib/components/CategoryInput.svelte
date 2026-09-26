@@ -27,12 +27,14 @@
     } = $props();
 
     const listId = $derived(`${id}-list`);
-    const suggestions = $derived(suggestCategories({
-        text: taskText,
-        existingCategories: categories,
-        parentCategory,
-        currentCategory: value
-    }));
+    const suggestions = $derived(
+        suggestCategories({
+            text: taskText,
+            existingCategories: categories,
+            parentCategory,
+            currentCategory: value
+        })
+    );
 
     /** @param {Event} event */
     function handleInput(event) {
@@ -67,7 +69,7 @@
         class="form-input"
         type="text"
         value={value}
-        {placeholder}
+        placeholder={placeholder}
         list={listId}
         autocomplete="off"
         oninput={handleInput}

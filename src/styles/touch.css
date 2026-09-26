@@ -35,61 +35,61 @@
 }
 
 @media (min-width: 721px) and (max-width: 1180px) and (hover: none) and (pointer: coarse) {
-        .header {
-            padding-left: calc(20px + var(--safe-left));
-            padding-right: calc(20px + var(--safe-right));
-        }
+    .header {
+        padding-left: calc(20px + var(--safe-left));
+        padding-right: calc(20px + var(--safe-right));
+    }
 
-        .header h1 {
-            flex: 0 1 220px;
-        }
+    .header h1 {
+        flex: 0 1 220px;
+    }
 
-        .view-toggle {
-            flex: 0 0 auto;
-        }
+    .view-toggle {
+        flex: 0 0 auto;
+    }
 
-        .header-actions {
-            flex-wrap: wrap;
-            max-width: 760px;
-            justify-content: flex-end;
-        }
+    .header-actions {
+        flex-wrap: wrap;
+        max-width: 760px;
+        justify-content: flex-end;
+    }
 
-        .add-panel,
-        .filter-bar,
-        .board,
-        .gantt-board,
-        .eisenhower-toolbar,
-        .eisenhower-board {
-            padding-left: calc(20px + var(--safe-left));
-            padding-right: calc(20px + var(--safe-right));
-        }
+    .add-panel,
+    .filter-bar,
+    .board,
+    .gantt-board,
+    .eisenhower-toolbar,
+    .eisenhower-board {
+        padding-left: calc(20px + var(--safe-left));
+        padding-right: calc(20px + var(--safe-right));
+    }
 
-        .calendar-feed-popover,
-        .calendar-sync-popover {
-            width: min(420px, calc(100vw - 40px - var(--safe-left) - var(--safe-right)));
-        }
+    .calendar-feed-popover,
+    .calendar-sync-popover {
+        width: min(420px, calc(100vw - 40px - var(--safe-left) - var(--safe-right)));
+    }
 
-        .side-panel {
-            width: min(540px, 54vw);
-        }
+    .side-panel {
+        width: min(540px, 54vw);
+    }
 
-        .panel-header,
-        .panel-body {
-            padding-right: 22px;
-            padding-left: 22px;
-        }
+    .panel-header,
+    .panel-body {
+        padding-right: 22px;
+        padding-left: 22px;
+    }
 
-        .panel-footer {
-            padding-right: 22px;
-            padding-left: 22px;
-        }
+    .panel-footer {
+        padding-right: 22px;
+        padding-left: 22px;
+    }
 
-        .gantt-sidebar {
-            width: min(360px, 36vw);
-        }
+    .gantt-sidebar {
+        width: min(360px, 36vw);
+    }
 
-        .eisenhower-board {
-            gap: 14px;
+    .eisenhower-board {
+        gap: 14px;
     }
 
     .eisenhower-quadrant {

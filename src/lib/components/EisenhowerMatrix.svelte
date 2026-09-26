@@ -1,7 +1,12 @@
 <script>
     import { filters, taskIndex, tasks, updateTask } from '$lib/client/task-store.js';
     import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
-    import { buildHierarchy, isTaskInEisenhowerQuadrant, matchesFilters, resolveEisenhowerMove } from '$lib/shared/task-domain.js';
+    import {
+        buildHierarchy,
+        isTaskInEisenhowerQuadrant,
+        matchesFilters,
+        resolveEisenhowerMove
+    } from '$lib/shared/task-domain.js';
     import { setBoardContext } from './board-context.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
@@ -57,7 +62,10 @@
 
     let showDoneTasks = $state(false);
 
-    const dndState = $state({ draggedId: /** @type {string | null} */ (null), hoveredZone: /** @type {string | null} */ (null) });
+    const dndState = $state({
+        draggedId: /** @type {string | null} */ (null),
+        hoveredZone: /** @type {string | null} */ (null)
+    });
 
     const controller = createPointerDndController({
         onStateChange(snapshot) {
@@ -87,10 +95,11 @@
 
     const matrixData = $derived.by(() =>
         quadrants.map((quadrant) => {
-            const quadrantTasks = $tasks.filter((task) =>
-                matchesFilters(task, $filters)
-                && isTaskInQuadrant(task, quadrant)
-                && (showDoneTasks || task.status !== 'done')
+            const quadrantTasks = $tasks.filter(
+                (task) =>
+                    matchesFilters(task, $filters)
+                    && isTaskInQuadrant(task, quadrant)
+                    && (showDoneTasks || task.status !== 'done')
             );
             const { roots, childrenByParent } = buildHierarchy(quadrantTasks);
 
@@ -125,7 +134,7 @@
 </script>
 
 <div class="eisenhower-toolbar">
-    <button class="btn btn-ghost eisenhower-done-toggle" onclick={() => showDoneTasks = !showDoneTasks}>
+    <button class="btn btn-ghost eisenhower-done-toggle" onclick={() => (showDoneTasks = !showDoneTasks)}>
         {showDoneTasks ? '완료 숨기기' : `완료 보기${hiddenDoneCount > 0 ? ` (${hiddenDoneCount})` : ''}`}
     </button>
 </div>
@@ -154,9 +163,7 @@
                     </div>
                 {:else}
                     {#each quadrant.roots as task (task.id)}
-                        <TaskTreeCard
-                            childrenByParent={quadrant.childrenByParent}
-                            task={task} />
+                        <TaskTreeCard childrenByParent={quadrant.childrenByParent} task={task} />
                     {/each}
                 {/if}
             </div>

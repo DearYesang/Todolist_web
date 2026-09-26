@@ -14,7 +14,10 @@
         { id: 'done', title: '완료', emptyIcon: '🎉' }
     ];
 
-    const dndState = $state({ draggedId: /** @type {string | null} */ (null), hoveredZone: /** @type {string | null} */ (null) });
+    const dndState = $state({
+        draggedId: /** @type {string | null} */ (null),
+        hoveredZone: /** @type {string | null} */ (null)
+    });
 
     const controller = createPointerDndController({
         onStateChange(snapshot) {
@@ -89,9 +92,7 @@
                     </div>
                 {:else}
                     {#each column.roots as task (task.id)}
-                        <TaskTreeCard
-                            childrenByParent={column.childrenByParent}
-                            task={task} />
+                        <TaskTreeCard childrenByParent={column.childrenByParent} task={task} />
                     {/each}
                 {/if}
             </div>

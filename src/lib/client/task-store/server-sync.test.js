@@ -4,18 +4,8 @@ import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { normalizeTask } from '../../shared/task-domain.js';
 import { mergeTasks, replaceTasks, tasks } from './task-cache.js';
 import { currentView, setCurrentView } from './view-preference.js';
-import {
-	addSubtask,
-	deleteSubtask,
-	renameSubtask,
-	toggleSubtask,
-	updateTask
-} from './task-mutations.js';
-import {
-	enqueueOfflineMutation,
-	loadOfflineQueue,
-	setOfflineQueueOwner
-} from '../offline-write-queue.js';
+import { addSubtask, deleteSubtask, renameSubtask, toggleSubtask, updateTask } from './task-mutations.js';
+import { enqueueOfflineMutation, loadOfflineQueue, setOfflineQueueOwner } from '../offline-write-queue.js';
 import { syncServerTasks } from './server-sync.js';
 
 describe('client task sync', () => {
@@ -37,22 +27,24 @@ describe('client task sync', () => {
 			id: '11111111-1111-4111-8111-111111111111',
 			text: 'Synced task'
 		});
-		const fetcher = vi.fn(async (url) => new Response(JSON.stringify(
-			url === '/api/board/preferences'
-				? { defaultView: 'matrix' }
-				: { tasks: [task] }
-		), {
-			status: 200,
-			headers: { 'content-type': 'application/json' }
-		}));
+		const fetcher = vi.fn(
+			async (url) =>
+				new Response(JSON.stringify(url === '/api/board/preferences' ? { defaultView: 'matrix' } : { tasks: [task] }), {
+					status: 200,
+					headers: { 'content-type': 'application/json' }
+				})
+		);
 
 		setCurrentView('kanban');
 		await syncServerTasks(fetcher);
 
 		expect(get(currentView)).toBe('matrix');
-		expect(fetcher).toHaveBeenCalledWith('/api/board/preferences', expect.objectContaining({
-			headers: { accept: 'application/json' }
-		}));
+		expect(fetcher).toHaveBeenCalledWith(
+			'/api/board/preferences',
+			expect.objectContaining({
+				headers: { accept: 'application/json' }
+			})
+		);
 	});
 
 	it('applies server UUID tasks as an authoritative snapshot while preserving pending local tasks', async () => {
@@ -78,22 +70,30 @@ describe('client task sync', () => {
 			id: '33333333-3333-4333-8333-333333333333',
 			text: 'New server task'
 		});
-		const fetcher = vi.fn(async () => new Response(JSON.stringify({
-			tasks: [serverSnapshotTask, newServerTask]
-		}), {
-			status: 200,
-			headers: { 'content-type': 'application/json' }
-		}));
+		const fetcher = vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({
+						tasks: [serverSnapshotTask, newServerTask]
+					}),
+					{
+						status: 200,
+						headers: { 'content-type': 'application/json' }
+					}
+				)
+		);
 
 		replaceTasks([currentServerTask, staleServerTask, pendingLocalTask]);
 		await syncServerTasks(fetcher);
 
-		expect(get(tasks).map((task) => ({
-			id: task.id,
-			text: task.text,
-			status: task.status,
-			collapsed: task.collapsed
-		}))).toEqual([
+		expect(
+			get(tasks).map((task) => ({
+				id: task.id,
+				text: task.text,
+				status: task.status,
+				collapsed: task.collapsed
+			}))
+		).toEqual([
 			expect.objectContaining({
 				id: 'local-pending',
 				text: 'Pending local'
@@ -182,9 +182,12 @@ describe('client task sync', () => {
 
 	it('coalesces pending checklist create edits and deletes through the task store', async () => {
 		vi.stubGlobal('window', {});
-		vi.stubGlobal('fetch', vi.fn(async () => {
-			throw new Error('offline');
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				throw new Error('offline');
+			})
+		);
 		const task = normalizeTask({
 			id: '44444444-4444-4444-8444-444444444444',
 			text: 'Server task'

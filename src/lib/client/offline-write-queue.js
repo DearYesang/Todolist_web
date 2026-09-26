@@ -136,7 +136,7 @@ function withFlushLock(operation) {
 			FLUSH_LOCK_NAME,
 			{ ifAvailable: true },
 			/** @param {unknown} lock */
-			(lock) => lock ? operation() : createFlushResult(loadOfflineQueue(), true)
+			(lock) => (lock ? operation() : createFlushResult(loadOfflineQueue(), true))
 		);
 	}
 
@@ -216,7 +216,11 @@ async function executeFlush(fetcher) {
 		if (result.ok) {
 			flushed += 1;
 			processedIds.add(mutation.id);
-			if ('pendingDoneItemId' in result && typeof result.pendingDoneItemId === 'string' && 'taskId' in executableMutation) {
+			if (
+				'pendingDoneItemId' in result
+				&& typeof result.pendingDoneItemId === 'string'
+				&& 'taskId' in executableMutation
+			) {
 				// A checked offline create landed its item but not the checked
 				// state; queue a retryable follow-up patch for the next flush.
 				// Mid-flush enqueues survive the post-flush reconciliation.
@@ -303,9 +307,7 @@ function reconcileQueueAfterFlush(remaining, processedIds, originalById, localTa
 		}
 
 		const retained = remainingById.get(mutation.id);
-		const merged = retained
-			? { ...mutation, attempts: Math.max(mutation.attempts, retained.attempts) }
-			: mutation;
+		const merged = retained ? { ...mutation, attempts: Math.max(mutation.attempts, retained.attempts) } : mutation;
 		finalQueue.push(remapMutationLocalIds(merged, localTaskIds));
 	}
 
@@ -359,10 +361,8 @@ function isPermanentlyOrphaned(mutation, queue, processedIds) {
 		return true;
 	}
 
-	return !queue.some((item) =>
-		item.type === 'task.create'
-		&& item.localTaskId === unresolvedLocalId
-		&& !processedIds.has(item.id)
+	return !queue.some(
+		(item) => item.type === 'task.create' && item.localTaskId === unresolvedLocalId && !processedIds.has(item.id)
 	);
 }
 
@@ -385,9 +385,7 @@ function withRefreshedExpectedVersion(mutation, latestVersions) {
 
 	if (mutation.type === 'task.delete') {
 		const knownVersion = latestVersions.get(mutation.taskId);
-		return typeof knownVersion === 'number'
-			? { ...mutation, expectedVersion: knownVersion }
-			: mutation;
+		return typeof knownVersion === 'number' ? { ...mutation, expectedVersion: knownVersion } : mutation;
 	}
 
 	return mutation;
@@ -442,11 +440,12 @@ function coalesceQueue(queue, mutation) {
 	}
 
 	if (mutation.type === 'checklist.patch') {
-		const pendingCreate = queue.find((item) =>
-			item.type === 'checklist.create'
-			&& item.taskId === mutation.taskId
-			&& Boolean(item.localItemId)
-			&& item.localItemId === mutation.itemId
+		const pendingCreate = queue.find(
+			(item) =>
+				item.type === 'checklist.create'
+				&& item.taskId === mutation.taskId
+				&& Boolean(item.localItemId)
+				&& item.localItemId === mutation.itemId
 		);
 		if (pendingCreate && pendingCreate.type === 'checklist.create') {
 			if (typeof mutation.patch.text === 'string') {
@@ -463,10 +462,8 @@ function coalesceQueue(queue, mutation) {
 			return queue;
 		}
 
-		const existing = queue.find((item) =>
-			item.type === 'checklist.patch'
-			&& item.taskId === mutation.taskId
-			&& item.itemId === mutation.itemId
+		const existing = queue.find(
+			(item) => item.type === 'checklist.patch' && item.taskId === mutation.taskId && item.itemId === mutation.itemId
 		);
 		if (existing && existing.type === 'checklist.patch') {
 			existing.patch = { ...existing.patch, ...mutation.patch };
@@ -475,21 +472,23 @@ function coalesceQueue(queue, mutation) {
 	}
 
 	if (mutation.type === 'checklist.delete') {
-		const withoutPendingCreate = queue.filter((item) =>
-			!(
-				item.type === 'checklist.create'
-				&& item.taskId === mutation.taskId
-				&& Boolean(item.localItemId)
-				&& item.localItemId === mutation.itemId
-			)
+		const withoutPendingCreate = queue.filter(
+			(item) =>
+				!(
+					item.type === 'checklist.create'
+					&& item.taskId === mutation.taskId
+					&& Boolean(item.localItemId)
+					&& item.localItemId === mutation.itemId
+				)
 		);
 		if (withoutPendingCreate.length !== queue.length || !isServerTaskId(mutation.itemId)) {
 			return withoutPendingCreate;
 		}
 
 		return [
-			...queue.filter((item) =>
-				!('taskId' in item && item.taskId === mutation.taskId && 'itemId' in item && item.itemId === mutation.itemId)
+			...queue.filter(
+				(item) =>
+					!('taskId' in item && item.taskId === mutation.taskId && 'itemId' in item && item.itemId === mutation.itemId)
 			),
 			mutation
 		];
@@ -503,8 +502,10 @@ function coalesceQueue(queue, mutation) {
  * @param {string} taskId
  */
 function isTaskScopedMutation(mutation, taskId) {
-	return ('taskId' in mutation && mutation.taskId === taskId)
-		|| (mutation.type === 'task.create' && mutation.localTaskId === taskId);
+	return (
+		('taskId' in mutation && mutation.taskId === taskId)
+		|| (mutation.type === 'task.create' && mutation.localTaskId === taskId)
+	);
 }
 
 /**
@@ -599,9 +600,7 @@ function updateQueuedLocalTaskReferences(queue, startIndex, localTaskId, serverT
  * @returns {Record<string, unknown> | null}
  */
 function getPayloadObject(payload) {
-	return payload && typeof payload === 'object'
-		? /** @type {Record<string, unknown>} */ (payload)
-		: null;
+	return payload && typeof payload === 'object' ? /** @type {Record<string, unknown>} */ (payload) : null;
 }
 
 /**
@@ -615,9 +614,13 @@ async function executeOfflineMutation(mutation, fetcher) {
 		case 'task.patch':
 			return updateServerTask(mutation.taskId, mutation.patch, fetcher);
 		case 'task.delete':
-			return deleteServerTask(mutation.taskId, {
-				...(typeof mutation.expectedVersion === 'number' ? { expectedVersion: mutation.expectedVersion } : {})
-			}, fetcher);
+			return deleteServerTask(
+				mutation.taskId,
+				{
+					...(typeof mutation.expectedVersion === 'number' ? { expectedVersion: mutation.expectedVersion } : {})
+				},
+				fetcher
+			);
 		case 'import.tasks':
 			return importServerTasks(mutation.payload, { mode: mutation.mode }, fetcher);
 		case 'checklist.create':
@@ -697,9 +700,7 @@ export function loadOfflineQueue() {
 		}
 
 		const parsed = JSON.parse(raw);
-		return Array.isArray(parsed)
-			? parsed.filter(isOfflineMutation).filter(isCurrentOwnerMutation)
-			: [];
+		return Array.isArray(parsed) ? parsed.filter(isOfflineMutation).filter(isCurrentOwnerMutation) : [];
 	} catch {
 		return [];
 	}
@@ -750,9 +751,7 @@ function readLegacyQueue(storage) {
 function getStorage() {
 	try {
 		const storage = globalThis.localStorage;
-		return storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
-			? storage
-			: null;
+		return storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function' ? storage : null;
 	} catch {
 		return null;
 	}
@@ -768,11 +767,13 @@ function isOfflineMutation(value) {
 	}
 
 	const mutation = /** @type {Record<string, unknown>} */ (value);
-	return typeof mutation.id === 'string'
+	return (
+		typeof mutation.id === 'string'
 		&& typeof mutation.type === 'string'
 		&& (mutation.ownerUserId === undefined || typeof mutation.ownerUserId === 'string')
 		&& typeof mutation.createdAt === 'number'
-		&& typeof mutation.attempts === 'number';
+		&& typeof mutation.attempts === 'number'
+	);
 }
 
 /**

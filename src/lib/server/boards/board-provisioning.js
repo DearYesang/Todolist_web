@@ -94,7 +94,12 @@ export async function getFirstBoardForUser(db, userId) {
 	const [board] = await db
 		.select()
 		.from(schema.boards)
-		.where(inArray(schema.boards.workspaceId, memberships.map((membership) => membership.workspaceId)))
+		.where(
+			inArray(
+				schema.boards.workspaceId,
+				memberships.map((membership) => membership.workspaceId)
+			)
+		)
 		.orderBy(asc(schema.boards.createdAt))
 		.limit(1);
 

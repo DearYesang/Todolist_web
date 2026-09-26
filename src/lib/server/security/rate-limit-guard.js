@@ -1,8 +1,4 @@
-import {
-	assertRateLimit,
-	createRateLimitHeaders,
-	RateLimitError
-} from '$lib/server/security/rate-limit.js';
+import { assertRateLimit, createRateLimitHeaders, RateLimitError } from '$lib/server/security/rate-limit.js';
 
 // Keyed on the user id alone (no client IP) so the budget is a true per-user
 // hard stop: a leaked session replayed through rotating egress IPs shares one
@@ -51,10 +47,7 @@ async function enforceLimit(scope, userId, options) {
 		return null;
 	} catch (error) {
 		if (error instanceof RateLimitError) {
-			return Response.json(
-				{ message: error.message },
-				{ status: 429, headers: createRateLimitHeaders(error) }
-			);
+			return Response.json({ message: error.message }, { status: 429, headers: createRateLimitHeaders(error) });
 		}
 
 		throw error;

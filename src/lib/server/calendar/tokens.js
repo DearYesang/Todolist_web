@@ -56,9 +56,13 @@ export async function createCalendarTokenForUser(userId, payload) {
 	const activeTokens = await db
 		.select({ id: schema.calendarSubscriptionTokens.id })
 		.from(schema.calendarSubscriptionTokens)
-		.where(and(eq(schema.calendarSubscriptionTokens.userId, userId), isNull(schema.calendarSubscriptionTokens.revokedAt)));
+		.where(
+			and(eq(schema.calendarSubscriptionTokens.userId, userId), isNull(schema.calendarSubscriptionTokens.revokedAt))
+		);
 	if (activeTokens.length >= MAX_ACTIVE_TOKENS_PER_USER) {
-		throw new CalendarTokenLimitError(`Calendar feeds are limited to ${MAX_ACTIVE_TOKENS_PER_USER} active tokens per user.`);
+		throw new CalendarTokenLimitError(
+			`Calendar feeds are limited to ${MAX_ACTIVE_TOKENS_PER_USER} active tokens per user.`
+		);
 	}
 
 	const [created] = await db
@@ -93,11 +97,13 @@ export async function revokeCalendarTokenForUser(userId, tokenId) {
 	const [revoked] = await db
 		.update(schema.calendarSubscriptionTokens)
 		.set({ revokedAt: new Date() })
-		.where(and(
-			eq(schema.calendarSubscriptionTokens.id, tokenId),
-			eq(schema.calendarSubscriptionTokens.userId, userId),
-			isNull(schema.calendarSubscriptionTokens.revokedAt)
-		))
+		.where(
+			and(
+				eq(schema.calendarSubscriptionTokens.id, tokenId),
+				eq(schema.calendarSubscriptionTokens.userId, userId),
+				isNull(schema.calendarSubscriptionTokens.revokedAt)
+			)
+		)
 		.returning();
 
 	return revoked ? sanitizeTokenRecord(revoked) : null;
@@ -111,11 +117,16 @@ export async function getCalendarTasksForToken(rawToken) {
 	const [tokenRecord] = await db
 		.select()
 		.from(schema.calendarSubscriptionTokens)
-		.where(and(
-			eq(schema.calendarSubscriptionTokens.tokenHash, hashCalendarToken(rawToken)),
-			isNull(schema.calendarSubscriptionTokens.revokedAt),
-			or(isNull(schema.calendarSubscriptionTokens.expiresAt), gt(schema.calendarSubscriptionTokens.expiresAt, new Date()))
-		))
+		.where(
+			and(
+				eq(schema.calendarSubscriptionTokens.tokenHash, hashCalendarToken(rawToken)),
+				isNull(schema.calendarSubscriptionTokens.revokedAt),
+				or(
+					isNull(schema.calendarSubscriptionTokens.expiresAt),
+					gt(schema.calendarSubscriptionTokens.expiresAt, new Date())
+				)
+			)
+		)
 		.limit(1);
 
 	if (!tokenRecord) {
@@ -158,10 +169,15 @@ async function refreshCalendarTokenLastUsedAt(db, tokenRecord) {
 	await db
 		.update(schema.calendarSubscriptionTokens)
 		.set({ lastUsedAt: now })
-		.where(and(
-			eq(schema.calendarSubscriptionTokens.id, tokenRecord.id),
-			or(isNull(schema.calendarSubscriptionTokens.lastUsedAt), lt(schema.calendarSubscriptionTokens.lastUsedAt, cutoff))
-		));
+		.where(
+			and(
+				eq(schema.calendarSubscriptionTokens.id, tokenRecord.id),
+				or(
+					isNull(schema.calendarSubscriptionTokens.lastUsedAt),
+					lt(schema.calendarSubscriptionTokens.lastUsedAt, cutoff)
+				)
+			)
+		);
 }
 
 export class CalendarTokenLimitError extends ApiError {
@@ -193,9 +209,10 @@ function parseTokenName(value) {
  * @param {Date} now
  */
 function parseTokenExpiresAt(value, now) {
-	const days = typeof value === 'number' && Number.isFinite(value)
-		? Math.max(1, Math.min(365, Math.floor(value)))
-		: DEFAULT_TOKEN_TTL_DAYS;
+	const days =
+		typeof value === 'number' && Number.isFinite(value)
+			? Math.max(1, Math.min(365, Math.floor(value)))
+			: DEFAULT_TOKEN_TTL_DAYS;
 	const expiresAt = new Date(now);
 	expiresAt.setUTCDate(expiresAt.getUTCDate() + days);
 	return expiresAt;

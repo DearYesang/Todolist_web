@@ -94,12 +94,16 @@ describe('personal board provisioning', () => {
 
 	it('fails with 500 when the workspace or the board is still missing after the insert', async () => {
 		recordStatements(db, [[], [], []]);
-		await expect(ensurePersonalBoardForUser(USER_ID))
-			.rejects.toMatchObject({ status: 500, message: 'A default workspace could not be created.' });
+		await expect(ensurePersonalBoardForUser(USER_ID)).rejects.toMatchObject({
+			status: 500,
+			message: 'A default workspace could not be created.'
+		});
 
 		recordStatements(db, [[WORKSPACE], [], [], [], []]);
-		await expect(ensurePersonalBoardForUser(USER_ID))
-			.rejects.toMatchObject({ status: 500, message: 'A default workspace board could not be created.' });
+		await expect(ensurePersonalBoardForUser(USER_ID)).rejects.toMatchObject({
+			status: 500,
+			message: 'A default workspace board could not be created.'
+		});
 	});
 });
 
@@ -128,7 +132,12 @@ describe('task listing board lookup', () => {
 	});
 
 	it('falls back to the oldest board of any membership when there is no Personal workspace', async () => {
-		const statements = recordStatements(db, [[], [{ workspaceId: 'shared-workspace-id' }], [{ id: 'shared-board-id' }], []]);
+		const statements = recordStatements(db, [
+			[],
+			[{ workspaceId: 'shared-workspace-id' }],
+			[{ id: 'shared-board-id' }],
+			[]
+		]);
 
 		await expect(listTasksForUser(USER_ID)).resolves.toEqual([]);
 		expect(statements.slice(2)).toEqual([
@@ -176,7 +185,9 @@ describe('board preferences', () => {
 	it('writes only the default view and updatedAt of the provisioned board', async () => {
 		const statements = recordStatements(db, [[WORKSPACE], [], [BOARD], [{ ...BOARD, defaultView: 'gantt' }]]);
 
-		await expect(updateBoardPreferencesForUser(USER_ID, { defaultView: 'gantt' })).resolves.toEqual({ defaultView: 'gantt' });
+		await expect(updateBoardPreferencesForUser(USER_ID, { defaultView: 'gantt' })).resolves.toEqual({
+			defaultView: 'gantt'
+		});
 		expect(statements).toEqual([
 			SELECT_WORKSPACE,
 			INSERT_MEMBERSHIP,
@@ -194,11 +205,14 @@ describe('board preferences', () => {
 	it('rejects an invalid view before touching the database and reports an update that matched no board as 500', async () => {
 		const statements = recordStatements(db, [[WORKSPACE], [], [BOARD], []]);
 
-		await expect(updateBoardPreferencesForUser(USER_ID, { defaultView: 'calendar' }))
-			.rejects.toMatchObject({ status: 400 });
+		await expect(updateBoardPreferencesForUser(USER_ID, { defaultView: 'calendar' })).rejects.toMatchObject({
+			status: 400
+		});
 		expect(statements).toEqual([]);
 
-		await expect(updateBoardPreferencesForUser(USER_ID, { defaultView: 'gantt' }))
-			.rejects.toMatchObject({ status: 500, message: 'Board preferences could not be updated.' });
+		await expect(updateBoardPreferencesForUser(USER_ID, { defaultView: 'gantt' })).rejects.toMatchObject({
+			status: 500,
+			message: 'Board preferences could not be updated.'
+		});
 	});
 });

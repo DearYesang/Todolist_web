@@ -29,10 +29,12 @@ export async function listCategoryRowsForBoard(db, boardId, options = {}) {
 	return db
 		.select()
 		.from(schema.categories)
-		.where(and(
-			eq(schema.categories.boardId, boardId),
-			...(options.includeArchived ? [] : [isNull(schema.categories.archivedAt)])
-		))
+		.where(
+			and(
+				eq(schema.categories.boardId, boardId),
+				...(options.includeArchived ? [] : [isNull(schema.categories.archivedAt)])
+			)
+		)
 		.orderBy(asc(schema.categories.sortOrder), asc(schema.categories.name));
 }
 
@@ -46,11 +48,13 @@ export async function getCategoryRowForBoard(db, boardId, categoryId, options = 
 	const [category] = await db
 		.select()
 		.from(schema.categories)
-		.where(and(
-			eq(schema.categories.id, categoryId),
-			eq(schema.categories.boardId, boardId),
-			...(options.includeArchived ? [] : [isNull(schema.categories.archivedAt)])
-		))
+		.where(
+			and(
+				eq(schema.categories.id, categoryId),
+				eq(schema.categories.boardId, boardId),
+				...(options.includeArchived ? [] : [isNull(schema.categories.archivedAt)])
+			)
+		)
 		.limit(1);
 
 	return category ?? null;
@@ -66,11 +70,13 @@ async function getCategoryRowByNormalizedName(db, boardId, normalizedName, optio
 	const [category] = await db
 		.select()
 		.from(schema.categories)
-		.where(and(
-			eq(schema.categories.boardId, boardId),
-			eq(schema.categories.normalizedName, normalizedName),
-			...(options.includeArchived ? [] : [isNull(schema.categories.archivedAt)])
-		))
+		.where(
+			and(
+				eq(schema.categories.boardId, boardId),
+				eq(schema.categories.normalizedName, normalizedName),
+				...(options.includeArchived ? [] : [isNull(schema.categories.archivedAt)])
+			)
+		)
 		.limit(1);
 
 	return category ?? null;
@@ -128,7 +134,9 @@ export async function findOrCreateCategoryRow(db, input) {
 		})
 		.returning();
 
-	return created ?? await getCategoryRowByNormalizedName(db, input.boardId, normalizedName, { includeArchived: true });
+	return (
+		created ?? (await getCategoryRowByNormalizedName(db, input.boardId, normalizedName, { includeArchived: true }))
+	);
 }
 
 /**

@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import {
-	createCalendarOAuthErrorMessage,
-	createCalendarSyncRedirect
-} from './oauth-status.js';
+import { createCalendarOAuthErrorMessage, createCalendarSyncRedirect } from './oauth-status.js';
 
 describe('calendar oauth status helpers', () => {
 	it('creates compact redirect query strings for calendar oauth status', () => {
-		expect(createCalendarSyncRedirect({
-			status: 'connected',
-			provider: 'google'
-		})).toBe('/?calendarSync=connected&calendarSyncProvider=google');
+		expect(
+			createCalendarSyncRedirect({
+				status: 'connected',
+				provider: 'google'
+			})
+		).toBe('/?calendarSync=connected&calendarSyncProvider=google');
 	});
 
 	it('explains Google testing access_denied errors', () => {

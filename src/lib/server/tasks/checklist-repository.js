@@ -136,16 +136,20 @@ export function buildTaskVersionBump(db, taskId, now, options = {}) {
 			updatedAt: now,
 			version: sql`${schema.tasks.version} + 1`
 		})
-		.where(and(
-			eq(schema.tasks.id, taskId),
-			isNull(schema.tasks.deletedAt),
-			...(options.requireChecklistItemId
-				? [sql`exists (
+		.where(
+			and(
+				eq(schema.tasks.id, taskId),
+				isNull(schema.tasks.deletedAt),
+				...(options.requireChecklistItemId
+					? [
+							sql`exists (
 					select 1 from ${schema.checklistItems}
 					where ${schema.checklistItems.id} = ${options.requireChecklistItemId}
 						and ${schema.checklistItems.taskId} = ${taskId}
-				)`]
-				: [])
-		))
+				)`
+						]
+					: [])
+			)
+		)
 		.returning();
 }

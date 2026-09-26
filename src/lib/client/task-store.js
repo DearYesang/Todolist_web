@@ -39,30 +39,21 @@ export const filters = readonly(writableFilters);
 // taskIndex is derived from tasks, so it has no set or update to hide.
 export { clearLocalTaskCache, taskIndex } from './task-store/task-cache.js';
 
-export {
-    clearPendingDefaultView,
-    flushPendingViewPreference,
-    selectView
-} from './task-store/view-preference.js';
+export { clearPendingDefaultView, flushPendingViewPreference, selectView } from './task-store/view-preference.js';
+
+export { setCategoryFilter, setPriorityFilter, setSearchFilter, setUrgencyFilter } from './task-store/filters.js';
 
 export {
-    setCategoryFilter,
-    setPriorityFilter,
-    setSearchFilter,
-    setUrgencyFilter
-} from './task-store/filters.js';
-
-export {
-    assignTaskCategory,
-    categories,
-    categorySummaries,
-    clearCategory,
-    mergeCategory,
-    renameCategory,
-    reorderCategories,
-    setCategoryHidden,
-    updateCategoryColor,
-    visibleCategorySummaries
+	assignTaskCategory,
+	categories,
+	categorySummaries,
+	clearCategory,
+	mergeCategory,
+	renameCategory,
+	reorderCategories,
+	setCategoryHidden,
+	updateCategoryColor,
+	visibleCategorySummaries
 } from './task-store/category-store.js';
 
 export { setTaskStoreOwner } from './task-store/owner.js';
@@ -70,18 +61,18 @@ export { setTaskStoreOwner } from './task-store/owner.js';
 export { drainPendingTaskSyncsToOfflineQueue } from './task-store/sync-engine.js';
 
 export {
-    addSubtask,
-    assignParent,
-    clearDoneTasks,
-    createTask,
-    deleteSubtask,
-    deleteTaskCascade,
-    importTasks,
-    moveTask,
-    renameSubtask,
-    toggleCollapse,
-    toggleSubtask,
-    updateTask
+	addSubtask,
+	assignParent,
+	clearDoneTasks,
+	createTask,
+	deleteSubtask,
+	deleteTaskCascade,
+	importTasks,
+	moveTask,
+	renameSubtask,
+	toggleCollapse,
+	toggleSubtask,
+	updateTask
 } from './task-store/task-mutations.js';
 
 export { setupCrossTabTaskSync } from './task-store/cross-tab-sync.js';

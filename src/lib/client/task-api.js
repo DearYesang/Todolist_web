@@ -325,14 +325,10 @@ export async function deleteServerTask(taskId, options = {}, fetcher = globalThi
 	}
 
 	try {
-		const expectedVersion = typeof requestOptions.expectedVersion === 'number'
-			? requestOptions.expectedVersion
-			: null;
+		const expectedVersion = typeof requestOptions.expectedVersion === 'number' ? requestOptions.expectedVersion : null;
 		const response = await requestFetcher(`/api/tasks/${encodeURIComponent(taskId)}`, {
 			method: 'DELETE',
-			headers: expectedVersion === null
-				? { accept: 'application/json' }
-				: { 'content-type': 'application/json' },
+			headers: expectedVersion === null ? { accept: 'application/json' } : { 'content-type': 'application/json' },
 			...(expectedVersion === null ? {} : { body: JSON.stringify({ expectedVersion }) })
 		});
 		const body = await readJsonBody(response);
@@ -357,10 +353,14 @@ export async function deleteServerTask(taskId, options = {}, fetcher = globalThi
  * @returns {Promise<UpdateServerTaskResult>}
  */
 export async function createServerChecklistItem(taskId, text, fetcher = globalThis.fetch) {
-	return writeServerTask(`/api/tasks/${encodeURIComponent(taskId)}/checklist`, {
-		method: 'POST',
-		body: { text }
-	}, fetcher);
+	return writeServerTask(
+		`/api/tasks/${encodeURIComponent(taskId)}/checklist`,
+		{
+			method: 'POST',
+			body: { text }
+		},
+		fetcher
+	);
 }
 
 /**
@@ -371,10 +371,14 @@ export async function createServerChecklistItem(taskId, text, fetcher = globalTh
  * @returns {Promise<UpdateServerTaskResult>}
  */
 export async function updateServerChecklistItem(taskId, itemId, patch, fetcher = globalThis.fetch) {
-	return writeServerTask(`/api/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`, {
-		method: 'PATCH',
-		body: patch
-	}, fetcher);
+	return writeServerTask(
+		`/api/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`,
+		{
+			method: 'PATCH',
+			body: patch
+		},
+		fetcher
+	);
 }
 
 /**
@@ -384,9 +388,13 @@ export async function updateServerChecklistItem(taskId, itemId, patch, fetcher =
  * @returns {Promise<UpdateServerTaskResult>}
  */
 export async function deleteServerChecklistItem(taskId, itemId, fetcher = globalThis.fetch) {
-	return writeServerTask(`/api/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`, {
-		method: 'DELETE'
-	}, fetcher);
+	return writeServerTask(
+		`/api/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`,
+		{
+			method: 'DELETE'
+		},
+		fetcher
+	);
 }
 
 /**
@@ -403,9 +411,7 @@ async function writeServerTask(url, request, fetcher) {
 	try {
 		const response = await fetcher(url, {
 			method: request.method,
-			headers: request.body === undefined
-				? { accept: 'application/json' }
-				: { 'content-type': 'application/json' },
+			headers: request.body === undefined ? { accept: 'application/json' } : { 'content-type': 'application/json' },
 			...(request.body === undefined ? {} : { body: JSON.stringify(request.body) })
 		});
 		const body = await readJsonBody(response);
@@ -457,7 +463,7 @@ function isDeleteResponse(body) {
 		body
 		&& typeof body === 'object'
 		&& 'deleted' in body
-		&& typeof /** @type {{ deleted?: unknown }} */ (body).deleted === 'number'
+		&& typeof (/** @type {{ deleted?: unknown }} */ (body).deleted) === 'number'
 	);
 }
 

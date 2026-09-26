@@ -32,8 +32,16 @@ describe('ApiError', () => {
 		const error = new ApiError('Category name is required.');
 
 		expect(error).toBeInstanceOf(Error);
-		expect(error).toMatchObject({ name: 'ApiError', message: 'Category name is required.', status: 400, headers: undefined });
-		expect(new ApiError('Gone.', 404, { 'x-reason': 'deleted' })).toMatchObject({ status: 404, headers: { 'x-reason': 'deleted' } });
+		expect(error).toMatchObject({
+			name: 'ApiError',
+			message: 'Category name is required.',
+			status: 400,
+			headers: undefined
+		});
+		expect(new ApiError('Gone.', 404, { 'x-reason': 'deleted' })).toMatchObject({
+			status: 404,
+			headers: { 'x-reason': 'deleted' }
+		});
 	});
 
 	it.each([
@@ -95,7 +103,9 @@ describe('apiErrorResponse', () => {
 		],
 		[
 			'AccountSecurityConfigurationError',
-			new AccountSecurityConfigurationError('ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.'),
+			new AccountSecurityConfigurationError(
+				'ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.'
+			),
 			AccountSecurityConfigurationError
 		]
 	])('throws %s again unless the route names its class', (_name, error, type) => {
@@ -133,7 +143,9 @@ describe('readJsonBody', () => {
 	it('takes an empty or blank body as no payload when the body is optional', async () => {
 		expect(await readJsonBody(createRequest(undefined), { optional: true })).toBeUndefined();
 		expect(await readJsonBody(createRequest(' \n\t'), { optional: true })).toBeUndefined();
-		expect(await readJsonBody(createRequest('{"expectedVersion":2}'), { optional: true })).toEqual({ expectedVersion: 2 });
+		expect(await readJsonBody(createRequest('{"expectedVersion":2}'), { optional: true })).toEqual({
+			expectedVersion: 2
+		});
 		await expect(readJsonBody(createRequest('{'), { optional: true })).rejects.toMatchObject(invalidJson);
 	});
 
@@ -147,12 +159,18 @@ describe('readJsonBody', () => {
 		const tooLarge = { status: 413, message: 'Import payload is too large.' };
 		const options = { maxLength: 10, tooLargeMessage: 'Import payload is too large.' };
 
-		await expect(readJsonBody(createRequest('[]', { 'content-length': '11' }), options)).rejects.toMatchObject(tooLarge);
+		await expect(readJsonBody(createRequest('[]', { 'content-length': '11' }), options)).rejects.toMatchObject(
+			tooLarge
+		);
 		await expect(readJsonBody(createRequest('[1,2,3,4,5]'), options)).rejects.toMatchObject(tooLarge);
 		expect(await readJsonBody(createRequest('[1,2,3,45]'), options)).toEqual([1, 2, 3, 45]);
-		await expect(readJsonBody(createRequest('[', { 'content-length': '1' }), options)).rejects.toMatchObject(invalidJson);
-		await expect(readJsonBody(createRequest('[1,2,3,4,5]'), { maxLength: 10 }))
-			.rejects.toMatchObject({ status: 413, message: 'Request body is too large.' });
+		await expect(readJsonBody(createRequest('[', { 'content-length': '1' }), options)).rejects.toMatchObject(
+			invalidJson
+		);
+		await expect(readJsonBody(createRequest('[1,2,3,4,5]'), { maxLength: 10 })).rejects.toMatchObject({
+			status: 413,
+			message: 'Request body is too large.'
+		});
 	});
 
 	it('counts the text after reading in characters, not bytes, as the import route always has', async () => {

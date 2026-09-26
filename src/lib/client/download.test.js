@@ -63,11 +63,7 @@ describe('downloadJson', () => {
 
 		downloadJson([{ id: 'a', text: '백업' }], 'kanban_backup_2026-09-24.json', environment);
 
-		expect(events).toEqual([
-			'create blob:1',
-			'click blob:1 as kanban_backup_2026-09-24.json',
-			'revoke blob:1'
-		]);
+		expect(events).toEqual(['create blob:1', 'click blob:1 as kanban_backup_2026-09-24.json', 'revoke blob:1']);
 		expect(blobs[0].type).toBe('application/json');
 		expect(await blobs[0].text()).toBe(JSON.stringify([{ id: 'a', text: '백업' }], null, 2));
 	});
@@ -76,8 +72,9 @@ describe('downloadJson', () => {
 describe('createDatedFilename', () => {
 	it('stamps the local date of an injected time', () => {
 		// Local components, so this holds in every time zone.
-		expect(createDatedFilename('kanban_backup', 'json', new Date(2026, 8, 24, 8, 30)))
-			.toBe('kanban_backup_2026-09-24.json');
+		expect(createDatedFilename('kanban_backup', 'json', new Date(2026, 8, 24, 8, 30))).toBe(
+			'kanban_backup_2026-09-24.json'
+		);
 	});
 
 	it('uses the Korean date at 08:30 KST, while UTC is still on the previous day', () => {

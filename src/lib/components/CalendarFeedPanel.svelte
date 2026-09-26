@@ -1,10 +1,6 @@
 <script>
     import { authClient } from '$lib/client/auth-client.js';
-    import {
-        createCalendarToken,
-        listCalendarTokens,
-        revokeCalendarToken
-    } from '$lib/client/calendar-token-api.js';
+    import { createCalendarToken, listCalendarTokens, revokeCalendarToken } from '$lib/client/calendar-token-api.js';
 
     const session = authClient.useSession();
 
@@ -63,7 +59,7 @@
                 return;
             }
 
-            tokens = tokens.map((token) => token.id === tokenId && result.token ? result.token : token);
+            tokens = tokens.map((token) => (token.id === tokenId && result.token ? result.token : token));
             message = '전체 일정 비밀 링크가 해지되었습니다.';
         } finally {
             isWorking = false;
@@ -109,7 +105,7 @@
         <button
             class="btn calendar-feed-trigger primary-action"
             class:active={isOpen}
-            onclick={() => isOpen = !isOpen}
+            onclick={() => (isOpen = !isOpen)}
             aria-label="전체 일정 동기화"
             title="전체 일정 동기화">
             <span class="action-icon" aria-hidden="true">📅</span>
@@ -120,16 +116,21 @@
         {#if isOpen}
             <div class="calendar-feed-popover">
                 <div class="calendar-feed-actions">
+                    <!-- prettier-ignore -->
                     <p class="calendar-feed-warning">
                         이 링크는 비밀번호 없이 전체 일정을 읽는 비밀 주소입니다. 캘린더 앱에 추가할 때만 복사하고, 의심되면 바로 중지하세요.
                     </p>
-                    <select class="calendar-feed-select" bind:value={expiresInDays} aria-label="전체 일정 비밀 링크 만료">
+                    <select
+                        class="calendar-feed-select"
+                        bind:value={expiresInDays}
+                        aria-label="전체 일정 비밀 링크 만료">
                         <option value={7}>7일</option>
                         <option value={30}>30일</option>
                         <option value={90}>90일</option>
                         <option value={365}>1년</option>
                     </select>
-                    <button class="btn btn-primary" onclick={handleCreate} disabled={isWorking}>비밀 링크 만들기</button>
+                    <button class="btn btn-primary" onclick={handleCreate} disabled={isWorking}
+                        >비밀 링크 만들기</button>
                     {#if latestUrl}
                         <button class="btn" onclick={copyLatestUrl}>복사</button>
                     {/if}

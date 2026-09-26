@@ -75,7 +75,10 @@ export async function listUserPasskeys(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Passkey list request could not be completed.');
 	}
@@ -110,7 +113,10 @@ export async function updateUserPasskeyName(id, name, fetcher = globalThis.fetch
 			}
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Passkey update request could not be completed.');
 	}
@@ -141,7 +147,10 @@ export async function deleteUserPasskey(id, fetcher = globalThis.fetch) {
 			return { ok: true };
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body, BETTER_AUTH_ERROR_FIELDS) ?? `Passkey API request failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Passkey delete request could not be completed.');
 	}

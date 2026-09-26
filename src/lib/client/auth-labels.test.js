@@ -7,11 +7,16 @@ import {
 	getAuthErrorMessage
 } from './auth-labels.js';
 
-const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
-const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
-const MAC_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
-const WINDOWS_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
-const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+const IPHONE_UA =
+	'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+const IPAD_UA =
+	'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+const MAC_UA =
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+const WINDOWS_UA =
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+const ANDROID_UA =
+	'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
 
 /**
  * @param {string} userAgent
@@ -28,12 +33,20 @@ afterEach(() => {
 
 describe('auth error messages', () => {
 	it('names an unavailable database before anything else', () => {
-		expect(getAuthErrorMessage({ status: 503, message: 'INVALID_PASSKEY_EMAIL_CODE' })).toBe('데이터베이스 설정 후 이용할 수 있습니다.');
+		expect(getAuthErrorMessage({ status: 503, message: 'INVALID_PASSKEY_EMAIL_CODE' })).toBe(
+			'데이터베이스 설정 후 이용할 수 있습니다.'
+		);
 	});
 
 	it.each([
-		['Passkey registration requires a valid email verification code.', '확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.'],
-		['Email verification is required for passkey registration.', '확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.'],
+		[
+			'Passkey registration requires a valid email verification code.',
+			'확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.'
+		],
+		[
+			'Email verification is required for passkey registration.',
+			'확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.'
+		],
 		['INVALID_PASSKEY_EMAIL_CODE', '확인 코드가 맞지 않거나 만료되었습니다. 가장 최근에 받은 코드를 입력해 주세요.'],
 		['Enter a valid recovery code.', '복구 코드가 맞지 않거나 이미 사용되었습니다.'],
 		['INVALID_PASSKEY_RECOVERY_CODE', '복구 코드가 맞지 않거나 이미 사용되었습니다.'],
@@ -48,7 +61,9 @@ describe('auth error messages', () => {
 
 	it('falls back to the server message, the status text, then a generic message', () => {
 		expect(getAuthErrorMessage({ status: 429, message: 'Too many requests.' })).toBe('Too many requests.');
-		expect(getAuthErrorMessage({ status: 500, message: '', statusText: 'Internal Server Error' })).toBe('Internal Server Error');
+		expect(getAuthErrorMessage({ status: 500, message: '', statusText: 'Internal Server Error' })).toBe(
+			'Internal Server Error'
+		);
 		expect(getAuthErrorMessage({})).toBe('인증 요청을 완료하지 못했습니다.');
 	});
 });
@@ -94,7 +109,9 @@ describe('passkey names', () => {
 
 		expect(createFallbackPasskeyName({ id: 'abcdef123456', name: null, createdAt })).toBe('패스키 2026-05-02');
 		expect(createFallbackPasskeyName({ id: 'abcdef123456', name: null })).toBe('패스키 abcdef');
-		expect(createFallbackPasskeyName({ id: 'abcdef123456', name: null, createdAt: 'not a date' })).toBe('패스키 알 수 없음');
+		expect(createFallbackPasskeyName({ id: 'abcdef123456', name: null, createdAt: 'not a date' })).toBe(
+			'패스키 알 수 없음'
+		);
 	});
 
 	it('describes when a passkey was registered and whether it syncs', () => {

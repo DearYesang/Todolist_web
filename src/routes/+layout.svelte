@@ -5,9 +5,7 @@
 <svelte:head>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260504" />
     <title>Todolist Web</title>
-    <meta
-        name="description"
-        content="로컬 우선 Kanban/Gantt todo 앱" />
+    <meta name="description" content="로컬 우선 Kanban/Gantt todo 앱" />
 </svelte:head>
 
 <slot />

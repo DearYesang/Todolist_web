@@ -159,9 +159,10 @@ export function parseDeleteTaskInput(payload) {
 	}
 
 	return {
-		expectedVersion: hasField(source, 'expectedVersion') || hasField(source, 'version')
-			? parseExpectedVersion(source.expectedVersion ?? source.version)
-			: null
+		expectedVersion:
+			hasField(source, 'expectedVersion') || hasField(source, 'version')
+				? parseExpectedVersion(source.expectedVersion ?? source.version)
+				: null
 	};
 }
 

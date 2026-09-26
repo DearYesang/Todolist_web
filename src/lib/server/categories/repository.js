@@ -82,8 +82,10 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 	const now = new Date();
 	const nextName = input.name ?? existing.name;
 	const nextNormalizedName = input.name === undefined ? existing.normalizedName : normalizeCategoryKey(input.name);
-	const nextHiddenAt = input.hidden === undefined ? existing.hiddenAt : input.hidden ? existing.hiddenAt ?? now : null;
-	const nextArchivedAt = input.archived === undefined ? existing.archivedAt : input.archived ? existing.archivedAt ?? now : null;
+	const nextHiddenAt =
+		input.hidden === undefined ? existing.hiddenAt : input.hidden ? (existing.hiddenAt ?? now) : null;
+	const nextArchivedAt =
+		input.archived === undefined ? existing.archivedAt : input.archived ? (existing.archivedAt ?? now) : null;
 	const nextColor = input.color === undefined ? existing.color : input.color;
 
 	try {
@@ -103,20 +105,22 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 			...(input.name === undefined
 				? []
 				: [
-					db
-						.update(schema.tasks)
-						.set({
-							category: nextName,
-							updatedAt: now,
-							version: sql`${schema.tasks.version} + 1`
-						})
-						.where(and(
-							eq(schema.tasks.boardId, board.id),
-							eq(schema.tasks.categoryId, existing.id),
-							isNull(schema.tasks.deletedAt)
-						))
-						.returning(TASK_VERSION_COLUMNS)
-				])
+						db
+							.update(schema.tasks)
+							.set({
+								category: nextName,
+								updatedAt: now,
+								version: sql`${schema.tasks.version} + 1`
+							})
+							.where(
+								and(
+									eq(schema.tasks.boardId, board.id),
+									eq(schema.tasks.categoryId, existing.id),
+									isNull(schema.tasks.deletedAt)
+								)
+							)
+							.returning(TASK_VERSION_COLUMNS)
+					])
 		]);
 
 		if (!updatedCategory[0]) {
@@ -168,11 +172,9 @@ export async function mergeCategoryForUser(userId, sourceCategoryId, payload) {
 				updatedAt: now,
 				version: sql`${schema.tasks.version} + 1`
 			})
-			.where(and(
-				eq(schema.tasks.boardId, board.id),
-				eq(schema.tasks.categoryId, source.id),
-				isNull(schema.tasks.deletedAt)
-			))
+			.where(
+				and(eq(schema.tasks.boardId, board.id), eq(schema.tasks.categoryId, source.id), isNull(schema.tasks.deletedAt))
+			)
 			.returning(TASK_VERSION_COLUMNS),
 		db
 			.update(schema.categories)
@@ -216,11 +218,13 @@ export async function deleteCategoryForUser(userId, categoryId) {
 				updatedAt: now,
 				version: sql`${schema.tasks.version} + 1`
 			})
-			.where(and(
-				eq(schema.tasks.boardId, board.id),
-				eq(schema.tasks.categoryId, category.id),
-				isNull(schema.tasks.deletedAt)
-			))
+			.where(
+				and(
+					eq(schema.tasks.boardId, board.id),
+					eq(schema.tasks.categoryId, category.id),
+					isNull(schema.tasks.deletedAt)
+				)
+			)
 			.returning(TASK_VERSION_COLUMNS),
 		db
 			.update(schema.categories)
@@ -246,9 +250,7 @@ export async function deleteCategoryForUser(userId, categoryId) {
  */
 export async function reorderCategoriesForUser(userId, payload) {
 	const source = readPayloadObject(payload);
-	const categoryIds = Array.isArray(source.categoryIds)
-		? source.categoryIds.map(parseCategoryId)
-		: null;
+	const categoryIds = Array.isArray(source.categoryIds) ? source.categoryIds.map(parseCategoryId) : null;
 	if (!categoryIds || categoryIds.length === 0) {
 		throw new ApiError('categoryIds must be a non-empty array.');
 	}
@@ -259,11 +261,13 @@ export async function reorderCategoriesForUser(userId, payload) {
 	const existingRows = await db
 		.select({ id: schema.categories.id })
 		.from(schema.categories)
-		.where(and(
-			eq(schema.categories.boardId, board.id),
-			inArray(schema.categories.id, uniqueIds),
-			isNull(schema.categories.archivedAt)
-		));
+		.where(
+			and(
+				eq(schema.categories.boardId, board.id),
+				inArray(schema.categories.id, uniqueIds),
+				isNull(schema.categories.archivedAt)
+			)
+		);
 	if (existingRows.length !== uniqueIds.length) {
 		throw new ApiError('One or more categories were not found.', 404);
 	}
@@ -370,7 +374,7 @@ function isUniqueConstraintError(error) {
 		error
 		&& typeof error === 'object'
 		&& 'message' in error
-		&& typeof /** @type {{ message?: unknown }} */ (error).message === 'string'
+		&& typeof (/** @type {{ message?: unknown }} */ (error).message) === 'string'
 		&& /** @type {{ message: string }} */ (error).message.includes('categories_board_normalized_name_uidx')
 	);
 }

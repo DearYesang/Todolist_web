@@ -17,11 +17,15 @@ const CATEGORY_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const TARGET_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const TASK_IDS = ['11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333'];
 // What the tasks UPDATE returns: each rewritten task with its bumped version.
-const TASK_VERSIONS = [{ id: TASK_IDS[0], version: 4 }, { id: TASK_IDS[1], version: 8 }];
+const TASK_VERSIONS = [
+	{ id: TASK_IDS[0], version: 4 },
+	{ id: TASK_IDS[1], version: 8 }
+];
 const NOW = new Date('2026-07-06T12:00:00.000Z');
 // toSQL() hands timestamp parameters over as ISO strings.
 const STAMP = NOW.toISOString();
-const CATEGORY_COLUMNS = '"id", "board_id", "user_id", "name", "normalized_name", "color", "sort_order", "hidden_at", "archived_at", "created_at", "updated_at"';
+const CATEGORY_COLUMNS =
+	'"id", "board_id", "user_id", "name", "normalized_name", "color", "sort_order", "hidden_at", "archived_at", "created_at", "updated_at"';
 
 /**
  * @param {Record<string, unknown>} [overrides]
@@ -69,7 +73,9 @@ function stubSelects(db, results) {
  */
 function renderBatch(batchMock) {
 	expect(batchMock).toHaveBeenCalledTimes(1);
-	return batchMock.mock.calls[0][0].map((/** @type {{ toSQL: () => { sql: string; params: unknown[] } }} */ statement) => statement.toSQL());
+	return batchMock.mock.calls[0][0].map(
+		(/** @type {{ toSQL: () => { sql: string; params: unknown[] } }} */ statement) => statement.toSQL()
+	);
 }
 
 describe('category writes that rewrite tasks', () => {
@@ -128,18 +134,27 @@ describe('category writes that rewrite tasks', () => {
 
 	it('reports an unknown category as 404 and a taken name as 409', async () => {
 		stubSelects(db, [[]]);
-		await expect(updateCategoryForUser(USER_ID, CATEGORY_ID, { name: '학습' }))
-			.rejects.toMatchObject({ status: 404 });
+		await expect(updateCategoryForUser(USER_ID, CATEGORY_ID, { name: '학습' })).rejects.toMatchObject({ status: 404 });
 		expect(batchMock).not.toHaveBeenCalled();
 
 		stubSelects(db, [[createCategoryRow()]]);
-		batchMock.mockRejectedValue(new Error('duplicate key value violates unique constraint "categories_board_normalized_name_uidx"'));
-		await expect(updateCategoryForUser(USER_ID, CATEGORY_ID, { name: '학습' }))
-			.rejects.toMatchObject({ status: 409, message: 'A category with that name already exists.' });
+		batchMock.mockRejectedValue(
+			new Error('duplicate key value violates unique constraint "categories_board_normalized_name_uidx"')
+		);
+		await expect(updateCategoryForUser(USER_ID, CATEGORY_ID, { name: '학습' })).rejects.toMatchObject({
+			status: 409,
+			message: 'A category with that name already exists.'
+		});
 	});
 
 	it('merges by moving the tasks to the target, bumping each version, then archiving the source', async () => {
-		const target = createCategoryRow({ id: TARGET_ID, name: '학습', normalizedName: '학습', color: null, sortOrder: 1 });
+		const target = createCategoryRow({
+			id: TARGET_ID,
+			name: '학습',
+			normalizedName: '학습',
+			color: null,
+			sortOrder: 1
+		});
 		stubSelects(db, [[createCategoryRow()], [target]]);
 		const archived = createCategoryRow({ hiddenAt: NOW, archivedAt: NOW });
 		batchMock.mockResolvedValue([TASK_VERSIONS, [archived]]);
@@ -156,7 +171,14 @@ describe('category writes that rewrite tasks', () => {
 			params: [STAMP, STAMP, STAMP, CATEGORY_ID, BOARD_ID]
 		});
 		expect(result).toEqual({
-			source: { id: CATEGORY_ID, name: '공부', color: '#58a6ff', sortOrder: 0, hiddenAt: NOW.toISOString(), archivedAt: NOW.toISOString() },
+			source: {
+				id: CATEGORY_ID,
+				name: '공부',
+				color: '#58a6ff',
+				sortOrder: 0,
+				hiddenAt: NOW.toISOString(),
+				archivedAt: NOW.toISOString()
+			},
 			target: { id: TARGET_ID, name: '학습', color: null, sortOrder: 1, hiddenAt: null, archivedAt: null },
 			updatedTasks: 2,
 			taskVersions: TASK_VERSIONS
@@ -177,7 +199,14 @@ describe('category writes that rewrite tasks', () => {
 		});
 		expect(categoryUpdate.sql).toMatch(/^update "categories" set "hidden_at" = \$1, "archived_at" = \$2/);
 		expect(result).toEqual({
-			category: { id: CATEGORY_ID, name: '공부', color: '#58a6ff', sortOrder: 0, hiddenAt: NOW.toISOString(), archivedAt: NOW.toISOString() },
+			category: {
+				id: CATEGORY_ID,
+				name: '공부',
+				color: '#58a6ff',
+				sortOrder: 0,
+				hiddenAt: NOW.toISOString(),
+				archivedAt: NOW.toISOString()
+			},
 			clearedTasks: 2,
 			taskVersions: TASK_VERSIONS
 		});

@@ -24,9 +24,12 @@ function createFakeWindow({ serviceWorker = true, ready, update } = {}) {
 		})
 	});
 	const registration = {
-		update: vi.fn(update ?? (async () => {
-			events.push('update');
-		}))
+		update: vi.fn(
+			update
+				?? (async () => {
+					events.push('update');
+				})
+		)
 	};
 	const worker = {
 		...createTarget(workerListeners),

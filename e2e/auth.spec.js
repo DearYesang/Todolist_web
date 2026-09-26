@@ -129,18 +129,24 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 			return;
 		}
 		sessionStorage.setItem('e2e-account-seeded', '1');
-		localStorage.setItem('kanbanTasks:e2e-user', JSON.stringify([
-			{ id: 'account-cached-task', text: 'Account cached task', status: 'todo' }
-		]));
-		localStorage.setItem('kanbanOfflineWriteQueue:e2e-user', JSON.stringify([{
-			id: 'account-pending-patch',
-			type: 'task.patch',
-			taskId: '77777777-7777-4777-8777-777777777777',
-			patch: { text: 'Pending edit' },
-			ownerUserId: 'e2e-user',
-			createdAt: Date.now(),
-			attempts: 0
-		}]));
+		localStorage.setItem(
+			'kanbanTasks:e2e-user',
+			JSON.stringify([{ id: 'account-cached-task', text: 'Account cached task', status: 'todo' }])
+		);
+		localStorage.setItem(
+			'kanbanOfflineWriteQueue:e2e-user',
+			JSON.stringify([
+				{
+					id: 'account-pending-patch',
+					type: 'task.patch',
+					taskId: '77777777-7777-4777-8777-777777777777',
+					patch: { text: 'Pending edit' },
+					ownerUserId: 'e2e-user',
+					createdAt: Date.now(),
+					attempts: 0
+				}
+			])
+		);
 	});
 	// Confirm answers: delete passkey (no, yes), then sign out (no, yes).
 	const dialogs = recordDialogs(page, [false, true, false, true]);
@@ -162,7 +168,7 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 		}
 		if (pathname === '/api/auth/passkey/update-passkey') {
 			const { id, name } = request.postDataJSON();
-			passkeys = passkeys.map((passkey) => passkey.id === id ? { ...passkey, name } : passkey);
+			passkeys = passkeys.map((passkey) => (passkey.id === id ? { ...passkey, name } : passkey));
 			return route.fulfill({ json: { passkey: passkeys.find((passkey) => passkey.id === id) } });
 		}
 		if (pathname === '/api/auth/passkey/delete-passkey') {
@@ -194,7 +200,9 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 	await page.goto('/');
 	const panel = page.locator('.header .auth-panel');
 	await expect(panel.locator('.auth-identity')).toHaveText('e2e@example.com');
-	await expect(panel.locator('input.auth-input-small')).toHaveValue(/^(Windows PC|Mac|iPhone|iPad|Android|내 기기) 패스키 - \d{4}-\d{2}-\d{2}$/);
+	await expect(panel.locator('input.auth-input-small')).toHaveValue(
+		/^(Windows PC|Mac|iPhone|iPad|Android|내 기기) 패스키 - \d{4}-\d{2}-\d{2}$/
+	);
 	await expect(panel.locator('input.auth-input-small')).toHaveAttribute('aria-label', '패스키 이름');
 	const status = panel.locator('.auth-status');
 
@@ -216,7 +224,9 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 	await expect(panel.locator('.auth-error')).toHaveText('패스키 이름을 입력해 주세요.');
 	await rows.nth(1).locator('input').fill('iPhone 패스키');
 	await rows.nth(1).getByRole('button', { name: '저장' }).click();
-	await expect(status.first()).toHaveText('패스키 이름을 저장했습니다. Apple 선택 화면은 기존 이름을 계속 표시할 수 있습니다.');
+	await expect(status.first()).toHaveText(
+		'패스키 이름을 저장했습니다. Apple 선택 화면은 기존 이름을 계속 표시할 수 있습니다.'
+	);
 	await expect(rows.nth(1).locator('input')).toHaveValue('iPhone 패스키');
 
 	// The first delete is cancelled at the question, the second goes through.
@@ -232,7 +242,10 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 	await expect(status.first()).toHaveText('패스키를 삭제했습니다.');
 	await expect(rows).toHaveCount(1);
 	await expect(rows.nth(0).getByRole('button', { name: '삭제' })).toBeDisabled();
-	await expect(rows.nth(0).getByRole('button', { name: '삭제' })).toHaveAttribute('title', '마지막 패스키는 삭제하지 않는 것이 안전합니다.');
+	await expect(rows.nth(0).getByRole('button', { name: '삭제' })).toHaveAttribute(
+		'title',
+		'마지막 패스키는 삭제하지 않는 것이 안전합니다.'
+	);
 	await manager.getByRole('button', { name: '다시 불러오기' }).click();
 	await expect(rows).toHaveCount(1);
 	await expect(rows.nth(0).locator('input')).toHaveValue('iPhone 패스키');
@@ -263,7 +276,9 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 	await clearCache.check();
 	await panel.getByRole('button', { name: '로그아웃' }).click();
 	await expect.poll(() => dialogs.length).toBe(3);
-	expect(dialogs[2]).toBe('confirm:아직 동기화되지 않은 오프라인 변경 1건이 있습니다. 로그아웃하면서 이 기기 캐시를 삭제할까요?');
+	expect(dialogs[2]).toBe(
+		'confirm:아직 동기화되지 않은 오프라인 변경 1건이 있습니다. 로그아웃하면서 이 기기 캐시를 삭제할까요?'
+	);
 	await expect(status.first()).toHaveText('로그아웃을 취소했습니다. 먼저 Sync로 오프라인 변경을 동기화해 주세요.');
 	await expect(panel.locator('.auth-identity')).toHaveText('e2e@example.com');
 
@@ -272,10 +287,12 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 	expect(dialogs).toHaveLength(4);
 	// The queue is dropped and the cached list emptied (the store writes the
 	// empty list back under the same key).
-	expect(await page.evaluate(() => [
-		localStorage.getItem('kanbanOfflineWriteQueue:e2e-user'),
-		localStorage.getItem('kanbanTasks:e2e-user')
-	])).toEqual([null, '[]']);
+	expect(
+		await page.evaluate(() => [
+			localStorage.getItem('kanbanOfflineWriteQueue:e2e-user'),
+			localStorage.getItem('kanbanTasks:e2e-user')
+		])
+	).toEqual([null, '[]']);
 });
 
 /**
@@ -285,14 +302,17 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
  * @param {import('@playwright/test').Page} page
  */
 async function seedPendingDefaultView(page) {
-	await page.addInitScript(({ user }) => {
-		if (sessionStorage.getItem('e2e-view-seeded')) {
-			return;
-		}
-		sessionStorage.setItem('e2e-view-seeded', '1');
-		localStorage.setItem('todokanbanAuthScope', JSON.stringify({ ...user, cachedAt: Date.now() }));
-		localStorage.setItem('todokanbanPendingDefaultView', 'gantt');
-	}, { user: E2E_SESSION.user });
+	await page.addInitScript(
+		({ user }) => {
+			if (sessionStorage.getItem('e2e-view-seeded')) {
+				return;
+			}
+			sessionStorage.setItem('e2e-view-seeded', '1');
+			localStorage.setItem('todokanbanAuthScope', JSON.stringify({ ...user, cachedAt: Date.now() }));
+			localStorage.setItem('todokanbanPendingDefaultView', 'gantt');
+		},
+		{ user: E2E_SESSION.user }
+	);
 }
 
 /** @param {import('@playwright/test').Page} page */
@@ -300,7 +320,9 @@ function readPendingDefaultView(page) {
 	return page.evaluate(() => localStorage.getItem('todokanbanPendingDefaultView'));
 }
 
-test('keeps a default view chosen offline when the session check fails on a network that reports online', async ({ page }) => {
+test('keeps a default view chosen offline when the session check fails on a network that reports online', async ({
+	page
+}) => {
 	await seedPendingDefaultView(page);
 	// navigator.onLine stays true, but nothing reaches the server (captive
 	// Wi-Fi, an outage) until the reload below.

@@ -30,10 +30,13 @@ import { deleteCalendarConnection, listCalendarProviders, syncCalendarProviders 
  * @param {unknown} body
  */
 function respondJson(status, body) {
-	return /** @type {typeof fetch} */ (async () => new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	}));
+	return /** @type {typeof fetch} */ (
+		async () =>
+			new Response(JSON.stringify(body), {
+				status,
+				headers: { 'content-type': 'application/json' }
+			})
+	);
 }
 
 /**
@@ -44,9 +47,11 @@ function respondText(status, text) {
 	return /** @type {typeof fetch} */ (async () => new Response(text, { status }));
 }
 
-const failNetwork = /** @type {typeof fetch} */ (async () => {
-	throw new TypeError('Failed to fetch');
-});
+const failNetwork = /** @type {typeof fetch} */ (
+	async () => {
+		throw new TypeError('Failed to fetch');
+	}
+);
 
 // null, not undefined: undefined would pick the default globalThis.fetch.
 const notAFetcher = /** @type {typeof fetch} */ (/** @type {unknown} */ (null));
@@ -134,7 +139,9 @@ describe('task-api failures', () => {
 			status: 503,
 			message: 'Board preferences request failed with status 503.'
 		});
-		await expect(updateBoardPreferences({ defaultView: 'gantt' }, respondJson(400, { message: 'Invalid view.' }))).resolves.toEqual({
+		await expect(
+			updateBoardPreferences({ defaultView: 'gantt' }, respondJson(400, { message: 'Invalid view.' }))
+		).resolves.toEqual({
 			ok: false,
 			fallback: false,
 			status: 400,
@@ -241,12 +248,16 @@ describe('calendar-token-api failures', () => {
 
 describe('account-security-api failures', () => {
 	it('returns status and message without a fallback flag', async () => {
-		await expect(requestEmailVerificationCode({ email: 'a@example.com' }, respondJson(429, { message: 'Too many requests.' }))).resolves.toEqual({
+		await expect(
+			requestEmailVerificationCode({ email: 'a@example.com' }, respondJson(429, { message: 'Too many requests.' }))
+		).resolves.toEqual({
 			ok: false,
 			status: 429,
 			message: 'Too many requests.'
 		});
-		await expect(requestEmailVerificationCode({ email: 'a@example.com' }, respondJson(201, { email: 'a@example.com' }))).resolves.toEqual({
+		await expect(
+			requestEmailVerificationCode({ email: 'a@example.com' }, respondJson(201, { email: 'a@example.com' }))
+		).resolves.toEqual({
 			ok: false,
 			status: 201,
 			message: 'Account API request failed with status 201.'
@@ -284,7 +295,9 @@ describe('account-security-api failures', () => {
 
 describe('passkey-management-api failures', () => {
 	it('reads Better Auth errors from message, then error, then code', async () => {
-		await expect(listUserPasskeys(respondJson(401, { message: 'Unauthorized', error: 'e', code: 'c' }))).resolves.toEqual({
+		await expect(
+			listUserPasskeys(respondJson(401, { message: 'Unauthorized', error: 'e', code: 'c' }))
+		).resolves.toEqual({
 			ok: false,
 			status: 401,
 			message: 'Unauthorized'
@@ -294,11 +307,13 @@ describe('passkey-management-api failures', () => {
 			status: 400,
 			message: 'Bad request'
 		});
-		await expect(updateUserPasskeyName('id', 'name', respondJson(404, { code: 'PASSKEY_NOT_FOUND' }))).resolves.toEqual({
-			ok: false,
-			status: 404,
-			message: 'PASSKEY_NOT_FOUND'
-		});
+		await expect(updateUserPasskeyName('id', 'name', respondJson(404, { code: 'PASSKEY_NOT_FOUND' }))).resolves.toEqual(
+			{
+				ok: false,
+				status: 404,
+				message: 'PASSKEY_NOT_FOUND'
+			}
+		);
 		// Unlike the other modules, a blank message string is returned as is.
 		await expect(deleteUserPasskey('id', respondJson(400, { message: '', error: 'ignored' }))).resolves.toEqual({
 			ok: false,

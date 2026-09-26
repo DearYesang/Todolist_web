@@ -115,9 +115,10 @@ async function assertPersistentRateLimit(key, options) {
  * @param {string} [subject]
  */
 export function createRateLimitKey(event, scope, subject = '') {
-	const ip = typeof event.getClientAddress === 'function'
-		? safeClientAddress(/** @type {{ getClientAddress: () => string }} */ (event))
-		: event.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+	const ip =
+		typeof event.getClientAddress === 'function'
+			? safeClientAddress(/** @type {{ getClientAddress: () => string }} */ (event))
+			: (event.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown');
 	return `${scope}:${ip}:${subject.trim().toLowerCase()}`;
 }
 

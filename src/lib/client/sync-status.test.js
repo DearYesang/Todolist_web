@@ -41,24 +41,27 @@ function installServer() {
 		/** @type {string[]} */
 		requests: []
 	};
-	vi.stubGlobal('fetch', vi.fn(async (/** @type {string} */ url, /** @type {RequestInit | undefined} */ init) => {
-		const method = init?.method ?? 'GET';
-		const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
-		server.requests.push(`${method} ${url}`);
-		if (url === '/api/tasks' && method === 'GET') {
-			return server.listTasks();
-		}
-		if (url === '/api/categories') {
-			return jsonResponse({ categories: [] });
-		}
-		if (url === '/api/board/preferences') {
-			return method === 'PATCH' ? jsonResponse(body) : jsonResponse({ message: 'Unavailable.' }, { status: 503 });
-		}
-		if (url.startsWith('/api/tasks/')) {
-			return server.taskWrites({ method, path: url, body });
-		}
-		return jsonResponse({ message: 'Not found.' }, { status: 404 });
-	}));
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async (/** @type {string} */ url, /** @type {RequestInit | undefined} */ init) => {
+			const method = init?.method ?? 'GET';
+			const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+			server.requests.push(`${method} ${url}`);
+			if (url === '/api/tasks' && method === 'GET') {
+				return server.listTasks();
+			}
+			if (url === '/api/categories') {
+				return jsonResponse({ categories: [] });
+			}
+			if (url === '/api/board/preferences') {
+				return method === 'PATCH' ? jsonResponse(body) : jsonResponse({ message: 'Unavailable.' }, { status: 503 });
+			}
+			if (url.startsWith('/api/tasks/')) {
+				return server.taskWrites({ method, path: url, body });
+			}
+			return jsonResponse({ message: 'Not found.' }, { status: 404 });
+		})
+	);
 	return server;
 }
 
@@ -69,11 +72,27 @@ function installServer() {
  */
 function seedConflictingQueue(storage) {
 	const base = { ownerUserId: USER_ID, createdAt: Date.parse('2026-09-20T00:00:00.000Z'), attempts: 0 };
-	storage.set(`kanbanOfflineWriteQueue:${USER_ID}`, JSON.stringify([
-		{ ...base, id: 'conflict-patch', type: 'task.patch', taskId: PATCHED_TASK_ID, patch: { text: 'My offline title', expectedVersion: 2 } },
-		{ ...base, id: 'conflict-delete', type: 'task.delete', taskId: DELETED_TASK_ID, expectedVersion: 1 },
-		{ ...base, id: 'conflict-checklist', type: 'checklist.patch', taskId: PATCHED_TASK_ID, itemId: CHECKLIST_ITEM_ID, patch: { done: true } }
-	]));
+	storage.set(
+		`kanbanOfflineWriteQueue:${USER_ID}`,
+		JSON.stringify([
+			{
+				...base,
+				id: 'conflict-patch',
+				type: 'task.patch',
+				taskId: PATCHED_TASK_ID,
+				patch: { text: 'My offline title', expectedVersion: 2 }
+			},
+			{ ...base, id: 'conflict-delete', type: 'task.delete', taskId: DELETED_TASK_ID, expectedVersion: 1 },
+			{
+				...base,
+				id: 'conflict-checklist',
+				type: 'checklist.patch',
+				taskId: PATCHED_TASK_ID,
+				itemId: CHECKLIST_ITEM_ID,
+				patch: { done: true }
+			}
+		])
+	);
 }
 
 function readStatus() {
@@ -216,8 +235,18 @@ describe('sync status', () => {
 
 			expect(conflicts.map((conflict) => [conflict.id, conflict.title, conflict.target, conflict.detail])).toEqual([
 				['conflict-patch', '작업 수정', 'Conflict server task', '충돌 필드: 작업명'],
-				['conflict-delete', '작업 삭제', 'Conflict kept task', '서버의 최신 버전과 맞지 않아 삭제가 적용되지 않았습니다.'],
-				['conflict-checklist', '체크리스트 수정', 'Conflict server task', '체크리스트 변경을 서버에 적용하지 못했습니다.']
+				[
+					'conflict-delete',
+					'작업 삭제',
+					'Conflict kept task',
+					'서버의 최신 버전과 맞지 않아 삭제가 적용되지 않았습니다.'
+				],
+				[
+					'conflict-checklist',
+					'체크리스트 수정',
+					'Conflict server task',
+					'체크리스트 변경을 서버에 적용하지 못했습니다.'
+				]
 			]);
 			expect(readStatus()).toMatchObject({ notice: null, detailsOpen: false, isRefreshing: false });
 
@@ -271,7 +300,11 @@ describe('sync status', () => {
 			// The writes go out on the tasks' sync chains: wait for the answers.
 			await vi.waitFor(() => {
 				expect(writes.map(({ method, path, body }) => ({ method, path, body }))).toEqual([
-					{ method: 'PATCH', path: `/api/tasks/${PATCHED_TASK_ID}`, body: expect.objectContaining({ text: 'My offline title', expectedVersion: 3 }) },
+					{
+						method: 'PATCH',
+						path: `/api/tasks/${PATCHED_TASK_ID}`,
+						body: expect.objectContaining({ text: 'My offline title', expectedVersion: 3 })
+					},
 					{ method: 'DELETE', path: `/api/tasks/${DELETED_TASK_ID}`, body: { expectedVersion: 2 } }
 				]);
 				expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['My offline title', 4]]);

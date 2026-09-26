@@ -25,11 +25,7 @@
      *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
      * }} */
-    let {
-        task,
-        childrenByParent,
-        depth = 0
-    } = $props();
+    let { task, childrenByParent, depth = 0 } = $props();
 
     // The same for every card on the board, at every depth.
     const { dnd, openTask } = getBoardContext();
@@ -57,11 +53,13 @@
         return parent && parent.status !== task.status ? parent : null;
     });
     const completedSubtasks = $derived(task.subtasks.filter((subtask) => subtask.done).length);
-    const subtaskProgress = $derived(task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100));
+    const subtaskProgress = $derived(
+        task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100)
+    );
     /** @type {Record<string, import('$lib/shared/task-links.js').LinkPart[]>} */
-    const subtaskParts = $derived(Object.fromEntries(
-        task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)])
-    ));
+    const subtaskParts = $derived(
+        Object.fromEntries(task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)]))
+    );
 
     /**
      * @param {MouseEvent} event
@@ -161,7 +159,7 @@
     role="listitem"
     style={depth > 0 ? `margin-left:${depth * 32}px;` : ''}
     use:cardDraggable={task.id}
-    {...(dnd.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {})}>
+    {...dnd.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {}}>
     <div class="card-meta">
         <TaskBadges task={task} variant="card" onaddcategory={handleOpenTask} />
 
@@ -188,10 +186,16 @@
         {/if}
     </div>
 
-    <div class="card-text" role="button" tabindex="0" onclick={handleOpenTask} onkeydown={(event) => event.key === 'Enter' && openTask(task.id)}>
+    <div
+        class="card-text"
+        role="button"
+        tabindex="0"
+        onclick={handleOpenTask}
+        onkeydown={(event) => event.key === 'Enter' && openTask(task.id)}>
         {task.text}
     </div>
 
+    <!-- prettier-ignore -->
     <button
         class="date-tag"
         class:overdue={dueStatus === 'overdue'}
@@ -245,10 +249,14 @@
                             aria-label={`${subtask.text} 수정`}
                             title="수정"
                             onclick={(event) => handleRenameSubtask(subtask, event)}>✏️</button>
-                        <button class="subtask-action delete" aria-label={`${subtask.text} 삭제`} title="삭제" onclick={(event) => {
-                            event.stopPropagation();
-                            deleteSubtask(task.id, subtask.id);
-                        }}>×</button>
+                        <button
+                            class="subtask-action delete"
+                            aria-label={`${subtask.text} 삭제`}
+                            title="삭제"
+                            onclick={(event) => {
+                                event.stopPropagation();
+                                deleteSubtask(task.id, subtask.id);
+                            }}>×</button>
                     </div>
                 {/each}
             </div>
@@ -282,16 +290,14 @@
 
         <div class="card-secondary-actions">
             <button class="btn btn-calendar btn-small" onclick={handleCalendarDownload}>📅 일정 추가</button>
-            <button class="btn btn-danger" aria-label={`${task.text} 삭제`} title="작업 삭제" onclick={handleDeleteTask}>🗑</button>
+            <button class="btn btn-danger" aria-label={`${task.text} 삭제`} title="작업 삭제" onclick={handleDeleteTask}
+                >🗑</button>
         </div>
     </div>
 </div>
 
 {#if children.length > 0 && !task.collapsed}
     {#each children as child (child.id)}
-        <TaskTreeCard
-            childrenByParent={childrenByParent}
-            depth={depth + 1}
-            task={child} />
+        <TaskTreeCard childrenByParent={childrenByParent} depth={depth + 1} task={child} />
     {/each}
 {/if}

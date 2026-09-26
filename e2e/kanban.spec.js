@@ -15,11 +15,7 @@ test('keeps iPad-width Kanban columns side by side', async ({ page }) => {
 	await expect(doing).toBeVisible();
 	await expect(done).toBeVisible();
 
-	const boxes = await Promise.all([
-		todo.boundingBox(),
-		doing.boundingBox(),
-		done.boundingBox()
-	]);
+	const boxes = await Promise.all([todo.boundingBox(), doing.boundingBox(), done.boundingBox()]);
 	expect(boxes.every(Boolean)).toBe(true);
 	expect(Math.abs(boxes[0].y - boxes[1].y)).toBeLessThan(4);
 	expect(Math.abs(boxes[1].y - boxes[2].y)).toBeLessThan(4);
@@ -40,11 +36,7 @@ test('stacks Kanban columns on iPhone-width screens', async ({ page }) => {
 	await expect(doing).toBeVisible();
 	await expect(done).toBeVisible();
 
-	const boxes = await Promise.all([
-		todo.boundingBox(),
-		doing.boundingBox(),
-		done.boundingBox()
-	]);
+	const boxes = await Promise.all([todo.boundingBox(), doing.boundingBox(), done.boundingBox()]);
 	expect(boxes.every(Boolean)).toBe(true);
 	expect(boxes[0].y).toBeLessThan(boxes[1].y);
 	expect(boxes[1].y).toBeLessThan(boxes[2].y);

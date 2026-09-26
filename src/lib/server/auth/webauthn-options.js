@@ -1,10 +1,7 @@
 // The passkey options read BETTER_AUTH_URL, PASSKEY_ORIGIN and PASSKEY_RP_ID
 // with the rules the config report in env.js checks them by, so /api/health
 // and Better Auth agree on what a value means.
-export {
-	normalizeOrigin as normalizeWebAuthnOrigin,
-	normalizeRpId as normalizeRpID
-} from '$lib/server/config/env.js';
+export { normalizeOrigin as normalizeWebAuthnOrigin, normalizeRpId as normalizeRpID } from '$lib/server/config/env.js';
 
 /**
  * The hostname to use as the RP ID when none is set. Unlike env.js's

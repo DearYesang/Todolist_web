@@ -12,16 +12,18 @@ export async function GET({ request, url }) {
 		ok: strict ? report.ok : true,
 		checkedAt: new Date().toISOString(),
 		status: report.ok ? 'ready' : 'blocked',
-		...(detailed ? {
-			nodeEnv: report.nodeEnv,
-			databaseConfigured: report.databaseConfigured,
-			authReady: report.authReady,
-			emailDeliveryReady: report.emailDeliveryReady,
-			calendarFeedReady: report.calendarFeedReady,
-			calendarProviderReady: report.calendarProviderReady,
-			blocking: report.blocking.map(toPublicCheck),
-			checks: report.checks.map(toPublicCheck)
-		} : {})
+		...(detailed
+			? {
+					nodeEnv: report.nodeEnv,
+					databaseConfigured: report.databaseConfigured,
+					authReady: report.authReady,
+					emailDeliveryReady: report.emailDeliveryReady,
+					calendarFeedReady: report.calendarFeedReady,
+					calendarProviderReady: report.calendarProviderReady,
+					blocking: report.blocking.map(toPublicCheck),
+					checks: report.checks.map(toPublicCheck)
+				}
+			: {})
 	};
 
 	return json(body, {

@@ -1,0 +1,6 @@
+# Commits that only reformat code, skipped by `git blame`.
+# GitHub reads this file on its own; locally, run once:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format the codebase with Prettier
+# (the squash-merge SHA is added here after the formatting PR merges)

@@ -48,9 +48,13 @@ async function stubWindowOpen(page, mode = 'allow') {
 		const calls = [];
 		let allowance = openMode === 'allow' ? Number.POSITIVE_INFINITY : 0;
 		if (openMode === 'one-per-click') {
-			window.addEventListener('click', () => {
-				allowance = 1;
-			}, true);
+			window.addEventListener(
+				'click',
+				() => {
+					allowance = 1;
+				},
+				true
+			);
 		}
 		Object.defineProperty(window, '__opened', { value: calls });
 		window.open = (...args) => {
@@ -198,7 +202,9 @@ test('falls back to a link list when the browser blocks pop-ups', async ({ page 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await cardByTitle(page, 'E2E 링크 모음').getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
+	await cardByTitle(page, 'E2E 링크 모음')
+		.getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true })
+		.click();
 	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
 
 	const panel = page.locator('.link-open-panel');
@@ -212,9 +218,11 @@ test('falls back to a link list when the browser blocks pop-ups', async ({ page 
 	await expect(panel.getByRole('button', { name: '다음 링크 열기 (1/3)' })).toBeFocused();
 	const fallbackLinks = panel.locator('a');
 	await expect(fallbackLinks).toHaveCount(3);
-	expect(await fallbackLinks.evaluateAll((anchors) =>
-		anchors.map((anchor) => [anchor.getAttribute('href'), anchor.getAttribute('target'), anchor.getAttribute('rel')])
-	)).toEqual(LINK_TASK_URLS.slice(1).map((href) => [href, '_blank', 'noopener noreferrer']));
+	expect(
+		await fallbackLinks.evaluateAll((anchors) =>
+			anchors.map((anchor) => [anchor.getAttribute('href'), anchor.getAttribute('target'), anchor.getAttribute('rel')])
+		)
+	).toEqual(LINK_TASK_URLS.slice(1).map((href) => [href, '_blank', 'noopener noreferrer']));
 
 	// Each step is a fresh click, so exactly one more window.open per click.
 	await panel.getByRole('button', { name: '다음 링크 열기 (1/3)' }).click();
@@ -239,7 +247,9 @@ test('lists every link when new tabs cannot be opened at all', async ({ page }) 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await cardByTitle(page, 'E2E 링크 모음').getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
+	await cardByTitle(page, 'E2E 링크 모음')
+		.getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true })
+		.click();
 
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('이 환경에서는 새 탭을 자동으로 열 수 없습니다.');
@@ -260,7 +270,11 @@ const MANY_LINK_TASKS = [
 	{
 		id: 'local-many-links',
 		text: 'E2E 링크 21개',
-		subtasks: MANY_LINK_URLS.map((url, index) => ({ id: `local-many-link-${index + 1}`, text: `자료 ${index + 1} ${url}`, done: false }))
+		subtasks: MANY_LINK_URLS.map((url, index) => ({
+			id: `local-many-link-${index + 1}`,
+			text: `자료 ${index + 1} ${url}`,
+			done: false
+		}))
 	}
 ];
 
@@ -311,19 +325,23 @@ test('drops a leftover link panel when another account signs in', async ({ page 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await cardByTitle(page, 'E2E 링크 모음').getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
+	await cardByTitle(page, 'E2E 링크 모음')
+		.getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true })
+		.click();
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('링크 4개 중 1개만 열렸습니다');
 
 	// Another account's session arrives in the same tab, with no page reload
 	// (sign-out, then a different sign-in). The DB-less server has no auth, so
 	// the session and task endpoints are faked here.
-	await page.route('**/api/auth/get-session**', (route) => route.fulfill({
-		json: {
-			session: { id: 'e2e-session-2', userId: 'e2e-user-2', expiresAt: '2099-01-01T00:00:00.000Z' },
-			user: { id: 'e2e-user-2', email: 'other@example.com', name: null }
-		}
-	}));
+	await page.route('**/api/auth/get-session**', (route) =>
+		route.fulfill({
+			json: {
+				session: { id: 'e2e-session-2', userId: 'e2e-user-2', expiresAt: '2099-01-01T00:00:00.000Z' },
+				user: { id: 'e2e-user-2', email: 'other@example.com', name: null }
+			}
+		})
+	);
 	await page.route('**/api/tasks**', (route) => route.fulfill({ status: 503, json: { message: 'unavailable' } }));
 	await page.evaluate(() => window.dispatchEvent(new Event('online')));
 

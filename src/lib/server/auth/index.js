@@ -115,10 +115,12 @@ function parseList(value) {
 async function userHasRegisteredPasskeys(ctx, userId) {
 	const passkeys = await ctx.context.adapter.findMany({
 		model: 'passkey',
-		where: [{
-			field: 'userId',
-			value: userId
-		}]
+		where: [
+			{
+				field: 'userId',
+				value: userId
+			}
+		]
 	});
 
 	return passkeys.length > 0;

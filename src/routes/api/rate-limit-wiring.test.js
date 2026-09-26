@@ -51,45 +51,68 @@ const PROTECTED_HANDLERS = [
 	{ name: 'POST /api/tasks', handler: createTask, method: 'POST', guard: enforceTaskWriteRateLimit },
 	{ name: 'PATCH /api/tasks/[taskId]', handler: patchTask, method: 'PATCH', guard: enforceTaskWriteRateLimit },
 	{ name: 'DELETE /api/tasks/[taskId]', handler: deleteTask, method: 'DELETE', guard: enforceTaskWriteRateLimit },
-	{ name: 'POST /api/tasks/[taskId]/checklist', handler: createChecklistItem, method: 'POST', guard: enforceTaskWriteRateLimit },
-	{ name: 'PATCH .../checklist/[itemId]', handler: patchChecklistItem, method: 'PATCH', guard: enforceTaskWriteRateLimit },
-	{ name: 'DELETE .../checklist/[itemId]', handler: deleteChecklistItem, method: 'DELETE', guard: enforceTaskWriteRateLimit },
+	{
+		name: 'POST /api/tasks/[taskId]/checklist',
+		handler: createChecklistItem,
+		method: 'POST',
+		guard: enforceTaskWriteRateLimit
+	},
+	{
+		name: 'PATCH .../checklist/[itemId]',
+		handler: patchChecklistItem,
+		method: 'PATCH',
+		guard: enforceTaskWriteRateLimit
+	},
+	{
+		name: 'DELETE .../checklist/[itemId]',
+		handler: deleteChecklistItem,
+		method: 'DELETE',
+		guard: enforceTaskWriteRateLimit
+	},
 	{ name: 'POST /api/import', handler: importTasks, method: 'POST', guard: enforceImportRateLimit }
 ];
 
 describe('rate-limit guard wiring on every protected write route', () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
-		vi.mocked(requireAuthUser).mockResolvedValue(/** @type {any} */ ({
-			ok: true,
-			user: { id: 'user-id' },
-			session: { id: 'session-id' }
-		}));
-	});
-
-	it.each(PROTECTED_HANDLERS)('$name returns the guard 429 before touching the repository', async ({ handler, method, guard }) => {
-		vi.mocked(guard).mockResolvedValue(
-			Response.json({ message: 'Too many requests.' }, { status: 429, headers: { 'retry-after': '30' } })
+		vi.mocked(requireAuthUser).mockResolvedValue(
+			/** @type {any} */ ({
+				ok: true,
+				user: { id: 'user-id' },
+				session: { id: 'session-id' }
+			})
 		);
+	});
 
-		const response = await handler(createEvent(method));
+	it.each(PROTECTED_HANDLERS)(
+		'$name returns the guard 429 before touching the repository',
+		async ({ handler, method, guard }) => {
+			vi.mocked(guard).mockResolvedValue(
+				Response.json({ message: 'Too many requests.' }, { status: 429, headers: { 'retry-after': '30' } })
+			);
 
-		expect(response.status).toBe(429);
-		expect(response.headers.get('retry-after')).toBe('30');
-		expect(guard).toHaveBeenCalledWith('user-id');
-		for (const repositoryFn of Object.values(repository)) {
-			expect(repositoryFn).not.toHaveBeenCalled();
+			const response = await handler(createEvent(method));
+
+			expect(response.status).toBe(429);
+			expect(response.headers.get('retry-after')).toBe('30');
+			expect(guard).toHaveBeenCalledWith('user-id');
+			for (const repositoryFn of Object.values(repository)) {
+				expect(repositoryFn).not.toHaveBeenCalled();
+			}
 		}
-	});
+	);
 
-	it.each(PROTECTED_HANDLERS)('$name proceeds when the guard allows the request', async ({ handler, method, guard }) => {
-		vi.mocked(guard).mockResolvedValue(null);
+	it.each(PROTECTED_HANDLERS)(
+		'$name proceeds when the guard allows the request',
+		async ({ handler, method, guard }) => {
+			vi.mocked(guard).mockResolvedValue(null);
 
-		const response = await handler(createEvent(method));
+			const response = await handler(createEvent(method));
 
-		// Repository mocks resolve undefined, so a pass-through reaches the
-		// handler's success path (200/201) rather than the 429 short-circuit.
-		expect(response.status).not.toBe(429);
-		expect(guard).toHaveBeenCalledWith('user-id');
-	});
+			// Repository mocks resolve undefined, so a pass-through reaches the
+			// handler's success path (200/201) rather than the 429 short-circuit.
+			expect(response.status).not.toBe(429);
+			expect(guard).toHaveBeenCalledWith('user-id');
+		}
+	);
 });

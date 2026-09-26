@@ -5,7 +5,10 @@ const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
 	if (!isTrustedUnsafeApiRequest(event)) {
-		return withSecurityHeaders(Response.json({ message: 'Cross-site API writes are not allowed.' }, { status: 403 }), event);
+		return withSecurityHeaders(
+			Response.json({ message: 'Cross-site API writes are not allowed.' }, { status: 403 }),
+			event
+		);
 	}
 
 	if (!authDatabaseConfigured) {
@@ -86,16 +89,19 @@ function withSecurityHeaders(response, event) {
 	headers.set('x-content-type-options', 'nosniff');
 	headers.set('x-frame-options', 'DENY');
 	headers.set('referrer-policy', 'no-referrer');
-	headers.set('permissions-policy', [
-		'accelerometer=()',
-		'camera=()',
-		'geolocation=()',
-		'gyroscope=()',
-		'magnetometer=()',
-		'microphone=()',
-		'payment=()',
-		'usb=()'
-	].join(', '));
+	headers.set(
+		'permissions-policy',
+		[
+			'accelerometer=()',
+			'camera=()',
+			'geolocation=()',
+			'gyroscope=()',
+			'magnetometer=()',
+			'microphone=()',
+			'payment=()',
+			'usb=()'
+		].join(', ')
+	);
 	headers.set('cross-origin-opener-policy', 'same-origin');
 	if (production && event.url.protocol === 'https:') {
 		headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
@@ -110,12 +116,8 @@ function withSecurityHeaders(response, event) {
  * @param {boolean} production
  */
 function createFallbackContentSecurityPolicy(production) {
-	const scriptSrc = production
-		? "script-src 'self'"
-		: "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
-	const connectSrc = production
-		? "connect-src 'self'"
-		: "connect-src 'self' http: https: ws:";
+	const scriptSrc = production ? "script-src 'self'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+	const connectSrc = production ? "connect-src 'self'" : "connect-src 'self' http: https: ws:";
 	const styleSrc = "style-src 'self' 'unsafe-inline'";
 
 	const cspDirectives = [

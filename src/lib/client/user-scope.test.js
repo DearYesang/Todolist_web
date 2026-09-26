@@ -4,14 +4,7 @@ import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { jsonResponse } from '$lib/test-support/http.js';
 import { DEFAULT_FILTERS } from '../shared/task-domain.js';
 import { linkOpenState, requestOpenLinks } from './link-opener.js';
-import {
-	categories,
-	filters,
-	setCategoryFilter,
-	setPriorityFilter,
-	syncServerTasks,
-	tasks
-} from './task-store.js';
+import { categories, filters, setCategoryFilter, setPriorityFilter, syncServerTasks, tasks } from './task-store.js';
 import {
 	applyUserScope,
 	cacheAuthScope,
@@ -83,37 +76,46 @@ describe('user scope', () => {
 	function seedUserData(userId, { taskText, queued = 0 }) {
 		storage.set(`kanbanTasks:${userId}`, JSON.stringify([{ id: `local-${userId}`, text: taskText }]));
 		if (queued > 0) {
-			storage.set(`kanbanOfflineWriteQueue:${userId}`, JSON.stringify(Array.from({ length: queued }, (_, index) => ({
-				id: `mutation-${userId}-${index}`,
-				type: 'task.patch',
-				taskId: `local-${userId}`,
-				patch: { text: taskText },
-				ownerUserId: userId,
-				createdAt: 1,
-				attempts: 0
-			}))));
+			storage.set(
+				`kanbanOfflineWriteQueue:${userId}`,
+				JSON.stringify(
+					Array.from({ length: queued }, (_, index) => ({
+						id: `mutation-${userId}-${index}`,
+						type: 'task.patch',
+						taskId: `local-${userId}`,
+						patch: { text: taskText },
+						ownerUserId: userId,
+						createdAt: 1,
+						attempts: 0
+					}))
+				)
+			);
 		}
 	}
 
 	/** Loads a category catalog the way a finished server sync does. */
 	async function syncCategoryCatalog() {
-		await syncServerTasks(vi.fn(async (/** @type {unknown} */ url) => {
-			if (url === '/api/categories') {
-				return jsonResponse({ categories: [{ id: CATEGORY_ID, name: '서버 카테고리', sortOrder: 0 }] });
-			}
-			return url === '/api/tasks'
-				? jsonResponse({ tasks: [] })
-				: jsonResponse({ message: 'Unavailable.' }, { status: 503 });
-		}));
+		await syncServerTasks(
+			vi.fn(async (/** @type {unknown} */ url) => {
+				if (url === '/api/categories') {
+					return jsonResponse({ categories: [{ id: CATEGORY_ID, name: '서버 카테고리', sortOrder: 0 }] });
+				}
+				return url === '/api/tasks'
+					? jsonResponse({ tasks: [] })
+					: jsonResponse({ message: 'Unavailable.' }, { status: 503 });
+			})
+		);
 	}
 
 	function openLinkConfirmStep() {
-		requestOpenLinks(Array.from({ length: 11 }, (_, index) => ({
-			href: `https://example.com/${index + 1}`,
-			label: `링크 ${index + 1}`,
-			taskId: 'task-1',
-			taskText: '링크 모음'
-		})));
+		requestOpenLinks(
+			Array.from({ length: 11 }, (_, index) => ({
+				href: `https://example.com/${index + 1}`,
+				label: `링크 ${index + 1}`,
+				taskId: 'task-1',
+				taskText: '링크 모음'
+			}))
+		);
 	}
 
 	it('points the task cache, the offline queue and the link-open state at the signed-in user', async () => {
@@ -179,7 +181,7 @@ describe('user scope', () => {
 	// Probes P2 and P3. Left behind, a pending view is sent by the next
 	// sync (sync-status.js runServerSync) as the default view of whoever
 	// signs in next.
-	it('drops the previous user\'s catalog, filters and pending default view when another user signs in', async () => {
+	it("drops the previous user's catalog, filters and pending default view when another user signs in", async () => {
 		await leaveUserABoardState();
 
 		applyUserScope('user-b');
@@ -209,7 +211,7 @@ describe('user scope', () => {
 		expect(storage.get(PENDING_VIEW_KEY)).toBe('gantt');
 	});
 
-	it('clears only the signed-in user\'s queue, cached tasks and pending default view on sign-out', () => {
+	it("clears only the signed-in user's queue, cached tasks and pending default view on sign-out", () => {
 		seedUserData('user-a', { taskText: 'User A task', queued: 1 });
 		seedUserData('user-b', { taskText: 'User B task', queued: 1 });
 		applyUserScope('user-a');

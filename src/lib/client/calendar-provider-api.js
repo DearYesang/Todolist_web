@@ -68,7 +68,10 @@ export async function listCalendarProviders(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Calendar provider API failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body) ?? `Calendar provider API failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Calendar provider API request could not be completed.');
 	}
@@ -93,11 +96,19 @@ export async function deleteCalendarConnection(connectionId, fetcher = globalThi
 			headers: { accept: 'application/json' }
 		});
 		const body = await readJsonBody(response);
-		if (response.ok && body && typeof body === 'object' && typeof /** @type {{ deleted?: unknown }} */ (body).deleted === 'string') {
+		if (
+			response.ok
+			&& body
+			&& typeof body === 'object'
+			&& typeof (/** @type {{ deleted?: unknown }} */ (body).deleted) === 'string'
+		) {
 			return { ok: true, deleted: /** @type {{ deleted: string }} */ (body).deleted };
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Calendar provider API failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body) ?? `Calendar provider API failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Calendar provider API request could not be completed.');
 	}
@@ -130,7 +141,10 @@ export async function syncCalendarProviders(fetcher = globalThis.fetch) {
 			};
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Calendar sync failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body) ?? `Calendar sync failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Calendar sync request could not be completed.');
 	}
@@ -157,8 +171,8 @@ function isSyncBody(body) {
 	return Boolean(
 		body
 		&& typeof body === 'object'
-		&& typeof /** @type {{ connections?: unknown }} */ (body).connections === 'number'
-		&& typeof /** @type {{ tasks?: unknown }} */ (body).tasks === 'number'
+		&& typeof (/** @type {{ connections?: unknown }} */ (body).connections) === 'number'
+		&& typeof (/** @type {{ tasks?: unknown }} */ (body).tasks) === 'number'
 		&& Array.isArray(/** @type {{ summaries?: unknown }} */ (body).summaries)
 	);
 }
