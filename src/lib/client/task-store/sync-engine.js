@@ -670,6 +670,10 @@ function toServerTaskPatch(task) {
         urgency: task.urgency,
         category: task.category,
         categoryId: task.categoryId ?? null,
+        // A null categoryId means "find the category by name", not "clear
+        // it"; an empty name still clears it. The server clears for clients
+        // that do not send this.
+        categoryByName: true,
         parentId: isServerTaskId(task.parentId) ? task.parentId : null,
         ...(typeof task.version === 'number' ? { expectedVersion: task.version } : {})
     };

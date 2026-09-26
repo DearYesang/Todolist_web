@@ -299,7 +299,7 @@ describe('task updates', () => {
 		expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'select tasks', 'select tasks']);
 	});
 
-	it('finds or creates the category by name when the patch names one without an id', async () => {
+	it('finds or creates the category by name when the patch names one without an id and asks for it', async () => {
 		// The client sends its whole task with every patch. A category typed in
 		// the task panel that the catalog does not hold yet has a name and a
 		// null id, and must not be read as "no category".
@@ -328,7 +328,12 @@ describe('task updates', () => {
 			[created]
 		]);
 
-		const task = await updateTaskForUser(USER_ID, TASK_ID, { category: ' 신규  기획 ', categoryId: null, expectedVersion: 3 });
+		const task = await updateTaskForUser(USER_ID, TASK_ID, {
+			category: ' 신규  기획 ',
+			categoryId: null,
+			categoryByName: true,
+			expectedVersion: 3
+		});
 
 		expect(describeStatements(statements)).toEqual([
 			...AUTHORIZATION_STATEMENTS,
@@ -345,8 +350,29 @@ describe('task updates', () => {
 		expect(task).toMatchObject({ category: '신규 기획', categoryId: NEW_CATEGORY_ID, categoryMeta: { id: NEW_CATEGORY_ID, name: '신규 기획' } });
 	});
 
+	it('clears the category for a null id from a client that does not ask for the name to decide', async () => {
+		// Clients cached from before categoryByName send a patch per keystroke
+		// in the task panel; a half-typed name must not become a category.
+		const statements = recordStatements(db, [
+			...AUTHORIZATION,
+			[createTaskRow()],
+			[createTaskRow({ version: 4 })],
+			[]
+		]);
+
+		await updateTaskForUser(USER_ID, TASK_ID, { category: 'ㄱ', categoryId: null, expectedVersion: 3 });
+
+		expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'update tasks', 'select checklist_items']);
+		expect(statements[3].set).toMatchObject({ category: '', categoryId: null });
+	});
+
 	it('clears the category when the patch sends a null id with an empty or missing name', async () => {
-		for (const patch of [{ category: '', categoryId: null }, { categoryId: null }]) {
+		for (const patch of [
+			{ category: '', categoryId: null },
+			{ categoryId: null },
+			{ category: '', categoryId: null, categoryByName: true },
+			{ categoryId: null, categoryByName: true }
+		]) {
 			const statements = recordStatements(db, [
 				...AUTHORIZATION,
 				[createTaskRow({ category: '개발', categoryId: CATEGORY_ID })],

@@ -154,7 +154,9 @@ describe('assigning a task category', () => {
 
         expect(get(tasks)[0]).toMatchObject({ category: '리서치', categoryId: null, categoryMeta: null });
         await waitForPendingTaskSyncs();
-        expect(patches).toEqual([expect.objectContaining({ category: '리서치', categoryId: null })]);
+        // categoryByName tells the server to look the null id up by name; a
+        // patch without it clears the category, as it did for older clients.
+        expect(patches).toEqual([expect.objectContaining({ category: '리서치', categoryId: null, categoryByName: true })]);
     });
 
     it('keeps the space inside a name and tidies the spaces around it', async () => {

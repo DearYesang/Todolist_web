@@ -149,10 +149,18 @@ async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
 		return category;
 	}
 
-	// Without an id the name decides. The client sends categoryId: null with
-	// every task patch, also for a name it has no id for yet (typed in the task
-	// panel, or renamed offline), so a null id must not clear a named category.
-	// An empty or missing name still clears it.
+	// A null id clears the category unless the client asks for the name to
+	// decide. Clients cached from before categoryByName send a patch for every
+	// keystroke in the task panel, each with categoryId: null, and resolving
+	// those names would leave a category for every half-typed name.
+	if (hasField(input, 'categoryId') && input.categoryByName !== true) {
+		return { id: null, name: '' };
+	}
+
+	// The name decides. Current clients send categoryId: null with every task
+	// patch, also for a name they have no id for yet (typed in the task panel,
+	// or renamed offline), so a null id must not clear a named category. An
+	// empty or missing name still clears it.
 	const category = await findOrCreateCategoryRow(db, {
 		boardId,
 		userId,
