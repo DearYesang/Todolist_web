@@ -3,6 +3,7 @@ import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import {
 	advanceQueuedTaskVersion,
+	clearOfflineWriteQueue,
 	dropQueuedChecklistFields,
 	dropQueuedTaskPatch,
 	enqueueOfflineMutation,
@@ -655,6 +656,38 @@ describe('offline write queue conflict behavior', () => {
 			expect.objectContaining({ type: 'checklist.patch', taskId, itemId: serverItemId, patch: { done: true }, ownerUserId: 'user-a' })
 		]);
 		expect(loadOfflineQueue()).toEqual([expect.objectContaining({ type: 'task.delete', ownerUserId: 'user-b' })]);
+	});
+
+	// A sign-out that clears local data empties the queue while a flush is
+	// out. A checked create's follow-up patch, queued when its checked
+	// state is throttled, then goes back into the cleared queue.
+	it.fails('queues no follow-up in a queue that was cleared while the flush was out', async () => {
+		const taskId = '55555555-5555-4555-8555-555555555555';
+		const serverItemId = '66666666-6666-4666-8666-666666666666';
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({
+			type: 'checklist.create',
+			taskId,
+			localItemId: 'local-checklist',
+			text: 'Checked offline',
+			done: true
+		});
+		const createAnswer = createDeferred();
+		const fetcher = vi.fn()
+			.mockReturnValueOnce(createAnswer.promise)
+			.mockResolvedValueOnce(jsonResponse({ message: 'Too many task changes.' }, { status: 429 }));
+
+		const flushing = flushOfflineWriteQueue(fetcher);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		// A sign-out that clears local data.
+		clearOfflineWriteQueue();
+		createAnswer.resolve(jsonResponse({
+			task: { id: taskId, text: 'Task', subtasks: [{ id: serverItemId, text: 'Checked offline', done: false }] }
+		}, { status: 201 }));
+		await flushing;
+
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(storage.has('kanbanOfflineWriteQueue:user-a')).toBe(false);
 	});
 
 	it('drops a pending checklist create when the local item is deleted before sync', () => {

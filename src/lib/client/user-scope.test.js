@@ -802,4 +802,51 @@ describe('a sync of the offline queue that outlives its user', () => {
 			userBCache: [[USER_B_TASK.id, 'User B task']]
 		});
 	});
+
+	// Found while fixing the two above. A sign-out that clears local data
+	// counts the queue, which the sync is still sending, and deletes it and
+	// the cached board. The import's answer then puts the imported tasks
+	// back in the cleared cache: through the board while it is still the
+	// user's, before the session refetch hands it to no user, and since the
+	// previous commit through the cache once it is not.
+	/**
+	 * Clears user A's local data while the import is out, and answers it
+	 * with the board still user A's or already no user's.
+	 * @param {{ answerAfterBoardLeaves: boolean }} options
+	 */
+	async function clearWhileImportIsOut({ answerAfterBoardLeaves }) {
+		seedUserA({ id: 'local-import', text: 'Imported' }, {
+			type: 'import.tasks',
+			mode: 'replace',
+			payload: [{ text: 'Imported' }],
+			localTaskIds: ['local-import']
+		});
+		const syncing = syncServerTasks();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(fetch).toHaveBeenCalledTimes(1);
+
+		clearUserLocalData();
+		if (answerAfterBoardLeaves) {
+			applyUserScope(null);
+		}
+		firstAnswer.resolve(jsonResponse({
+			tasks: [{ id: SERVER_TASK_ID, text: 'Imported', version: 1 }],
+			summary: { imported: 1 }
+		}));
+		await syncing;
+		applyUserScope(null);
+
+		return {
+			userAQueue: storage.get('kanbanOfflineWriteQueue:user-a') ?? null,
+			userACache: readTexts('kanbanTasks:user-a')
+		};
+	}
+
+	it.fails('leaves the cleared cache empty when the answer comes before the board goes to no user', async () => {
+		await expect(clearWhileImportIsOut({ answerAfterBoardLeaves: false })).resolves.toEqual({ userAQueue: null, userACache: [] });
+	});
+
+	it.fails('leaves the cleared cache empty when the answer comes after the board went to no user', async () => {
+		await expect(clearWhileImportIsOut({ answerAfterBoardLeaves: true })).resolves.toEqual({ userAQueue: null, userACache: [] });
+	});
 });
