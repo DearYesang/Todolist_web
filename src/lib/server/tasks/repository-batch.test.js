@@ -256,7 +256,8 @@ describe('task write responses', () => {
 
 		const responses = {
 			createTask: await createTaskForUser('user-id', { text: 'Task', categoryId: CATEGORY_ID, startDate: '2026-07-01', endDate: '2026-07-02' }),
-			updateTask: await updateTaskForUser('user-id', TASK_ID, { text: 'Task', expectedVersion: 3 }),
+			// The authorization read returns taskRow, so the current version is 4.
+			updateTask: await updateTaskForUser('user-id', TASK_ID, { text: 'Task', expectedVersion: 4 }),
 			createChecklistItem: await createChecklistItemForUser('user-id', TASK_ID, { text: 'Item' }),
 			updateChecklistItem: await updateChecklistItemForUser('user-id', TASK_ID, ITEM_ID, { done: true }),
 			deleteChecklistItem: await deleteChecklistItemForUser('user-id', TASK_ID, ITEM_ID)

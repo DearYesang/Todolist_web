@@ -20,6 +20,8 @@ import {
 	TaskWriteError
 } from './validation.js';
 
+const STALE_TASK_MESSAGE = 'Task changed on another device. Sync and try again.';
+
 /**
  * @param {string} userId
  */
@@ -183,6 +185,12 @@ export async function updateTaskForUser(userId, taskId, payload) {
 		throw new TaskWriteError('Task was not found.', 404);
 	}
 	const expectedVersion = typeof input.expectedVersion === 'number' ? input.expectedVersion : null;
+	// A stale write must change nothing. Resolving the category below can
+	// create a category or bring an archived one back before the UPDATE's
+	// own version guard rejects the write, so the version is checked first.
+	if (expectedVersion !== null && existing.version !== expectedVersion) {
+		throw new TaskWriteError(STALE_TASK_MESSAGE, 409);
+	}
 
 	const hasParentPatch = hasField(input, 'parentId');
 	const hasCategoryIdPatch = hasField(input, 'categoryId');
@@ -233,7 +241,7 @@ export async function updateTaskForUser(userId, taskId, payload) {
 
 	if (!updated) {
 		if (expectedVersion !== null) {
-			throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
+			throw new TaskWriteError(STALE_TASK_MESSAGE, 409);
 		}
 		// The task passed the authz read moments ago, so an unversioned update
 		// matching nothing means it was deleted concurrently — a benign race.
@@ -313,7 +321,7 @@ export async function deleteTaskCascadeForUser(userId, taskId, payload = undefin
 	const result = await db.execute(buildCascadeDeleteStatement(task, now, input.expectedVersion));
 	const deletedCount = result.rows.length;
 	if (input.expectedVersion !== null && deletedCount === 0) {
-		throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
+		throw new TaskWriteError(STALE_TASK_MESSAGE, 409);
 	}
 
 	return deletedCount;

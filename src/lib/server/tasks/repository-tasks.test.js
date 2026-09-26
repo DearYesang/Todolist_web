@@ -350,6 +350,21 @@ describe('task updates', () => {
 		expect(task).toMatchObject({ category: '신규 기획', categoryId: NEW_CATEGORY_ID, categoryMeta: { id: NEW_CATEGORY_ID, name: '신규 기획' } });
 	});
 
+	it('answers a stale version with 409 before finding, creating or reactivating a category', async () => {
+		// The copy is on version 2; the server's task is on 3. Resolving the
+		// name first would write a category row for a write that then fails.
+		const statements = recordStatements(db, [...AUTHORIZATION, [createTaskRow()]]);
+
+		await expect(updateTaskForUser(USER_ID, TASK_ID, {
+			category: '기획',
+			categoryId: null,
+			categoryByName: true,
+			expectedVersion: 2
+		})).rejects.toMatchObject({ status: 409 });
+
+		expect(describeStatements(statements)).toEqual(AUTHORIZATION_STATEMENTS);
+	});
+
 	it('clears the category for a null id from a client that does not ask for the name to decide', async () => {
 		// Clients cached from before categoryByName send a patch per keystroke
 		// in the task panel; a half-typed name must not become a category.
@@ -388,8 +403,14 @@ describe('task updates', () => {
 	});
 
 	it('reports a stale version as 409, a vanished task as 404 and an unknown task as 404', async () => {
-		recordStatements(db, [...AUTHORIZATION, [createTaskRow()], []]);
+		// Changed before the request read the task (version 3)...
+		recordStatements(db, [...AUTHORIZATION, [createTaskRow()]]);
 		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed', expectedVersion: 2 }))
+			.rejects.toMatchObject({ status: 409, message: 'Task changed on another device. Sync and try again.' });
+
+		// ...and between that read and the UPDATE, which then matches no row.
+		recordStatements(db, [...AUTHORIZATION, [createTaskRow()], []]);
+		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed', expectedVersion: 3 }))
 			.rejects.toMatchObject({ status: 409, message: 'Task changed on another device. Sync and try again.' });
 
 		recordStatements(db, [...AUTHORIZATION, [createTaskRow()], []]);
