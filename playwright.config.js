@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
 	testDir: './e2e',
+	// A committed test.only would otherwise run one test and pass CI.
+	forbidOnly: !!process.env.CI,
 	timeout: 30_000,
 	expect: {
 		timeout: 5_000
