@@ -65,12 +65,14 @@ export async function createCalendarProviderAuthorizationUrl(userId, provider, b
 	const state = createOauthState();
 	const redirectUri = createRedirectUri(baseUrl, provider);
 	const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-	await getDb().insert(schema.verification).values({
-		id: createStateId(),
-		identifier: `${OAUTH_STATE_PREFIX}${state}`,
-		value: JSON.stringify({ userId, provider, sessionId: sessionBinding.sessionId }),
-		expiresAt
-	});
+	await getDb()
+		.insert(schema.verification)
+		.values({
+			id: createStateId(),
+			identifier: `${OAUTH_STATE_PREFIX}${state}`,
+			value: JSON.stringify({ userId, provider, sessionId: sessionBinding.sessionId }),
+			expiresAt
+		});
 
 	return buildCalendarAuthorizationUrl(provider, state, redirectUri);
 }
@@ -115,11 +117,13 @@ export async function completeCalendarProviderAuthorization(provider, code, stat
 	const [existing] = await db
 		.select()
 		.from(schema.calendarConnections)
-		.where(and(
-			eq(schema.calendarConnections.userId, stateRecord.userId),
-			eq(schema.calendarConnections.provider, provider),
-			eq(schema.calendarConnections.providerAccountId, account.id)
-		))
+		.where(
+			and(
+				eq(schema.calendarConnections.userId, stateRecord.userId),
+				eq(schema.calendarConnections.provider, provider),
+				eq(schema.calendarConnections.providerAccountId, account.id)
+			)
+		)
 		.limit(1);
 
 	const now = new Date();
@@ -446,10 +450,7 @@ async function upsertEventLink(connectionId, taskId, externalEventId, etag) {
 			syncStatus: 'active'
 		})
 		.onConflictDoUpdate({
-			target: [
-				schema.calendarEventLinks.connectionId,
-				schema.calendarEventLinks.taskId
-			],
+			target: [schema.calendarEventLinks.connectionId, schema.calendarEventLinks.taskId],
 			set: {
 				externalCalendarId: 'primary',
 				externalEventId,
@@ -469,10 +470,7 @@ async function markTaskLinkErrored(connectionId, taskId) {
 	const [existing] = await db
 		.select()
 		.from(schema.calendarEventLinks)
-		.where(and(
-			eq(schema.calendarEventLinks.connectionId, connectionId),
-			eq(schema.calendarEventLinks.taskId, taskId)
-		))
+		.where(and(eq(schema.calendarEventLinks.connectionId, connectionId), eq(schema.calendarEventLinks.taskId, taskId)))
 		.limit(1);
 
 	if (!existing) {

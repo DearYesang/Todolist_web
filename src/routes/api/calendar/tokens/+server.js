@@ -18,11 +18,14 @@ export async function GET({ request }) {
 
 	try {
 		const tokens = await listCalendarTokensForUser(authResult.user.id);
-		return json({ tokens }, {
-			headers: {
-				'cache-control': 'private, no-store'
+		return json(
+			{ tokens },
+			{
+				headers: {
+					'cache-control': 'private, no-store'
+				}
 			}
-		});
+		);
 	} catch (error) {
 		return apiErrorResponse(error, CalendarTokenConfigurationError);
 	}

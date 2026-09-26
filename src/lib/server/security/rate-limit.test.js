@@ -30,11 +30,15 @@ describe('server rate limit helper', () => {
 	});
 
 	it('keys limits by ip, scope, and normalized subject', () => {
-		const key = createRateLimitKey({
-			request: new Request('https://todo.example.com/api', {
-				headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }
-			})
-		}, 'email', ' USER@Example.COM ');
+		const key = createRateLimitKey(
+			{
+				request: new Request('https://todo.example.com/api', {
+					headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }
+				})
+			},
+			'email',
+			' USER@Example.COM '
+		);
 
 		expect(key).toBe('email:203.0.113.9:user@example.com');
 	});

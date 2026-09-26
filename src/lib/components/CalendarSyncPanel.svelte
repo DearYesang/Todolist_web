@@ -13,7 +13,9 @@
     let isWorking = $state(false);
     let message = $state('');
     let providers = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarProviderRecord[]} */ ([]));
-    let connections = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarConnectionRecord[]} */ ([]));
+    let connections = $state(
+        /** @type {import('$lib/client/calendar-provider-api.js').CalendarConnectionRecord[]} */ ([])
+    );
     let syncRuns = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarSyncRunRecord[]} */ ([]));
 
     onMount(() => {
@@ -144,9 +146,10 @@
         const rawMessage = url.searchParams.get('calendarSyncMessage');
         let nextMessage = rawMessage;
         if (!nextMessage) {
-            nextMessage = status === 'connected'
-                ? `${getStaticProviderName(provider)} 연결이 완료되었습니다. 지금 동기화로 작업 일정을 반영할 수 있습니다.`
-                : `${getStaticProviderName(provider)} 연결을 완료하지 못했습니다.`;
+            nextMessage =
+                status === 'connected'
+                    ? `${getStaticProviderName(provider)} 연결이 완료되었습니다. 지금 동기화로 작업 일정을 반영할 수 있습니다.`
+                    : `${getStaticProviderName(provider)} 연결을 완료하지 못했습니다.`;
         }
 
         url.searchParams.delete('calendarSync');
@@ -179,7 +182,8 @@
                             {/if}
                         </div>
                     {/each}
-                    <button class="btn btn-primary" onclick={syncNow} disabled={isWorking || connections.length === 0}>지금 동기화</button>
+                    <button class="btn btn-primary" onclick={syncNow} disabled={isWorking || connections.length === 0}
+                        >지금 동기화</button>
                 </div>
 
                 <details class="calendar-oauth-help">
@@ -198,10 +202,15 @@
                                 <span>
                                     {getProviderName(connection.provider)}
                                     {#if connection.latestSync}
-                                        · {connection.latestSync.status} · {formatDateTime(connection.latestSync.startedAt)}
+                                        · {connection.latestSync.status} · {formatDateTime(
+                                            connection.latestSync.startedAt
+                                        )}
                                     {/if}
                                 </span>
-                                <button class="btn btn-small" onclick={() => disconnect(connection.id)} disabled={isWorking}>연결 해제</button>
+                                <button
+                                    class="btn btn-small"
+                                    onclick={() => disconnect(connection.id)}
+                                    disabled={isWorking}>연결 해제</button>
                             </div>
                         {/each}
                     </div>

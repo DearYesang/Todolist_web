@@ -77,9 +77,7 @@ function resolveImport(importer, specifier) {
  * @param {string} file
  */
 function readSource(file) {
-	return readFileSync(posix.join(SRC_DIR, file), 'utf8')
-		.replace(BLOCK_COMMENT, '')
-		.replace(LINE_COMMENT, '');
+	return readFileSync(posix.join(SRC_DIR, file), 'utf8').replace(BLOCK_COMMENT, '').replace(LINE_COMMENT, '');
 }
 
 /** @param {string} file */
@@ -103,7 +101,10 @@ function readNamedImports(file, module) {
 		if (resolveImport(file, specifier)?.target !== module) {
 			continue;
 		}
-		for (const entry of list.split(',').map((part) => part.trim()).filter(Boolean)) {
+		for (const entry of list
+			.split(',')
+			.map((part) => part.trim())
+			.filter(Boolean)) {
 			const [imported, local = imported] = entry.split(/\s+as\s+/);
 			names.set(imported, local);
 		}
@@ -183,9 +184,8 @@ function findCycles(nodes, next) {
  * cycle.
  */
 function findFileCycles() {
-	return findCycles(
-		files.filter(isProduction),
-		(file) => (imports.get(file) ?? []).filter((target) => target !== file && isProduction(target))
+	return findCycles(files.filter(isProduction), (file) =>
+		(imports.get(file) ?? []).filter((target) => target !== file && isProduction(target))
 	);
 }
 
@@ -226,36 +226,49 @@ describe('source architecture', () => {
 		// packages that use it: boards/ and http/ import no other package,
 		// and tasks/ imports categories/ but categories/ never imports tasks/.
 		expect(findServerPackageCycles()).toEqual([]);
-		expect(findImports((importer, imported) =>
-			isProduction(importer) && importer.startsWith(`${SERVER_DIR}categories/`) && imported.startsWith(`${SERVER_DIR}tasks/`)
-		)).toEqual([]);
+		expect(
+			findImports(
+				(importer, imported) =>
+					isProduction(importer)
+					&& importer.startsWith(`${SERVER_DIR}categories/`)
+					&& imported.startsWith(`${SERVER_DIR}tasks/`)
+			)
+		).toEqual([]);
 	});
 
 	it.each(LAYER_RULES.map((rule) => ({ ...rule, names: rule.forbidden.join(', ') })))(
 		'keeps $layer code from importing $names code',
 		({ layer, forbidden }) => {
 			// Tests may cross layers, e.g. to hold client and server to one format.
-			expect(findImports((importer, imported) =>
-				isProduction(importer)
-					&& importer.startsWith(`lib/${layer}/`)
-					&& forbidden.some((name) => imported.startsWith(`lib/${name}/`))
-			)).toEqual([]);
+			expect(
+				findImports(
+					(importer, imported) =>
+						isProduction(importer)
+						&& importer.startsWith(`lib/${layer}/`)
+						&& forbidden.some((name) => imported.startsWith(`lib/${name}/`))
+				)
+			).toEqual([]);
 		}
 	);
 
 	it('reaches the client task store modules only through task-store.js', () => {
 		// Components, the other client modules and their tests use the
 		// facade; the modules and tests inside the folder import each other.
-		expect(findImports((importer, imported) =>
-			importer !== TASK_STORE_FACADE && !importer.startsWith(TASK_STORE_DIR) && imported.startsWith(TASK_STORE_DIR)
-		)).toEqual([]);
+		expect(
+			findImports(
+				(importer, imported) =>
+					importer !== TASK_STORE_FACADE && !importer.startsWith(TASK_STORE_DIR) && imported.startsWith(TASK_STORE_DIR)
+			)
+		).toEqual([]);
 	});
 
 	it('exports from task-store.js only names that production code outside the folder imports', async () => {
 		const facade = await import('./lib/client/task-store.js');
-		const imported = new Set(files
-			.filter((file) => isProduction(file) && !isInTaskStore(file))
-			.flatMap((file) => [...readNamedImports(file, TASK_STORE_FACADE).keys()]));
+		const imported = new Set(
+			files
+				.filter((file) => isProduction(file) && !isInTaskStore(file))
+				.flatMap((file) => [...readNamedImports(file, TASK_STORE_FACADE).keys()])
+		);
 		expect(Object.keys(facade).filter((name) => !imported.has(name))).toEqual([]);
 	});
 
@@ -263,15 +276,17 @@ describe('source architecture', () => {
 		/** @type {Record<string, unknown>} */
 		const facade = await import('./lib/client/task-store.js');
 		/** @param {unknown} value */
-		const isStore = (value) => typeof /** @type {{ subscribe?: unknown }} */ (value)?.subscribe === 'function';
+		const isStore = (value) => typeof (/** @type {{ subscribe?: unknown }} */ (value)?.subscribe) === 'function';
 		const storeNames = Object.keys(facade).filter((name) => isStore(facade[name]));
 		expect(storeNames).toContain('tasks');
 
 		// The facade hands out read-only views of the stores ...
-		expect(storeNames.filter((name) => {
-			const store = /** @type {object} */ (facade[name]);
-			return 'set' in store || 'update' in store;
-		})).toEqual([]);
+		expect(
+			storeNames.filter((name) => {
+				const store = /** @type {object} */ (facade[name]);
+				return 'set' in store || 'update' in store;
+			})
+		).toEqual([]);
 
 		// ... and no file outside the folder writes one: not with store.set()
 		// or store.update(), and not with a component's `$store = ...`,
@@ -283,11 +298,15 @@ describe('source architecture', () => {
 				const source = readSource(file);
 				return [...readNamedImports(file, TASK_STORE_FACADE)]
 					.filter(([imported]) => storeNames.includes(imported))
-					.filter(([, local]) => [
-						new RegExp(`(?<![\\w$.])${local}\\s*\\.\\s*(?:set|update)\\s*\\(`),
-						new RegExp(`\\$${local}(?:\\.[\\w$]+|\\[[^\\]]*\\])*\\s*(?:[-+*/%&|^]|\\*\\*|<<|>>>?|&&|\\|\\||\\?\\?)?=(?![=>])`),
-						new RegExp(`bind:[\\w|]+=\\{\\s*\\$${local}\\b`)
-					].some((pattern) => pattern.test(source)))
+					.filter(([, local]) =>
+						[
+							new RegExp(`(?<![\\w$.])${local}\\s*\\.\\s*(?:set|update)\\s*\\(`),
+							new RegExp(
+								`\\$${local}(?:\\.[\\w$]+|\\[[^\\]]*\\])*\\s*(?:[-+*/%&|^]|\\*\\*|<<|>>>?|&&|\\|\\||\\?\\?)?=(?![=>])`
+							),
+							new RegExp(`bind:[\\w|]+=\\{\\s*\\$${local}\\b`)
+						].some((pattern) => pattern.test(source))
+					)
 					.map(([imported]) => `${file} writes ${imported}`);
 			});
 		expect(writes).toEqual([]);
@@ -298,9 +317,9 @@ describe('source architecture', () => {
 		// scopes it to the signed-in user, counts its entries and clears it
 		// on sign-out.
 		const scopeNames = ['clearOfflineWriteQueue', 'getOfflineQueueSize', 'setOfflineQueueOwner'];
-		expect(files.filter((file) =>
-			isProduction(file) && !isInTaskStore(file) && imports.get(file)?.includes(OFFLINE_QUEUE)
-		)).toEqual([USER_SCOPE]);
+		expect(
+			files.filter((file) => isProduction(file) && !isInTaskStore(file) && imports.get(file)?.includes(OFFLINE_QUEUE))
+		).toEqual([USER_SCOPE]);
 		expect([...readNamedImports(USER_SCOPE, OFFLINE_QUEUE).keys()].sort()).toEqual(scopeNames);
 	});
 
@@ -309,14 +328,20 @@ describe('source architecture', () => {
 		// vi.mock('$lib/server/tasks/repository.js') factories in its tests.
 		// Tests may import the others, like validation.js for TaskWriteError.
 		const tasksDir = `${SERVER_DIR}tasks/`;
-		expect(findImports((importer, imported) =>
-			isProduction(importer) && !importer.startsWith(tasksDir) && imported.startsWith(tasksDir) && imported !== `${tasksDir}repository.js`
-		)).toEqual([]);
+		expect(
+			findImports(
+				(importer, imported) =>
+					isProduction(importer)
+					&& !importer.startsWith(tasksDir)
+					&& imported.startsWith(tasksDir)
+					&& imported !== `${tasksDir}repository.js`
+			)
+		).toEqual([]);
 	});
 
 	it('imports test-support only from tests', () => {
-		expect(findImports((importer, imported) =>
-			isProduction(importer) && imported.startsWith(TEST_SUPPORT)
-		)).toEqual([]);
+		expect(findImports((importer, imported) => isProduction(importer) && imported.startsWith(TEST_SUPPORT))).toEqual(
+			[]
+		);
 	});
 });

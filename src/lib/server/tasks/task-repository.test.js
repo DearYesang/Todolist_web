@@ -88,7 +88,13 @@ describe('task creation', () => {
 		const parent = createTaskRow({ id: PARENT_ID, status: 'done' });
 		const statements = recordStatements(db, [...PROVISIONING, [parent], [createTaskRow()]]);
 
-		await createTaskForUser(USER_ID, { text: 'Child', status: 'todo', parentId: PARENT_ID, startDate: '2026-07-06', endDate: '2026-07-07' });
+		await createTaskForUser(USER_ID, {
+			text: 'Child',
+			status: 'todo',
+			parentId: PARENT_ID,
+			startDate: '2026-07-06',
+			endDate: '2026-07-07'
+		});
 
 		expect(describeStatements(statements)).toEqual([...PROVISIONING_STATEMENTS, 'select tasks', 'insert tasks']);
 		expect(statements[3]).toMatchObject({
@@ -104,8 +110,9 @@ describe('task creation', () => {
 	it('rejects a parent that is not on the board', async () => {
 		const statements = recordStatements(db, [...PROVISIONING, []]);
 
-		await expect(createTaskForUser(USER_ID, { text: 'Child', parentId: PARENT_ID, startDate: '2026-07-06', endDate: '2026-07-07' }))
-			.rejects.toMatchObject({ status: 400, message: 'Parent task was not found on this board.' });
+		await expect(
+			createTaskForUser(USER_ID, { text: 'Child', parentId: PARENT_ID, startDate: '2026-07-06', endDate: '2026-07-07' })
+		).rejects.toMatchObject({ status: 400, message: 'Parent task was not found on this board.' });
 		expect(describeStatements(statements)).toEqual([...PROVISIONING_STATEMENTS, 'select tasks']);
 	});
 });
@@ -127,11 +134,20 @@ describe('task updates', () => {
 
 	it('writes only the named fields, guarded by the expected version', async () => {
 		const existing = createTaskRow();
-		const statements = recordStatements(db, [...AUTHORIZATION, [existing], [createTaskRow({ title: 'Renamed', version: 4 })], []]);
+		const statements = recordStatements(db, [
+			...AUTHORIZATION,
+			[existing],
+			[createTaskRow({ title: 'Renamed', version: 4 })],
+			[]
+		]);
 
 		const task = await updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed', expectedVersion: 3 });
 
-		expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'update tasks', 'select checklist_items']);
+		expect(describeStatements(statements)).toEqual([
+			...AUTHORIZATION_STATEMENTS,
+			'update tasks',
+			'select checklist_items'
+		]);
 		expect(statements[2].where.params).toEqual([TASK_ID, BOARD_ID]);
 		expect(Object.keys(statements[3].set)).toEqual(['updatedAt', 'version', 'title']);
 		expect(statements[3].set).toMatchObject({ updatedAt: NOW, title: 'Renamed' });
@@ -150,7 +166,10 @@ describe('task updates', () => {
 			...AUTHORIZATION,
 			[existing],
 			[parent],
-			[{ id: PARENT_ID, parentTaskId: null }, { id: TASK_ID, parentTaskId: PARENT_ID }],
+			[
+				{ id: PARENT_ID, parentTaskId: null },
+				{ id: TASK_ID, parentTaskId: PARENT_ID }
+			],
 			[existing],
 			[]
 		]);
@@ -184,7 +203,10 @@ describe('task updates', () => {
 			...AUTHORIZATION,
 			[existing],
 			[parent],
-			[{ id: OTHER_PARENT_ID, parentTaskId: null }, { id: TASK_ID, parentTaskId: null }],
+			[
+				{ id: OTHER_PARENT_ID, parentTaskId: null },
+				{ id: TASK_ID, parentTaskId: null }
+			],
 			[createTaskRow({ parentTaskId: OTHER_PARENT_ID, status: 'done', completedAt: NOW, version: 4 })],
 			[]
 		]);
@@ -202,11 +224,16 @@ describe('task updates', () => {
 			...AUTHORIZATION,
 			[existing],
 			[parent],
-			[{ id: OTHER_PARENT_ID, parentTaskId: TASK_ID }, { id: TASK_ID, parentTaskId: null }]
+			[
+				{ id: OTHER_PARENT_ID, parentTaskId: TASK_ID },
+				{ id: TASK_ID, parentTaskId: null }
+			]
 		]);
 
-		await expect(updateTaskForUser(USER_ID, TASK_ID, { parentId: OTHER_PARENT_ID }))
-			.rejects.toMatchObject({ status: 400, message: 'Parent task was not found on this board.' });
+		await expect(updateTaskForUser(USER_ID, TASK_ID, { parentId: OTHER_PARENT_ID })).rejects.toMatchObject({
+			status: 400,
+			message: 'Parent task was not found on this board.'
+		});
 		expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'select tasks', 'select tasks']);
 	});
 
@@ -258,7 +285,11 @@ describe('task updates', () => {
 		expect(statements[3].where.params).toEqual([BOARD_ID, '신규 기획']);
 		expect(statements[5].values).toMatchObject({ name: '신규 기획', normalizedName: '신규 기획', sortOrder: 2 });
 		expect(statements[6].set).toMatchObject({ category: '신규 기획', categoryId: NEW_CATEGORY_ID });
-		expect(task).toMatchObject({ category: '신규 기획', categoryId: NEW_CATEGORY_ID, categoryMeta: { id: NEW_CATEGORY_ID, name: '신규 기획' } });
+		expect(task).toMatchObject({
+			category: '신규 기획',
+			categoryId: NEW_CATEGORY_ID,
+			categoryMeta: { id: NEW_CATEGORY_ID, name: '신규 기획' }
+		});
 	});
 
 	it('takes the category by name when the patched id is gone and the client lets the name decide', async () => {
@@ -307,7 +338,11 @@ describe('task updates', () => {
 		expect(statements[4].where.params).toEqual([BOARD_ID, '개발']);
 		expect(statements[5].set).toMatchObject({ hiddenAt: null, archivedAt: null });
 		expect(statements[6].set).toMatchObject({ category: '개발', categoryId: CATEGORY_ID });
-		expect(task).toMatchObject({ category: '개발', categoryId: CATEGORY_ID, categoryMeta: { id: CATEGORY_ID, name: '개발' } });
+		expect(task).toMatchObject({
+			category: '개발',
+			categoryId: CATEGORY_ID,
+			categoryMeta: { id: CATEGORY_ID, name: '개발' }
+		});
 	});
 
 	it('answers 400 for a patched id that is gone when the client does not let the name decide', async () => {
@@ -317,8 +352,10 @@ describe('task updates', () => {
 		]) {
 			const statements = recordStatements(db, [...AUTHORIZATION, [createTaskRow()], [], []]);
 
-			await expect(updateTaskForUser(USER_ID, TASK_ID, { ...patch, expectedVersion: 3 }))
-				.rejects.toMatchObject({ status: 400, message: 'Category was not found on this board.' });
+			await expect(updateTaskForUser(USER_ID, TASK_ID, { ...patch, expectedVersion: 3 })).rejects.toMatchObject({
+				status: 400,
+				message: 'Category was not found on this board.'
+			});
 			expect(describeStatements(statements)).not.toContain('update tasks');
 		}
 	});
@@ -328,12 +365,14 @@ describe('task updates', () => {
 		// name first would write a category row for a write that then fails.
 		const statements = recordStatements(db, [...AUTHORIZATION, [createTaskRow()]]);
 
-		await expect(updateTaskForUser(USER_ID, TASK_ID, {
-			category: '기획',
-			categoryId: null,
-			categoryByName: true,
-			expectedVersion: 2
-		})).rejects.toMatchObject({ status: 409 });
+		await expect(
+			updateTaskForUser(USER_ID, TASK_ID, {
+				category: '기획',
+				categoryId: null,
+				categoryByName: true,
+				expectedVersion: 2
+			})
+		).rejects.toMatchObject({ status: 409 });
 
 		expect(describeStatements(statements)).toEqual(AUTHORIZATION_STATEMENTS);
 	});
@@ -341,16 +380,15 @@ describe('task updates', () => {
 	it('clears the category for a null id from a client that does not ask for the name to decide', async () => {
 		// Clients cached from before categoryByName send a patch per keystroke
 		// in the task panel; a half-typed name must not become a category.
-		const statements = recordStatements(db, [
-			...AUTHORIZATION,
-			[createTaskRow()],
-			[createTaskRow({ version: 4 })],
-			[]
-		]);
+		const statements = recordStatements(db, [...AUTHORIZATION, [createTaskRow()], [createTaskRow({ version: 4 })], []]);
 
 		await updateTaskForUser(USER_ID, TASK_ID, { category: 'ㄱ', categoryId: null, expectedVersion: 3 });
 
-		expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'update tasks', 'select checklist_items']);
+		expect(describeStatements(statements)).toEqual([
+			...AUTHORIZATION_STATEMENTS,
+			'update tasks',
+			'select checklist_items'
+		]);
 		expect(statements[3].set).toMatchObject({ category: '', categoryId: null });
 	});
 
@@ -370,7 +408,11 @@ describe('task updates', () => {
 
 			await updateTaskForUser(USER_ID, TASK_ID, patch);
 
-			expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'update tasks', 'select checklist_items']);
+			expect(describeStatements(statements)).toEqual([
+				...AUTHORIZATION_STATEMENTS,
+				'update tasks',
+				'select checklist_items'
+			]);
 			expect(statements[3].set).toMatchObject({ category: '', categoryId: null });
 		}
 	});
@@ -378,21 +420,29 @@ describe('task updates', () => {
 	it('reports a stale version as 409, a vanished task as 404 and an unknown task as 404', async () => {
 		// Changed before the request read the task (version 3)...
 		recordStatements(db, [...AUTHORIZATION, [createTaskRow()]]);
-		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed', expectedVersion: 2 }))
-			.rejects.toMatchObject({ status: 409, message: 'Task changed on another device. Sync and try again.' });
+		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed', expectedVersion: 2 })).rejects.toMatchObject({
+			status: 409,
+			message: 'Task changed on another device. Sync and try again.'
+		});
 
 		// ...and between that read and the UPDATE, which then matches no row.
 		recordStatements(db, [...AUTHORIZATION, [createTaskRow()], []]);
-		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed', expectedVersion: 3 }))
-			.rejects.toMatchObject({ status: 409, message: 'Task changed on another device. Sync and try again.' });
+		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed', expectedVersion: 3 })).rejects.toMatchObject({
+			status: 409,
+			message: 'Task changed on another device. Sync and try again.'
+		});
 
 		recordStatements(db, [...AUTHORIZATION, [createTaskRow()], []]);
-		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed' }))
-			.rejects.toMatchObject({ status: 404, message: 'Task was not found.' });
+		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed' })).rejects.toMatchObject({
+			status: 404,
+			message: 'Task was not found.'
+		});
 
 		const statements = recordStatements(db, [...AUTHORIZATION, []]);
-		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed' }))
-			.rejects.toMatchObject({ status: 404, message: 'Task was not found.' });
+		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed' })).rejects.toMatchObject({
+			status: 404,
+			message: 'Task was not found.'
+		});
 		expect(describeStatements(statements)).toEqual(AUTHORIZATION_STATEMENTS);
 	});
 });
@@ -456,11 +506,7 @@ describe('buildTaskPatchSet', () => {
 
 	it('writes status and completedAt together when status is patched', () => {
 		const existing = createExisting();
-		const set = buildTaskPatchSet(
-			{ status: 'done' },
-			existing,
-			createComputed(existing, { nextStatus: 'done' })
-		);
+		const set = buildTaskPatchSet({ status: 'done' }, existing, createComputed(existing, { nextStatus: 'done' }));
 
 		expect(set.status).toBe('done');
 		expect(set.completedAt).toBe(NOW);
@@ -556,11 +602,7 @@ describe('deleteTaskCascadeForUser result handling', () => {
 
 	it('throws 409 on a stale expectedVersion and returns the deleted count otherwise', async () => {
 		const db = getDb();
-		const selectResults = [
-			[{ workspaceId: 'ws' }],
-			[{ id: TASK.boardId }],
-			[{ ...TASK, deletedAt: null }]
-		];
+		const selectResults = [[{ workspaceId: 'ws' }], [{ id: TASK.boardId }], [{ ...TASK, deletedAt: null }]];
 		vi.spyOn(db, 'select').mockImplementation(() => {
 			const rows = selectResults.shift() ?? [];
 			/** @type {any} */
@@ -576,8 +618,9 @@ describe('deleteTaskCascadeForUser result handling', () => {
 		});
 		const execute = vi.spyOn(db, 'execute').mockResolvedValue(/** @type {any} */ ({ rows: [] }));
 
-		await expect(deleteTaskCascadeForUser('user-id', TASK.id, { expectedVersion: 7 }))
-			.rejects.toMatchObject({ status: 409 });
+		await expect(deleteTaskCascadeForUser('user-id', TASK.id, { expectedVersion: 7 })).rejects.toMatchObject({
+			status: 409
+		});
 		expect(execute).toHaveBeenCalledTimes(1);
 
 		selectResults.push([{ workspaceId: 'ws' }], [{ id: TASK.boardId }], [{ ...TASK, deletedAt: null }]);

@@ -1,8 +1,5 @@
 import { json } from '@sveltejs/kit';
-import {
-	CalendarSyncError,
-	syncCalendarProvidersForConnectedUsers
-} from '$lib/server/calendar/provider-sync.js';
+import { CalendarSyncError, syncCalendarProvidersForConnectedUsers } from '$lib/server/calendar/provider-sync.js';
 import { CalendarProviderError } from '$lib/server/calendar/providers.js';
 import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
 import { apiErrorResponse } from '$lib/server/http/api-error.js';
@@ -29,13 +26,16 @@ async function runCalendarCronSync(request, url) {
 	}
 
 	try {
-		return json(await syncCalendarProvidersForConnectedUsers({
-			maxUsers: readMaxUsers(url)
-		}), {
-			headers: {
-				'cache-control': 'private, no-store'
+		return json(
+			await syncCalendarProvidersForConnectedUsers({
+				maxUsers: readMaxUsers(url)
+			}),
+			{
+				headers: {
+					'cache-control': 'private, no-store'
+				}
 			}
-		});
+		);
 	} catch (error) {
 		return apiErrorResponse(error, CalendarSyncError, CalendarProviderError, CalendarTokenEncryptionError);
 	}

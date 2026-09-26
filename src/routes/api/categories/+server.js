@@ -11,11 +11,14 @@ export async function GET({ request }) {
 	}
 
 	const categories = await listCategoriesForUser(authResult.user.id);
-	return json({ categories }, {
-		headers: {
-			'cache-control': 'private, no-store'
+	return json(
+		{ categories },
+		{
+			headers: {
+				'cache-control': 'private, no-store'
+			}
 		}
-	});
+	);
 }
 
 /** @type {import('./$types').RequestHandler} */

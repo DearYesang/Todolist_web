@@ -136,7 +136,7 @@
     {/if}
 
     {#if selectedTaskId}
-        <TaskModal taskId={selectedTaskId} onclose={() => selectedTaskId = null} />
+        <TaskModal taskId={selectedTaskId} onclose={() => (selectedTaskId = null)} />
     {/if}
 
     <LinkOpenPanel />

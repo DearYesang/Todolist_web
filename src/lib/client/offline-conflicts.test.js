@@ -14,18 +14,21 @@ describe('offline conflict summaries', () => {
 			id: '11111111-1111-4111-8111-111111111111',
 			text: 'Server title'
 		});
-		const summary = summarizeOfflineConflict({
-			id: 'mutation-id',
-			type: 'task.patch',
-			taskId: task.id,
-			patch: {
-				text: 'Local title',
-				startDate: '2026-05-04',
-				expectedVersion: 1
+		const summary = summarizeOfflineConflict(
+			{
+				id: 'mutation-id',
+				type: 'task.patch',
+				taskId: task.id,
+				patch: {
+					text: 'Local title',
+					startDate: '2026-05-04',
+					expectedVersion: 1
+				},
+				createdAt: Date.parse('2026-05-03T00:00:00.000Z'),
+				attempts: 1
 			},
-			createdAt: Date.parse('2026-05-03T00:00:00.000Z'),
-			attempts: 1
-		}, [task]);
+			[task]
+		);
 
 		expect(summary).toMatchObject({
 			id: 'mutation-id',
@@ -77,7 +80,14 @@ const reportOnlyMutations = [
 	{ ...base, id: 'create-id', type: 'task.create', localTaskId: 'local-1', payload: { text: 'New' } },
 	{ ...base, id: 'import-id', type: 'import.tasks', mode: 'replace', payload: [] },
 	{ ...base, id: 'checklist-create-id', type: 'checklist.create', taskId: TASK_ID, text: 'Item' },
-	{ ...base, id: 'checklist-patch-id', type: 'checklist.patch', taskId: TASK_ID, itemId: 'item-1', patch: { done: true } },
+	{
+		...base,
+		id: 'checklist-patch-id',
+		type: 'checklist.patch',
+		taskId: TASK_ID,
+		itemId: 'item-1',
+		patch: { done: true }
+	},
 	{ ...base, id: 'checklist-delete-id', type: 'checklist.delete', taskId: TASK_ID, itemId: 'item-1' }
 ];
 
@@ -154,13 +164,17 @@ describe('the sync banner after a server sync', () => {
 	});
 
 	it('lists conflicts even when the snapshot was skipped', () => {
-		const update = describeServerSyncResult({
-			ok: false,
-			fallback: true,
-			status: 0,
-			message: 'Offline mutations are still pending, so the server snapshot was skipped.',
-			offlineConflicts: [deleteMutation]
-		}, [], { showSuccess: true });
+		const update = describeServerSyncResult(
+			{
+				ok: false,
+				fallback: true,
+				status: 0,
+				message: 'Offline mutations are still pending, so the server snapshot was skipped.',
+				offlineConflicts: [deleteMutation]
+			},
+			[],
+			{ showSuccess: true }
+		);
 
 		expect(update).toEqual({ conflicts: [expect.objectContaining({ id: 'delete-id' })], notice: null });
 	});

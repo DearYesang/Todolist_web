@@ -22,7 +22,7 @@
     const defaults = getDefaultDateRange();
     let startDate = $state(defaults.startDate);
     let endDate = $state(defaults.endDate);
-    const selectedParent = $derived(parentId ? $tasks.find((task) => task.id === parentId) ?? null : null);
+    const selectedParent = $derived(parentId ? ($tasks.find((task) => task.id === parentId) ?? null) : null);
 
     $effect(() => {
         if (!category && selectedParent?.category) {
@@ -102,7 +102,7 @@
 </script>
 
 <div class="add-panel" class:open={isFormOpen}>
-    <button class="add-toggle" class:active={isFormOpen} onclick={() => isFormOpen = !isFormOpen}>
+    <button class="add-toggle" class:active={isFormOpen} onclick={() => (isFormOpen = !isFormOpen)}>
         {isFormOpen ? '－ 닫기' : '＋ 새 작업 추가...'}
     </button>
 
@@ -137,7 +137,7 @@
 
                 <div class="form-row">
                     <label class="form-label" for="task-date-start-date">일정</label>
-                    <DateRangePicker idPrefix="task-date" bind:startDate bind:endDate />
+                    <DateRangePicker idPrefix="task-date" bind:startDate={startDate} bind:endDate={endDate} />
                 </div>
 
                 <div class="form-row">
@@ -159,7 +159,10 @@
                             class="priority-pill"
                             class:active={selectedPriority === value}
                             data-p={value}
-                            onclick={() => selectedPriority = /** @type {import('$lib/shared/task-domain.js').TaskPriority} */ (value)}>
+                            onclick={() =>
+                                (selectedPriority = /** @type {import('$lib/shared/task-domain.js').TaskPriority} */ (
+                                    value
+                                ))}>
                             {label}
                         </button>
                     {/each}
@@ -174,7 +177,10 @@
                             class="urgency-pill"
                             class:active={selectedUrgency === value}
                             data-u={value}
-                            onclick={() => selectedUrgency = /** @type {import('$lib/shared/task-domain.js').TaskUrgency} */ (value)}>
+                            onclick={() =>
+                                (selectedUrgency = /** @type {import('$lib/shared/task-domain.js').TaskUrgency} */ (
+                                    value
+                                ))}>
                             {label}
                         </button>
                     {/each}

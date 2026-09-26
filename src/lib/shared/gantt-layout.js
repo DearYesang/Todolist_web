@@ -36,11 +36,10 @@ const TRAILING_DAYS = 5;
  * @param {{ now?: Date; dayWidth?: number; todayPaddingDays?: number }} [options]
  * @returns {GanttLayout}
  */
-export function buildGanttLayout(visibleTasks, {
-	now = new Date(),
-	dayWidth = GANTT_DAY_WIDTH,
-	todayPaddingDays = GANTT_TODAY_PADDING_DAYS
-} = {}) {
+export function buildGanttLayout(
+	visibleTasks,
+	{ now = new Date(), dayWidth = GANTT_DAY_WIDTH, todayPaddingDays = GANTT_TODAY_PADDING_DAYS } = {}
+) {
 	if (visibleTasks.length === 0) {
 		return {
 			displayList: [],
@@ -178,9 +177,7 @@ export function getResizePreview(resize, dayOffset) {
  * @param {{ pointerId?: number }} event
  */
 export function ownsResizePointer(resize, event) {
-	return resize.pointerId === undefined
-		|| event.pointerId === undefined
-		|| event.pointerId === resize.pointerId;
+	return resize.pointerId === undefined || event.pointerId === undefined || event.pointerId === resize.pointerId;
 }
 
 /**

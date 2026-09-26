@@ -8,12 +8,7 @@
      *   idPrefix?: string;
      *   onchange?: (range: { startDate: string; endDate: string }) => void;
      * }} */
-    let {
-        startDate = $bindable(),
-        endDate = $bindable(),
-        idPrefix = 'date-range',
-        onchange = () => {}
-    } = $props();
+    let { startDate = $bindable(), endDate = $bindable(), idPrefix = 'date-range', onchange = () => {} } = $props();
 
     /** @type {Date | null} */
     let anchorDate = $state(null);
@@ -21,10 +16,12 @@
     let isCalendarOpen = $state(false);
     let calendarMonth = $state(parseLocalDate(startDate));
 
-    const monthLabel = $derived(calendarMonth.toLocaleDateString('ko-KR', {
-        year: 'numeric',
-        month: 'long'
-    }));
+    const monthLabel = $derived(
+        calendarMonth.toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: 'long'
+        })
+    );
     const calendarDays = $derived.by(() => buildCalendarDays(calendarMonth));
     const normalizedRange = $derived(normalizeDateRange(startDate, endDate));
     const selectedStart = $derived(parseLocalDate(normalizedRange.startDate));
@@ -138,9 +135,7 @@
      * @param {string | undefined} value
      */
     function parseLocalDate(value) {
-        const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
-            ? value
-            : todayString();
+        const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : todayString();
         return parseLocalDateNoon(normalized);
     }
 
@@ -214,9 +209,11 @@
             tabindex="-1"
             onkeydown={handleCalendarKeydown}>
             <div class="date-picker-header">
-                <button class="date-picker-nav" type="button" aria-label="이전 달" onclick={() => moveMonth(-1)}>‹</button>
+                <button class="date-picker-nav" type="button" aria-label="이전 달" onclick={() => moveMonth(-1)}
+                    >‹</button>
                 <strong>{monthLabel}</strong>
-                <button class="date-picker-nav" type="button" aria-label="다음 달" onclick={() => moveMonth(1)}>›</button>
+                <button class="date-picker-nav" type="button" aria-label="다음 달" onclick={() => moveMonth(1)}
+                    >›</button>
             </div>
 
             <div class="date-picker-weekdays" aria-hidden="true">
@@ -242,7 +239,7 @@
             </div>
 
             <div class="date-picker-footer">
-                <button class="btn btn-small" type="button" onclick={() => isCalendarOpen = false}>완료</button>
+                <button class="btn btn-small" type="button" onclick={() => (isCalendarOpen = false)}>완료</button>
             </div>
         </div>
     {/if}

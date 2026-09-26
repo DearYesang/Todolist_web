@@ -56,26 +56,46 @@ describe('readErrorMessage', () => {
 
 describe('result builders', () => {
 	it('builds a plain error result', () => {
-		expect(createErrorResult(429, 'Too many requests.')).toEqual({ ok: false, status: 429, message: 'Too many requests.' });
+		expect(createErrorResult(429, 'Too many requests.')).toEqual({
+			ok: false,
+			status: 429,
+			message: 'Too many requests.'
+		});
 		expect(createErrorResult(0, 'Offline.')).toEqual({ ok: false, status: 0, message: 'Offline.' });
 	});
 
 	it('marks only the given statuses as fallback and prefers the body message', () => {
 		const retryable = new Set([401, 503]);
 
-		expect(createHttpErrorResult(new Response(null, { status: 503 }), null, 'Category API request failed', retryable)).toEqual({
+		expect(
+			createHttpErrorResult(new Response(null, { status: 503 }), null, 'Category API request failed', retryable)
+		).toEqual({
 			ok: false,
 			fallback: true,
 			status: 503,
 			message: 'Category API request failed with status 503.'
 		});
-		expect(createHttpErrorResult(new Response(null, { status: 409 }), { message: 'Version conflict.' }, 'Category API request failed', retryable)).toEqual({
+		expect(
+			createHttpErrorResult(
+				new Response(null, { status: 409 }),
+				{ message: 'Version conflict.' },
+				'Category API request failed',
+				retryable
+			)
+		).toEqual({
 			ok: false,
 			fallback: false,
 			status: 409,
 			message: 'Version conflict.'
 		});
-		expect(createHttpErrorResult(new Response(null, { status: 409 }), { message: ' ' }, 'Task API request failed', new Set([409]))).toEqual({
+		expect(
+			createHttpErrorResult(
+				new Response(null, { status: 409 }),
+				{ message: ' ' },
+				'Task API request failed',
+				new Set([409])
+			)
+		).toEqual({
 			ok: false,
 			fallback: true,
 			status: 409,

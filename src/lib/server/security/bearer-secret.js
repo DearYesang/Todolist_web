@@ -6,7 +6,10 @@ import { timingSafeEqual } from 'node:crypto';
  * @param {Request} request
  */
 export function readBearerToken(request) {
-	return request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+	return request.headers
+		.get('authorization')
+		?.replace(/^Bearer\s+/i, '')
+		.trim();
 }
 
 /**

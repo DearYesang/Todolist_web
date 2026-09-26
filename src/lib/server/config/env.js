@@ -38,7 +38,11 @@ export function getRuntimeConfigReport(options = {}) {
 		checkAllowedEmails(),
 		checkEmailVerificationDevCodes(production, emailDevCodesEnabled),
 		checkSecret('ACCOUNT_RECOVERY_SECRET', process.env.ACCOUNT_RECOVERY_SECRET, authRequired),
-		checkUrl('EMAIL_DELIVERY_WEBHOOK_URL', process.env.EMAIL_DELIVERY_WEBHOOK_URL, emailDeliveryRequired && !resendConfigured),
+		checkUrl(
+			'EMAIL_DELIVERY_WEBHOOK_URL',
+			process.env.EMAIL_DELIVERY_WEBHOOK_URL,
+			emailDeliveryRequired && !resendConfigured
+		),
 		checkSecret('EMAIL_DELIVERY_WEBHOOK_SECRET', process.env.EMAIL_DELIVERY_WEBHOOK_SECRET, false),
 		checkSecret('RESEND_API_KEY', process.env.RESEND_API_KEY, emailDeliveryRequired && !webhookConfigured),
 		checkValue('EMAIL_FROM', process.env.EMAIL_FROM, resendConfigured || (emailDeliveryRequired && !webhookConfigured)),
@@ -60,15 +64,14 @@ export function getRuntimeConfigReport(options = {}) {
 		nodeEnv: process.env.NODE_ENV ?? 'development',
 		databaseConfigured: Boolean(process.env.DATABASE_URL),
 		authReady: authRequired && isCheckOk(checks, 'BETTER_AUTH_SECRET') && isCheckOk(checks, 'BETTER_AUTH_URL'),
-			emailDeliveryReady: (
-				isCheckOk(checks, 'EMAIL_DELIVERY_WEBHOOK_URL')
-				|| (isCheckOk(checks, 'RESEND_API_KEY') && isCheckOk(checks, 'EMAIL_FROM'))
-				|| (!production && emailDevCodesEnabled)
-			),
+		emailDeliveryReady:
+			isCheckOk(checks, 'EMAIL_DELIVERY_WEBHOOK_URL')
+			|| (isCheckOk(checks, 'RESEND_API_KEY') && isCheckOk(checks, 'EMAIL_FROM'))
+			|| (!production && emailDevCodesEnabled),
 		calendarFeedReady: isCheckOk(checks, 'CALENDAR_TOKEN_SECRET'),
-		calendarProviderReady: isCheckOk(checks, 'CALENDAR_OAUTH_ENCRYPTION_KEY') && (
-			hasProvider('GOOGLE_CALENDAR') || hasProvider('MICROSOFT_CALENDAR')
-		),
+		calendarProviderReady:
+			isCheckOk(checks, 'CALENDAR_OAUTH_ENCRYPTION_KEY')
+			&& (hasProvider('GOOGLE_CALENDAR') || hasProvider('MICROSOFT_CALENDAR')),
 		checks,
 		blocking
 	};
@@ -100,8 +103,9 @@ export function getProductionConfigError() {
  * @param {unknown} value
  */
 export function isPlaceholderValue(value) {
-	return typeof value === 'string'
-		&& (value.includes('replace-with') || value.includes('change-me') || value.trim() === '');
+	return (
+		typeof value === 'string' && (value.includes('replace-with') || value.includes('change-me') || value.trim() === '')
+	);
 }
 
 /**
@@ -122,7 +126,12 @@ function hasProvider(prefix) {
 function checkDatabaseUrl() {
 	const value = process.env.DATABASE_URL;
 	if (!value) {
-		return createCheck('DATABASE_URL', false, 'optional', 'DATABASE_URL is not configured; server APIs will return 503.');
+		return createCheck(
+			'DATABASE_URL',
+			false,
+			'optional',
+			'DATABASE_URL is not configured; server APIs will return 503.'
+		);
 	}
 
 	if (isPlaceholderValue(value)) {
@@ -143,7 +152,12 @@ function checkDatabaseUrl() {
  */
 function checkSecret(key, value, required) {
 	if (!value) {
-		return createCheck(key, required, required ? 'missing' : 'optional', `${key} is ${required ? 'required' : 'optional'}.`);
+		return createCheck(
+			key,
+			required,
+			required ? 'missing' : 'optional',
+			`${key} is ${required ? 'required' : 'optional'}.`
+		);
 	}
 
 	if (isPlaceholderValue(value)) {
@@ -164,7 +178,12 @@ function checkSecret(key, value, required) {
  */
 function checkUrl(key, value, required) {
 	if (!value) {
-		return createCheck(key, required, required ? 'missing' : 'optional', `${key} is ${required ? 'required' : 'optional'}.`);
+		return createCheck(
+			key,
+			required,
+			required ? 'missing' : 'optional',
+			`${key} is ${required ? 'required' : 'optional'}.`
+		);
 	}
 
 	if (isPlaceholderValue(value)) {
@@ -186,7 +205,12 @@ function checkUrl(key, value, required) {
 function checkTrustedOrigins() {
 	const value = process.env.BETTER_AUTH_TRUSTED_ORIGINS;
 	if (!value) {
-		return createCheck('BETTER_AUTH_TRUSTED_ORIGINS', process.env.NODE_ENV === 'production', process.env.NODE_ENV === 'production' ? 'missing' : 'optional', 'BETTER_AUTH_TRUSTED_ORIGINS should list deployed app origins.');
+		return createCheck(
+			'BETTER_AUTH_TRUSTED_ORIGINS',
+			process.env.NODE_ENV === 'production',
+			process.env.NODE_ENV === 'production' ? 'missing' : 'optional',
+			'BETTER_AUTH_TRUSTED_ORIGINS should list deployed app origins.'
+		);
 	}
 
 	const invalid = value
@@ -217,7 +241,12 @@ function checkTrustedOrigins() {
  */
 function checkPositiveInteger(key, value, required) {
 	if (!value) {
-		return createCheck(key, required, required ? 'missing' : 'optional', `${key} is ${required ? 'required' : 'optional'}.`);
+		return createCheck(
+			key,
+			required,
+			required ? 'missing' : 'optional',
+			`${key} is ${required ? 'required' : 'optional'}.`
+		);
 	}
 
 	const number = Number(value);
@@ -236,7 +265,12 @@ function checkPositiveInteger(key, value, required) {
  */
 function checkUrlMatchesCurrentOrigin(key, value, currentOrigin, required) {
 	if (!value) {
-		return createCheck(key, required, required ? 'missing' : 'optional', `${key} is ${required ? 'required' : 'optional'}.`);
+		return createCheck(
+			key,
+			required,
+			required ? 'missing' : 'optional',
+			`${key} is ${required ? 'required' : 'optional'}.`
+		);
 	}
 
 	const normalized = normalizeOrigin(value);
@@ -260,7 +294,12 @@ function checkUrlMatchesCurrentOrigin(key, value, currentOrigin, required) {
 function checkTrustedOriginsIncludeCurrentOrigin(currentOrigin) {
 	const value = process.env.BETTER_AUTH_TRUSTED_ORIGINS;
 	if (!value) {
-		return createCheck('BETTER_AUTH_TRUSTED_ORIGINS_CURRENT_ORIGIN', true, 'missing', 'BETTER_AUTH_TRUSTED_ORIGINS must include the current app origin.');
+		return createCheck(
+			'BETTER_AUTH_TRUSTED_ORIGINS_CURRENT_ORIGIN',
+			true,
+			'missing',
+			'BETTER_AUTH_TRUSTED_ORIGINS must include the current app origin.'
+		);
 	}
 
 	const origins = value
@@ -312,7 +351,12 @@ function checkPasskeyRpIdMatchesCurrentHost(currentOrigin) {
 function checkAllowedEmails() {
 	const value = process.env.AUTH_ALLOWED_EMAILS;
 	if (!value) {
-		return createCheck('AUTH_ALLOWED_EMAILS', process.env.NODE_ENV === 'production', process.env.NODE_ENV === 'production' ? 'missing' : 'optional', 'AUTH_ALLOWED_EMAILS should list the personal emails allowed to register.');
+		return createCheck(
+			'AUTH_ALLOWED_EMAILS',
+			process.env.NODE_ENV === 'production',
+			process.env.NODE_ENV === 'production' ? 'missing' : 'optional',
+			'AUTH_ALLOWED_EMAILS should list the personal emails allowed to register.'
+		);
 	}
 
 	const emails = value
@@ -359,7 +403,12 @@ function checkEmailVerificationDevCodes(production, enabled) {
  */
 function checkValue(key, value, required) {
 	if (!value) {
-		return createCheck(key, required, required ? 'missing' : 'optional', `${key} is ${required ? 'required' : 'optional'}.`);
+		return createCheck(
+			key,
+			required,
+			required ? 'missing' : 'optional',
+			`${key} is ${required ? 'required' : 'optional'}.`
+		);
 	}
 
 	if (isPlaceholderValue(value)) {

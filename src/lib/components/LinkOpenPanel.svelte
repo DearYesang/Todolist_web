@@ -64,7 +64,8 @@
     }
 
     function focusFirstControl() {
-        const target = panelElement?.querySelector('.link-open-panel-actions button')
+        const target =
+            panelElement?.querySelector('.link-open-panel-actions button')
             ?? panelElement?.querySelector('.link-open-panel-list a')
             ?? panelElement?.querySelector('.link-open-panel-close');
         if (target instanceof HTMLElement) {
@@ -144,7 +145,8 @@
                 <span aria-hidden="true">🔗</span>
                 {$linkOpenState.title || '링크 열기'}
             </strong>
-            <button type="button" class="btn btn-small btn-ghost link-open-panel-close" onclick={dismissLinkOpen}>닫기</button>
+            <button type="button" class="btn btn-small btn-ghost link-open-panel-close" onclick={dismissLinkOpen}
+                >닫기</button>
         </div>
 
         <p class="link-open-panel-message">{summary.message}</p>
@@ -154,10 +156,7 @@
 
         {#if summary.tone === 'confirm'}
             <div class="link-open-panel-actions">
-                <button
-                    type="button"
-                    class="btn btn-small btn-open-links"
-                    onclick={() => confirmOpen()}>
+                <button type="button" class="btn btn-small btn-open-links" onclick={() => confirmOpen()}>
                     모두 열기
                 </button>
                 <button type="button" class="btn btn-small" onclick={dismissLinkOpen}>취소</button>

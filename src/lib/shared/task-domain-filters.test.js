@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_FILTERS, getTaskDueStatus, matchesFilters, normalizeTask, resolveEisenhowerMove } from './task-domain.js';
+import {
+	DEFAULT_FILTERS,
+	getTaskDueStatus,
+	matchesFilters,
+	normalizeTask,
+	resolveEisenhowerMove
+} from './task-domain.js';
 
 function createTask(overrides = {}) {
 	return normalizeTask({
@@ -90,14 +96,24 @@ describe('eisenhower move policy', () => {
 	it('promotes to high when dropped into an important quadrant', () => {
 		const task = createTask({ priority: 'low', urgency: 'normal' });
 
-		expect(resolveEisenhowerMove(task, { importance: 'important', urgency: 'urgent' }))
-			.toEqual({ priority: 'high', urgency: 'urgent' });
+		expect(resolveEisenhowerMove(task, { importance: 'important', urgency: 'urgent' })).toEqual({
+			priority: 'high',
+			urgency: 'urgent'
+		});
 	});
 
 	it('only demotes high on the way out; medium and low survive unchanged', () => {
-		expect(resolveEisenhowerMove(createTask({ priority: 'high', urgency: 'urgent' }), { importance: 'less-important', urgency: 'urgent' }))
-			.toEqual({ priority: 'medium', urgency: 'urgent' });
-		expect(resolveEisenhowerMove(createTask({ priority: 'low', urgency: 'urgent' }), { importance: 'less-important', urgency: 'normal' }))
-			.toEqual({ priority: 'low', urgency: 'normal' });
+		expect(
+			resolveEisenhowerMove(createTask({ priority: 'high', urgency: 'urgent' }), {
+				importance: 'less-important',
+				urgency: 'urgent'
+			})
+		).toEqual({ priority: 'medium', urgency: 'urgent' });
+		expect(
+			resolveEisenhowerMove(createTask({ priority: 'low', urgency: 'urgent' }), {
+				importance: 'less-important',
+				urgency: 'normal'
+			})
+		).toEqual({ priority: 'low', urgency: 'normal' });
 	});
 });

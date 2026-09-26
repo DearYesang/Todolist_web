@@ -31,9 +31,7 @@ export function setupPageLifecycle(win, drainPendingWrites) {
 	win.addEventListener('pagehide', handlePageHide);
 
 	if ('serviceWorker' in win.navigator) {
-		win.navigator.serviceWorker.ready
-			.then((registration) => registration.update())
-			.catch(() => {});
+		win.navigator.serviceWorker.ready.then((registration) => registration.update()).catch(() => {});
 		win.navigator.serviceWorker.addEventListener('controllerchange', handleServiceWorkerUpdate);
 	}
 

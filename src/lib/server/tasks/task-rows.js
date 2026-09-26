@@ -36,7 +36,12 @@ export async function getWritableTaskForUser(db, userId, taskId) {
 	const userBoards = await db
 		.select({ id: schema.boards.id })
 		.from(schema.boards)
-		.where(inArray(schema.boards.workspaceId, memberships.map((membership) => membership.workspaceId)));
+		.where(
+			inArray(
+				schema.boards.workspaceId,
+				memberships.map((membership) => membership.workspaceId)
+			)
+		);
 
 	if (userBoards.length === 0) {
 		return null;
@@ -45,11 +50,16 @@ export async function getWritableTaskForUser(db, userId, taskId) {
 	const [task] = await db
 		.select()
 		.from(schema.tasks)
-		.where(and(
-			eq(schema.tasks.id, taskId),
-			inArray(schema.tasks.boardId, userBoards.map((board) => board.id)),
-			isNull(schema.tasks.deletedAt)
-		))
+		.where(
+			and(
+				eq(schema.tasks.id, taskId),
+				inArray(
+					schema.tasks.boardId,
+					userBoards.map((board) => board.id)
+				),
+				isNull(schema.tasks.deletedAt)
+			)
+		)
 		.limit(1);
 
 	return task ?? null;

@@ -1,9 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
-import {
-	CalendarSyncError,
-	syncCalendarProvidersForUser
-} from '$lib/server/calendar/provider-sync.js';
+import { CalendarSyncError, syncCalendarProvidersForUser } from '$lib/server/calendar/provider-sync.js';
 import { CalendarProviderError } from '$lib/server/calendar/providers.js';
 import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
 import { apiErrorResponse } from '$lib/server/http/api-error.js';
@@ -29,6 +26,12 @@ export async function POST(event) {
 			}
 		});
 	} catch (error) {
-		return apiErrorResponse(error, RateLimitError, CalendarSyncError, CalendarProviderError, CalendarTokenEncryptionError);
+		return apiErrorResponse(
+			error,
+			RateLimitError,
+			CalendarSyncError,
+			CalendarProviderError,
+			CalendarTokenEncryptionError
+		);
 	}
 }

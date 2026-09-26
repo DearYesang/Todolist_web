@@ -136,14 +136,24 @@
 <input class="auth-input" type="email" bind:value={email} placeholder="email@example.com" autocomplete="email" />
 <input class="auth-input auth-input-small" type="text" bind:value={name} placeholder="이름" autocomplete="name" />
 {#if isRecoveryMode}
-    <input class="auth-input" type="text" bind:value={recoveryCode} placeholder="복구 코드" autocomplete="one-time-code" />
+    <input
+        class="auth-input"
+        type="text"
+        bind:value={recoveryCode}
+        placeholder="복구 코드"
+        autocomplete="one-time-code" />
 {:else}
-    <input class="auth-input auth-input-small" type="text" bind:value={emailVerificationCode} placeholder="확인 코드" autocomplete="one-time-code" />
+    <input
+        class="auth-input auth-input-small"
+        type="text"
+        bind:value={emailVerificationCode}
+        placeholder="확인 코드"
+        autocomplete="one-time-code" />
     <button class="btn" onclick={sendVerificationCode} disabled={isWorking}>코드 받기</button>
 {/if}
 <button class="btn btn-primary" onclick={registerPasskey} disabled={isWorking}>패스키 만들기</button>
 <button class="btn" onclick={signInPasskey} disabled={isWorking}>패스키 로그인</button>
-<button class="btn" onclick={() => isRecoveryMode = !isRecoveryMode} disabled={isWorking}>
+<button class="btn" onclick={() => (isRecoveryMode = !isRecoveryMode)} disabled={isWorking}>
     {isRecoveryMode ? '가입 모드' : '복구 모드'}
 </button>
 

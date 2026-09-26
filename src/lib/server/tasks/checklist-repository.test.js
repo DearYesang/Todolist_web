@@ -19,8 +19,23 @@ const ITEM_ID = '33333333-3333-4333-8333-333333333333';
 const CATEGORY_ID = '44444444-4444-4444-8444-444444444444';
 const WORKSPACE = { id: 'workspace-id', name: 'Personal', ownerUserId: 'user-id' };
 const BOARD = { id: BOARD_ID, workspaceId: WORKSPACE.id, name: 'Inbox', defaultView: 'kanban' };
-const ITEM_ROW = { id: ITEM_ID, taskId: TASK_ID, text: 'Item', done: true, position: '1.000', createdAt: NOW, updatedAt: NOW };
-const CATEGORY_META = { id: CATEGORY_ID, name: '개발', color: '#ff0000', sortOrder: 0, hiddenAt: null, archivedAt: null };
+const ITEM_ROW = {
+	id: ITEM_ID,
+	taskId: TASK_ID,
+	text: 'Item',
+	done: true,
+	position: '1.000',
+	createdAt: NOW,
+	updatedAt: NOW
+};
+const CATEGORY_META = {
+	id: CATEGORY_ID,
+	name: '개발',
+	color: '#ff0000',
+	sortOrder: 0,
+	hiddenAt: null,
+	archivedAt: null
+};
 
 function createCategoryRow() {
 	return {
@@ -83,11 +98,7 @@ function stubWrites(db, taskRow) {
 }
 
 function authSelects(taskRow = createTaskRow()) {
-	return [
-		[{ workspaceId: 'workspace-id' }],
-		[{ id: BOARD_ID }],
-		[taskRow]
-	];
+	return [[{ workspaceId: 'workspace-id' }], [{ id: BOARD_ID }], [taskRow]];
 }
 
 describe('checklist batch transactions', () => {
@@ -129,16 +140,15 @@ describe('checklist batch transactions', () => {
 		stubSelects(db, authSelects());
 		batchMock.mockResolvedValue([[], []]);
 
-		await expect(updateChecklistItemForUser('user-id', TASK_ID, ITEM_ID, { done: true }))
-			.rejects.toMatchObject({ status: 404, message: 'Checklist item was not found.' });
+		await expect(updateChecklistItemForUser('user-id', TASK_ID, ITEM_ID, { done: true })).rejects.toMatchObject({
+			status: 404,
+			message: 'Checklist item was not found.'
+		});
 	});
 
 	it('deletes with the same bump-first gated ordering', async () => {
 		stubSelects(db, [...authSelects(), []]);
-		batchMock.mockResolvedValue([
-			[createTaskRow({ version: 4 })],
-			[{ id: ITEM_ID }]
-		]);
+		batchMock.mockResolvedValue([[createTaskRow({ version: 4 })], [{ id: ITEM_ID }]]);
 
 		const task = await deleteChecklistItemForUser('user-id', TASK_ID, ITEM_ID);
 
@@ -154,14 +164,25 @@ describe('checklist batch transactions', () => {
 		stubSelects(db, authSelects());
 		batchMock.mockResolvedValue([[], []]);
 
-		await expect(deleteChecklistItemForUser('user-id', TASK_ID, ITEM_ID))
-			.rejects.toMatchObject({ status: 404 });
+		await expect(deleteChecklistItemForUser('user-id', TASK_ID, ITEM_ID)).rejects.toMatchObject({ status: 404 });
 	});
 
 	it.each([
-		['create', () => createChecklistItemForUser('user-id', TASK_ID, { text: 'Item' }), [[ITEM_ROW], [createTaskRow({ version: 4, category: '개발', categoryId: CATEGORY_ID })]]],
-		['update', () => updateChecklistItemForUser('user-id', TASK_ID, ITEM_ID, { done: true }), [[createTaskRow({ version: 4, category: '개발', categoryId: CATEGORY_ID })], [ITEM_ROW]]],
-		['delete', () => deleteChecklistItemForUser('user-id', TASK_ID, ITEM_ID), [[createTaskRow({ version: 4, category: '개발', categoryId: CATEGORY_ID })], [{ id: ITEM_ID }]]]
+		[
+			'create',
+			() => createChecklistItemForUser('user-id', TASK_ID, { text: 'Item' }),
+			[[ITEM_ROW], [createTaskRow({ version: 4, category: '개발', categoryId: CATEGORY_ID })]]
+		],
+		[
+			'update',
+			() => updateChecklistItemForUser('user-id', TASK_ID, ITEM_ID, { done: true }),
+			[[createTaskRow({ version: 4, category: '개발', categoryId: CATEGORY_ID })], [ITEM_ROW]]
+		],
+		[
+			'delete',
+			() => deleteChecklistItemForUser('user-id', TASK_ID, ITEM_ID),
+			[[createTaskRow({ version: 4, category: '개발', categoryId: CATEGORY_ID })], [{ id: ITEM_ID }]]
+		]
 	])('answers a checklist %s with the category of the task', async (_name, write, batchResult) => {
 		// The client replaces its whole copy of the task with the response, so
 		// a missing categoryMeta used to drop a custom category colour.
@@ -220,7 +241,12 @@ describe('task write responses', () => {
 			.mockResolvedValueOnce([[taskRow], [{ id: ITEM_ID }]]);
 
 		const responses = {
-			createTask: await createTaskForUser('user-id', { text: 'Task', categoryId: CATEGORY_ID, startDate: '2026-07-01', endDate: '2026-07-02' }),
+			createTask: await createTaskForUser('user-id', {
+				text: 'Task',
+				categoryId: CATEGORY_ID,
+				startDate: '2026-07-01',
+				endDate: '2026-07-02'
+			}),
 			// The authorization read returns taskRow, so the current version is 4.
 			updateTask: await updateTaskForUser('user-id', TASK_ID, { text: 'Task', expectedVersion: 4 }),
 			createChecklistItem: await createChecklistItemForUser('user-id', TASK_ID, { text: 'Item' }),

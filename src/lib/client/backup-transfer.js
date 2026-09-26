@@ -31,9 +31,7 @@ export async function importTaskBackup(fileText, { confirmReplace, notify }) {
 			return;
 		}
 
-		const importMode = get(tasks).length > 0 && confirmReplace(REPLACE_QUESTION)
-			? 'replace'
-			: 'append';
+		const importMode = get(tasks).length > 0 && confirmReplace(REPLACE_QUESTION) ? 'replace' : 'append';
 
 		const result = await importTasks(parsedTasks, importMode);
 		if (!result.ok) {

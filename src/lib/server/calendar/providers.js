@@ -173,9 +173,10 @@ export async function upsertProviderCalendarEvent(provider, accessToken, eventId
  * @param {string} eventId
  */
 export async function deleteProviderCalendarEvent(provider, accessToken, eventId) {
-	const url = provider === 'google'
-		? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`
-		: `https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(eventId)}`;
+	const url =
+		provider === 'google'
+			? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`
+			: `https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(eventId)}`;
 	const response = await fetch(url, {
 		method: 'DELETE',
 		headers: {
@@ -306,11 +307,7 @@ function toMicrosoftEvent(task) {
  * @param {import('$lib/shared/task-domain.js').Task} task
  */
 function createTaskDescription(task) {
-	const lines = [
-		`Status: ${task.status}`,
-		`Priority: ${task.priority}`,
-		`Urgency: ${task.urgency}`
-	];
+	const lines = [`Status: ${task.status}`, `Priority: ${task.priority}`, `Urgency: ${task.urgency}`];
 	if (task.category) {
 		lines.push(`Category: ${task.category}`);
 	}

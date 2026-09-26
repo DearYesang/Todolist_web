@@ -32,15 +32,15 @@ import { clearPendingDefaultView } from './view-preference.js';
  * @param {string | null | undefined} userId
  */
 export function setTaskStoreOwner(userId) {
-    const previousOwner = getTaskStorageOwner();
-    setTaskStorageOwner(userId);
-    if (getTaskStorageOwner() === previousOwner) {
-        return;
-    }
+	const previousOwner = getTaskStorageOwner();
+	setTaskStorageOwner(userId);
+	if (getTaskStorageOwner() === previousOwner) {
+		return;
+	}
 
-    clearCategoryCatalog();
-    resetFilters();
-    if (previousOwner !== null && getTaskStorageOwner() !== null) {
-        clearPendingDefaultView();
-    }
+	clearCategoryCatalog();
+	resetFilters();
+	if (previousOwner !== null && getTaskStorageOwner() !== null) {
+		clearPendingDefaultView();
+	}
 }

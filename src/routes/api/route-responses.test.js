@@ -235,20 +235,27 @@ const call = {
 	'POST /api/tasks': (body = jsonBody({ text: 'Task' })) => tasksRoute.POST(createEvent('POST', { body })),
 	'PATCH /api/tasks/[taskId]': (body = jsonBody({ text: 'Task' })) => taskRoute.PATCH(createEvent('PATCH', { body })),
 	'DELETE /api/tasks/[taskId]': (body) => taskRoute.DELETE(createEvent('DELETE', { body })),
-	'POST /api/tasks/[taskId]/checklist': (body = jsonBody({ text: 'Item' })) => checklistRoute.POST(createEvent('POST', { body })),
-	'PATCH /api/tasks/[taskId]/checklist/[itemId]': (body = jsonBody({ done: true })) => checklistItemRoute.PATCH(createEvent('PATCH', { body })),
+	'POST /api/tasks/[taskId]/checklist': (body = jsonBody({ text: 'Item' })) =>
+		checklistRoute.POST(createEvent('POST', { body })),
+	'PATCH /api/tasks/[taskId]/checklist/[itemId]': (body = jsonBody({ done: true })) =>
+		checklistItemRoute.PATCH(createEvent('PATCH', { body })),
 	'DELETE /api/tasks/[taskId]/checklist/[itemId]': () => checklistItemRoute.DELETE(createEvent('DELETE')),
 	'POST /api/import': (body = '[]') => importRoute.POST(createEvent('POST', { path: '/api/import', body })),
-	'POST /api/import?mode=replace': (body = '[]') => importRoute.POST(createEvent('POST', { path: '/api/import?mode=replace', body })),
+	'POST /api/import?mode=replace': (body = '[]') =>
+		importRoute.POST(createEvent('POST', { path: '/api/import?mode=replace', body })),
 	'GET /api/export': () => exportRoute.GET(createEvent('GET')),
 	'GET /api/categories': () => categoriesRoute.GET(createEvent('GET')),
 	'POST /api/categories': (body = jsonBody({ name: 'Work' })) => categoriesRoute.POST(createEvent('POST', { body })),
-	'PATCH /api/categories/[categoryId]': (body = jsonBody({ name: 'Work' })) => categoryRoute.PATCH(createEvent('PATCH', { body })),
+	'PATCH /api/categories/[categoryId]': (body = jsonBody({ name: 'Work' })) =>
+		categoryRoute.PATCH(createEvent('PATCH', { body })),
 	'DELETE /api/categories/[categoryId]': () => categoryRoute.DELETE(createEvent('DELETE')),
-	'POST /api/categories/[categoryId]/merge': (body = jsonBody({ targetCategoryId: 'x' })) => categoryMergeRoute.POST(createEvent('POST', { body })),
-	'POST /api/categories/reorder': (body = jsonBody({ categoryIds: ['x'] })) => categoryReorderRoute.POST(createEvent('POST', { body })),
+	'POST /api/categories/[categoryId]/merge': (body = jsonBody({ targetCategoryId: 'x' })) =>
+		categoryMergeRoute.POST(createEvent('POST', { body })),
+	'POST /api/categories/reorder': (body = jsonBody({ categoryIds: ['x'] })) =>
+		categoryReorderRoute.POST(createEvent('POST', { body })),
 	'GET /api/board/preferences': () => boardPreferencesRoute.GET(createEvent('GET')),
-	'PATCH /api/board/preferences': (body = jsonBody({ defaultView: 'gantt' })) => boardPreferencesRoute.PATCH(createEvent('PATCH', { body })),
+	'PATCH /api/board/preferences': (body = jsonBody({ defaultView: 'gantt' })) =>
+		boardPreferencesRoute.PATCH(createEvent('PATCH', { body })),
 	'GET /api/account/recovery-codes': () => recoveryCodesRoute.GET(createEvent('GET')),
 	'POST /api/account/recovery-codes': () => recoveryCodesRoute.POST(createEvent('POST')),
 	'DELETE /api/account/recovery-codes': () => recoveryCodesRoute.DELETE(createEvent('DELETE')),
@@ -259,23 +266,27 @@ const call = {
 	'DELETE /api/calendar/providers/[connectionId]': () => providerConnectionRoute.DELETE(createEvent('DELETE')),
 	'GET /api/calendar/providers/[provider]/connect': () => providerConnectRoute.GET(createEvent('GET')),
 	'GET /api/calendar/providers/[provider]/callback': () =>
-		providerCallbackRoute.GET(createEvent('GET', { path: '/api/calendar/providers/google/callback?code=code&state=state' })),
+		providerCallbackRoute.GET(
+			createEvent('GET', { path: '/api/calendar/providers/google/callback?code=code&state=state' })
+		),
 	'POST /api/calendar/sync': () => calendarSyncRoute.POST(createEvent('POST')),
 	'GET /api/calendar/sync/cron': () =>
 		calendarCronRoute.GET(createEvent('GET', { headers: { authorization: `Bearer ${CRON_SECRET}` } })),
 	'POST /api/calendar/sync/cron': () =>
 		calendarCronRoute.POST(createEvent('POST', { headers: { 'x-cron-secret': CRON_SECRET } })),
 	'GET /api/calendar/tokens': () => calendarTokensRoute.GET(createEvent('GET')),
-	'POST /api/calendar/tokens': (body = jsonBody({ name: 'Feed' })) => calendarTokensRoute.POST(createEvent('POST', { body })),
+	'POST /api/calendar/tokens': (body = jsonBody({ name: 'Feed' })) =>
+		calendarTokensRoute.POST(createEvent('POST', { body })),
 	'DELETE /api/calendar/tokens/[tokenId]': () => calendarTokenRoute.DELETE(createEvent('DELETE')),
 	'GET /api/calendar/subscriptions/[token].ics': () => subscriptionRoute.GET(createEvent('GET'))
 };
 
 /** The routes that answer only a signed-in user, through requireAuthUser. */
-const AUTHENTICATED = Object.keys(call).filter((name) =>
-	!name.startsWith('POST /api/account/email-verifications')
-	&& !name.includes('/cron')
-	&& !name.includes('/subscriptions/')
+const AUTHENTICATED = Object.keys(call).filter(
+	(name) =>
+		!name.startsWith('POST /api/account/email-verifications')
+		&& !name.includes('/cron')
+		&& !name.includes('/subscriptions/')
 );
 
 /** The routes that read a JSON body and answer 400 when it does not parse. */
@@ -379,12 +390,18 @@ describe('signed-out requests', () => {
 		authState.databaseConfigured = false;
 		let result = await session.requireAuthUser(request);
 		expect(result.ok).toBe(false);
-		expect(result.ok || [result.response.status, await result.response.json()]).toEqual([503, { message: 'Auth service unavailable.' }]);
+		expect(result.ok || [result.response.status, await result.response.json()]).toEqual([
+			503,
+			{ message: 'Auth service unavailable.' }
+		]);
 
 		authState.databaseConfigured = true;
 		authState.configurationError = 'BETTER_AUTH_SECRET is missing.';
 		result = await session.requireAuthUser(request);
-		expect(result.ok || [result.response.status, await result.response.json()]).toEqual([500, { message: 'Auth service unavailable.' }]);
+		expect(result.ok || [result.response.status, await result.response.json()]).toEqual([
+			500,
+			{ message: 'Auth service unavailable.' }
+		]);
 	});
 });
 
@@ -403,8 +420,11 @@ describe('request bodies', () => {
 		await expectJson(await call['DELETE /api/tasks/[taskId]'](' \n '), 200, { deleted: 1 });
 		await expectJson(await call['DELETE /api/tasks/[taskId]']('{"expectedVersion":3}'), 200, { deleted: 1 });
 
-		expect(vi.mocked(taskRepository.deleteTaskCascadeForUser).mock.calls.map((args) => args[2]))
-			.toEqual([undefined, undefined, { expectedVersion: 3 }]);
+		expect(vi.mocked(taskRepository.deleteTaskCascadeForUser).mock.calls.map((args) => args[2])).toEqual([
+			undefined,
+			undefined,
+			{ expectedVersion: 3 }
+		]);
 	});
 
 	it('POST /api/tasks answers 400 to an empty body and passes a JSON null through', async () => {
@@ -427,24 +447,41 @@ describe('request bodies', () => {
 
 	it('POST /api/import answers 413 to a body over 5 MB, by its declared length or by its text', async () => {
 		const tooLarge = { message: 'Import payload is too large.' };
-		await expectJson(await importRoute.POST(createEvent('POST', {
-			path: '/api/import',
-			body: '[]',
-			headers: { 'content-length': String(5 * 1024 * 1024 + 1) }
-		})), 413, tooLarge);
+		await expectJson(
+			await importRoute.POST(
+				createEvent('POST', {
+					path: '/api/import',
+					body: '[]',
+					headers: { 'content-length': String(5 * 1024 * 1024 + 1) }
+				})
+			),
+			413,
+			tooLarge
+		);
 		await expectJson(await call['POST /api/import'](`[${' '.repeat(5 * 1024 * 1024)}]`), 413, tooLarge);
 
 		// Exactly 5 MB is allowed.
 		vi.mocked(taskRepository.importTasksForUser).mockResolvedValue(/** @type {any} */ ({ tasks: [] }));
-		await expectJson(await call['POST /api/import'](`[${' '.repeat(5 * 1024 * 1024 - 2)}]`), 201, { tasks: [] }, NO_STORE);
+		await expectJson(
+			await call['POST /api/import'](`[${' '.repeat(5 * 1024 * 1024 - 2)}]`),
+			201,
+			{ tasks: [] },
+			NO_STORE
+		);
 		expect(taskRepository.importTasksForUser).toHaveBeenCalledTimes(1);
 	});
 
 	it('POST /api/account/email-verifications answers 413 to a declared length over 10,000 bytes', async () => {
-		await expectJson(await emailVerificationsRoute.POST(createEvent('POST', {
-			body: jsonBody({ email: 'primary@example.com' }),
-			headers: { 'content-length': '10001' }
-		})), 413, { message: 'Request body is too large.' });
+		await expectJson(
+			await emailVerificationsRoute.POST(
+				createEvent('POST', {
+					body: jsonBody({ email: 'primary@example.com' }),
+					headers: { 'content-length': '10001' }
+				})
+			),
+			413,
+			{ message: 'Request body is too large.' }
+		);
 		expect(createPasskeyEmailVerification).not.toHaveBeenCalled();
 	});
 });
@@ -471,7 +508,9 @@ describe('the task write API', () => {
 		for (const failure of [
 			new CalendarTokenConfigurationError(),
 			new CalendarTokenEncryptionError('CALENDAR_OAUTH_ENCRYPTION_KEY must be at least 32 bytes.'),
-			new AccountSecurityConfigurationError('ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.')
+			new AccountSecurityConfigurationError(
+				'ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.'
+			)
 		]) {
 			dataFunction.mockRejectedValue(failure);
 			await expect(call[name]()).rejects.toBe(failure);
@@ -492,22 +531,122 @@ describe('the task write API', () => {
 
 	it.each([
 		['GET /api/tasks', () => vi.mocked(taskRepository.listTasksForUser).mockResolvedValue([]), 200, { tasks: [] }, {}],
-		['POST /api/tasks', () => vi.mocked(taskRepository.createTaskForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })), 201, { task: { id: 't' } }, {}],
-		['PATCH /api/tasks/[taskId]', () => vi.mocked(taskRepository.updateTaskForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })), 200, { task: { id: 't' } }, {}],
-		['DELETE /api/tasks/[taskId]', () => vi.mocked(taskRepository.deleteTaskCascadeForUser).mockResolvedValue(2), 200, { deleted: 2 }, {}],
-		['POST /api/tasks/[taskId]/checklist', () => vi.mocked(taskRepository.createChecklistItemForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })), 201, { task: { id: 't' } }, {}],
-		['PATCH /api/tasks/[taskId]/checklist/[itemId]', () => vi.mocked(taskRepository.updateChecklistItemForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })), 200, { task: { id: 't' } }, {}],
-		['DELETE /api/tasks/[taskId]/checklist/[itemId]', () => vi.mocked(taskRepository.deleteChecklistItemForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })), 200, { task: { id: 't' } }, {}],
-		['POST /api/import', () => vi.mocked(taskRepository.importTasksForUser).mockResolvedValue(/** @type {any} */ ({ tasks: [] })), 201, { tasks: [] }, NO_STORE],
-		['POST /api/import?mode=replace', () => vi.mocked(taskRepository.replaceTasksForUser).mockResolvedValue(/** @type {any} */ ({ tasks: [] })), 201, { tasks: [] }, NO_STORE],
-		['GET /api/categories', () => vi.mocked(categoryRepository.listCategoriesForUser).mockResolvedValue([]), 200, { categories: [] }, NO_STORE],
-		['POST /api/categories', () => vi.mocked(categoryRepository.createCategoryForUser).mockResolvedValue(/** @type {any} */ ({ id: 'c' })), 201, { category: { id: 'c' } }, {}],
-		['PATCH /api/categories/[categoryId]', () => vi.mocked(categoryRepository.updateCategoryForUser).mockResolvedValue(/** @type {any} */ ({ category: { id: 'c' } })), 200, { category: { id: 'c' } }, {}],
-		['DELETE /api/categories/[categoryId]', () => vi.mocked(categoryRepository.deleteCategoryForUser).mockResolvedValue(/** @type {any} */ ({ deleted: true })), 200, { deleted: true }, {}],
-		['POST /api/categories/[categoryId]/merge', () => vi.mocked(categoryRepository.mergeCategoryForUser).mockResolvedValue(/** @type {any} */ ({ merged: 1 })), 200, { merged: 1 }, {}],
-		['POST /api/categories/reorder', () => vi.mocked(categoryRepository.reorderCategoriesForUser).mockResolvedValue([]), 200, { categories: [] }, {}],
-		['GET /api/board/preferences', () => vi.mocked(boardProvisioning.getBoardPreferencesForUser).mockResolvedValue({ defaultView: 'matrix' }), 200, { defaultView: 'matrix' }, {}],
-		['PATCH /api/board/preferences', () => vi.mocked(boardProvisioning.updateBoardPreferencesForUser).mockResolvedValue({ defaultView: 'gantt' }), 200, { defaultView: 'gantt' }, {}]
+		[
+			'POST /api/tasks',
+			() => vi.mocked(taskRepository.createTaskForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })),
+			201,
+			{ task: { id: 't' } },
+			{}
+		],
+		[
+			'PATCH /api/tasks/[taskId]',
+			() => vi.mocked(taskRepository.updateTaskForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })),
+			200,
+			{ task: { id: 't' } },
+			{}
+		],
+		[
+			'DELETE /api/tasks/[taskId]',
+			() => vi.mocked(taskRepository.deleteTaskCascadeForUser).mockResolvedValue(2),
+			200,
+			{ deleted: 2 },
+			{}
+		],
+		[
+			'POST /api/tasks/[taskId]/checklist',
+			() => vi.mocked(taskRepository.createChecklistItemForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })),
+			201,
+			{ task: { id: 't' } },
+			{}
+		],
+		[
+			'PATCH /api/tasks/[taskId]/checklist/[itemId]',
+			() => vi.mocked(taskRepository.updateChecklistItemForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })),
+			200,
+			{ task: { id: 't' } },
+			{}
+		],
+		[
+			'DELETE /api/tasks/[taskId]/checklist/[itemId]',
+			() => vi.mocked(taskRepository.deleteChecklistItemForUser).mockResolvedValue(/** @type {any} */ ({ id: 't' })),
+			200,
+			{ task: { id: 't' } },
+			{}
+		],
+		[
+			'POST /api/import',
+			() => vi.mocked(taskRepository.importTasksForUser).mockResolvedValue(/** @type {any} */ ({ tasks: [] })),
+			201,
+			{ tasks: [] },
+			NO_STORE
+		],
+		[
+			'POST /api/import?mode=replace',
+			() => vi.mocked(taskRepository.replaceTasksForUser).mockResolvedValue(/** @type {any} */ ({ tasks: [] })),
+			201,
+			{ tasks: [] },
+			NO_STORE
+		],
+		[
+			'GET /api/categories',
+			() => vi.mocked(categoryRepository.listCategoriesForUser).mockResolvedValue([]),
+			200,
+			{ categories: [] },
+			NO_STORE
+		],
+		[
+			'POST /api/categories',
+			() => vi.mocked(categoryRepository.createCategoryForUser).mockResolvedValue(/** @type {any} */ ({ id: 'c' })),
+			201,
+			{ category: { id: 'c' } },
+			{}
+		],
+		[
+			'PATCH /api/categories/[categoryId]',
+			() =>
+				vi
+					.mocked(categoryRepository.updateCategoryForUser)
+					.mockResolvedValue(/** @type {any} */ ({ category: { id: 'c' } })),
+			200,
+			{ category: { id: 'c' } },
+			{}
+		],
+		[
+			'DELETE /api/categories/[categoryId]',
+			() =>
+				vi.mocked(categoryRepository.deleteCategoryForUser).mockResolvedValue(/** @type {any} */ ({ deleted: true })),
+			200,
+			{ deleted: true },
+			{}
+		],
+		[
+			'POST /api/categories/[categoryId]/merge',
+			() => vi.mocked(categoryRepository.mergeCategoryForUser).mockResolvedValue(/** @type {any} */ ({ merged: 1 })),
+			200,
+			{ merged: 1 },
+			{}
+		],
+		[
+			'POST /api/categories/reorder',
+			() => vi.mocked(categoryRepository.reorderCategoriesForUser).mockResolvedValue([]),
+			200,
+			{ categories: [] },
+			{}
+		],
+		[
+			'GET /api/board/preferences',
+			() => vi.mocked(boardProvisioning.getBoardPreferencesForUser).mockResolvedValue({ defaultView: 'matrix' }),
+			200,
+			{ defaultView: 'matrix' },
+			{}
+		],
+		[
+			'PATCH /api/board/preferences',
+			() => vi.mocked(boardProvisioning.updateBoardPreferencesForUser).mockResolvedValue({ defaultView: 'gantt' }),
+			200,
+			{ defaultView: 'gantt' },
+			{}
+		]
 	])('%s answers %i on success', async (name, arrange, status, body, headers) => {
 		arrange();
 		await expectJson(await call[name](), status, body, headers);
@@ -544,34 +683,66 @@ describe('account routes', () => {
 	const SUMMARY = { total: 10, available: 9, lastCreatedAt: '2026-09-26T00:00:00.000Z' };
 
 	it.each([
-		['GET /api/account/recovery-codes', () => vi.mocked(getRecoveryCodeSummaryForUser).mockResolvedValue(SUMMARY), 200, SUMMARY],
-		['POST /api/account/recovery-codes', () => vi.mocked(createRecoveryCodesForUser).mockResolvedValue({ codes: ['A'], summary: SUMMARY }), 201, { codes: ['A'], summary: SUMMARY }],
-		['DELETE /api/account/recovery-codes', () => vi.mocked(revokeRecoveryCodesForUser).mockResolvedValue(SUMMARY), 200, SUMMARY]
+		[
+			'GET /api/account/recovery-codes',
+			() => vi.mocked(getRecoveryCodeSummaryForUser).mockResolvedValue(SUMMARY),
+			200,
+			SUMMARY
+		],
+		[
+			'POST /api/account/recovery-codes',
+			() => vi.mocked(createRecoveryCodesForUser).mockResolvedValue({ codes: ['A'], summary: SUMMARY }),
+			201,
+			{ codes: ['A'], summary: SUMMARY }
+		],
+		[
+			'DELETE /api/account/recovery-codes',
+			() => vi.mocked(revokeRecoveryCodesForUser).mockResolvedValue(SUMMARY),
+			200,
+			SUMMARY
+		]
 	])('%s answers %i with no-store on success', async (name, arrange, status, body) => {
 		arrange();
 		await expectJson(await call[name](), status, body, NO_STORE);
 	});
 
 	it.each([
-		['POST /api/account/recovery-codes', 'recovery-code-create', 3, 'Too many recovery code regeneration requests.', vi.mocked(createRecoveryCodesForUser)],
-		['DELETE /api/account/recovery-codes', 'recovery-code-revoke', 6, 'Too many recovery code revoke requests.', vi.mocked(revokeRecoveryCodesForUser)]
-	])('%s keys its limit on the IP and user and answers 429 with Retry-After', async (name, scope, limit, message, dataFunction) => {
-		vi.mocked(assertRateLimit).mockRejectedValue(new RateLimitError(message, 1800));
+		[
+			'POST /api/account/recovery-codes',
+			'recovery-code-create',
+			3,
+			'Too many recovery code regeneration requests.',
+			vi.mocked(createRecoveryCodesForUser)
+		],
+		[
+			'DELETE /api/account/recovery-codes',
+			'recovery-code-revoke',
+			6,
+			'Too many recovery code revoke requests.',
+			vi.mocked(revokeRecoveryCodesForUser)
+		]
+	])(
+		'%s keys its limit on the IP and user and answers 429 with Retry-After',
+		async (name, scope, limit, message, dataFunction) => {
+			vi.mocked(assertRateLimit).mockRejectedValue(new RateLimitError(message, 1800));
 
-		await expectJson(await call[name](), 429, { message }, { 'retry-after': '1800' });
-		expect(assertRateLimit).toHaveBeenCalledWith(`${scope}:${CLIENT_IP}:${USER_ID}`, {
-			limit,
-			windowMs: 60 * 60 * 1000,
-			message
-		});
-		expect(dataFunction).not.toHaveBeenCalled();
-	});
+			await expectJson(await call[name](), 429, { message }, { 'retry-after': '1800' });
+			expect(assertRateLimit).toHaveBeenCalledWith(`${scope}:${CLIENT_IP}:${USER_ID}`, {
+				limit,
+				windowMs: 60 * 60 * 1000,
+				message
+			});
+			expect(dataFunction).not.toHaveBeenCalled();
+		}
+	);
 
 	it.each([
 		['POST /api/account/recovery-codes', vi.mocked(createRecoveryCodesForUser)],
 		['DELETE /api/account/recovery-codes', vi.mocked(revokeRecoveryCodesForUser)]
 	])('%s lets a missing recovery secret and any other error through', async (name, dataFunction) => {
-		const unconfigured = new AccountSecurityConfigurationError('ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.');
+		const unconfigured = new AccountSecurityConfigurationError(
+			'ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.'
+		);
 		dataFunction.mockRejectedValue(unconfigured);
 		await expect(call[name]()).rejects.toBe(unconfigured);
 
@@ -594,31 +765,57 @@ describe('account routes', () => {
 		});
 
 		it('checks the IP limit, then the IP and email limit, then sends the code', async () => {
-			vi.mocked(createPasskeyEmailVerification).mockResolvedValue({ email: 'primary@example.com', expiresAt: '2026-09-26T00:15:00.000Z' });
+			vi.mocked(createPasskeyEmailVerification).mockResolvedValue({
+				email: 'primary@example.com',
+				expiresAt: '2026-09-26T00:15:00.000Z'
+			});
 
-			await expectJson(await send(), 201, { email: 'primary@example.com', expiresAt: '2026-09-26T00:15:00.000Z' }, NO_STORE);
+			await expectJson(
+				await send(),
+				201,
+				{ email: 'primary@example.com', expiresAt: '2026-09-26T00:15:00.000Z' },
+				NO_STORE
+			);
 			expect(vi.mocked(assertRateLimit).mock.calls).toEqual([
-				[`email-verification-ip:${CLIENT_IP}:`, { limit: 20, windowMs: 15 * 60 * 1000, message: 'Too many email verification requests.' }],
-				[`email-verification-send:${CLIENT_IP}:primary@example.com`, { limit: 5, windowMs: 15 * 60 * 1000, message: 'Too many email verification requests.' }]
+				[
+					`email-verification-ip:${CLIENT_IP}:`,
+					{ limit: 20, windowMs: 15 * 60 * 1000, message: 'Too many email verification requests.' }
+				],
+				[
+					`email-verification-send:${CLIENT_IP}:primary@example.com`,
+					{ limit: 5, windowMs: 15 * 60 * 1000, message: 'Too many email verification requests.' }
+				]
 			]);
 			expect(createPasskeyEmailVerification).toHaveBeenCalledWith({ email: 'primary@example.com', name: 'User' });
 		});
 
 		it('answers 429 with Retry-After once a limit is spent', async () => {
 			vi.mocked(assertRateLimit).mockRejectedValue(new RateLimitError('Too many email verification requests.', 600));
-			await expectJson(await send(), 429, { message: 'Too many email verification requests.' }, { 'retry-after': '600' });
+			await expectJson(
+				await send(),
+				429,
+				{ message: 'Too many email verification requests.' },
+				{ 'retry-after': '600' }
+			);
 			expect(createPasskeyEmailVerification).not.toHaveBeenCalled();
 		});
 
 		it('answers a delivery or configuration failure with a generic 503', async () => {
-			vi.mocked(createPasskeyEmailVerification).mockRejectedValue(new AccountSecurityConfigurationError('Email verification delivery failed.'));
+			vi.mocked(createPasskeyEmailVerification).mockRejectedValue(
+				new AccountSecurityConfigurationError('Email verification delivery failed.')
+			);
 			await expectJson(await send(), 503, { message: 'Auth service unavailable.' });
 		});
 
 		it('answers an invalid or refused email as if it sent a code', async () => {
 			const accepted = { email: 'primary@example.com', expiresAt: expect.any(String) };
 
-			await expectJson(await send(jsonBody({ email: 'not-an-email' })), 201, { ...accepted, email: 'not-an-email' }, NO_STORE);
+			await expectJson(
+				await send(jsonBody({ email: 'not-an-email' })),
+				201,
+				{ ...accepted, email: 'not-an-email' },
+				NO_STORE
+			);
 
 			vi.mocked(assertAllowedAccountEmail).mockImplementation(() => {
 				throw new AccountSecurityPolicyError('This email is not allowed to create an account.');
@@ -626,7 +823,9 @@ describe('account routes', () => {
 			await expectJson(await send(), 201, accepted, NO_STORE);
 
 			vi.mocked(assertAllowedAccountEmail).mockReset();
-			vi.mocked(createPasskeyEmailVerification).mockRejectedValue(new AccountSecurityPolicyError('This email is not allowed to create an account.'));
+			vi.mocked(createPasskeyEmailVerification).mockRejectedValue(
+				new AccountSecurityPolicyError('This email is not allowed to create an account.')
+			);
 			await expectJson(await send(), 201, accepted, NO_STORE);
 			expect(createPasskeyEmailVerification).toHaveBeenCalledTimes(1);
 		});
@@ -647,24 +846,66 @@ describe('calendar routes', () => {
 	];
 
 	it.each([
-		['GET /api/calendar/providers', () => vi.mocked(listCalendarProviderConnections).mockResolvedValue(/** @type {any} */ ({ providers: [] })), 200, { providers: [] }],
-		['DELETE /api/calendar/providers/[connectionId]', () => vi.mocked(deleteCalendarProviderConnection).mockResolvedValue('connection-id'), 200, { deleted: 'connection-id' }],
-		['POST /api/calendar/sync', () => vi.mocked(syncCalendarProvidersForUser).mockResolvedValue(/** @type {any} */ ({ ok: true })), 200, { ok: true }],
-		['GET /api/calendar/sync/cron', () => vi.mocked(syncCalendarProvidersForConnectedUsers).mockResolvedValue(/** @type {any} */ ({ ok: true })), 200, { ok: true }],
-		['POST /api/calendar/sync/cron', () => vi.mocked(syncCalendarProvidersForConnectedUsers).mockResolvedValue(/** @type {any} */ ({ ok: true })), 200, { ok: true }],
+		[
+			'GET /api/calendar/providers',
+			() => vi.mocked(listCalendarProviderConnections).mockResolvedValue(/** @type {any} */ ({ providers: [] })),
+			200,
+			{ providers: [] }
+		],
+		[
+			'DELETE /api/calendar/providers/[connectionId]',
+			() => vi.mocked(deleteCalendarProviderConnection).mockResolvedValue('connection-id'),
+			200,
+			{ deleted: 'connection-id' }
+		],
+		[
+			'POST /api/calendar/sync',
+			() => vi.mocked(syncCalendarProvidersForUser).mockResolvedValue(/** @type {any} */ ({ ok: true })),
+			200,
+			{ ok: true }
+		],
+		[
+			'GET /api/calendar/sync/cron',
+			() => vi.mocked(syncCalendarProvidersForConnectedUsers).mockResolvedValue(/** @type {any} */ ({ ok: true })),
+			200,
+			{ ok: true }
+		],
+		[
+			'POST /api/calendar/sync/cron',
+			() => vi.mocked(syncCalendarProvidersForConnectedUsers).mockResolvedValue(/** @type {any} */ ({ ok: true })),
+			200,
+			{ ok: true }
+		],
 		['GET /api/calendar/tokens', () => vi.mocked(listCalendarTokensForUser).mockResolvedValue([]), 200, { tokens: [] }],
-		['POST /api/calendar/tokens', () => vi.mocked(createCalendarTokenForUser).mockResolvedValue(/** @type {any} */ ({ token: 'cal_token' })), 201, { token: 'cal_token' }],
-		['DELETE /api/calendar/tokens/[tokenId]', () => vi.mocked(revokeCalendarTokenForUser).mockResolvedValue(null), 200, { token: null }]
+		[
+			'POST /api/calendar/tokens',
+			() => vi.mocked(createCalendarTokenForUser).mockResolvedValue(/** @type {any} */ ({ token: 'cal_token' })),
+			201,
+			{ token: 'cal_token' }
+		],
+		[
+			'DELETE /api/calendar/tokens/[tokenId]',
+			() => vi.mocked(revokeCalendarTokenForUser).mockResolvedValue(null),
+			200,
+			{ token: null }
+		]
 	])('%s answers %i with no-store on success', async (name, arrange, status, body) => {
 		arrange();
 		await expectJson(await call[name](), status, body, NO_STORE);
 	});
 
 	it('DELETE /api/calendar/providers/[connectionId] answers a CalendarSyncError and lets the rest through', async () => {
-		vi.mocked(deleteCalendarProviderConnection).mockRejectedValue(new CalendarSyncError('Calendar connection was not found.', 404));
-		await expectJson(await call['DELETE /api/calendar/providers/[connectionId]'](), 404, { message: 'Calendar connection was not found.' });
+		vi.mocked(deleteCalendarProviderConnection).mockRejectedValue(
+			new CalendarSyncError('Calendar connection was not found.', 404)
+		);
+		await expectJson(await call['DELETE /api/calendar/providers/[connectionId]'](), 404, {
+			message: 'Calendar connection was not found.'
+		});
 
-		for (const failure of [new CalendarProviderError('Google Calendar request failed.', 502), new Error('connection reset')]) {
+		for (const failure of [
+			new CalendarProviderError('Google Calendar request failed.', 502),
+			new Error('connection reset')
+		]) {
 			vi.mocked(deleteCalendarProviderConnection).mockRejectedValue(failure);
 			await expect(call['DELETE /api/calendar/providers/[connectionId]']()).rejects.toBe(failure);
 		}
@@ -673,7 +914,12 @@ describe('calendar routes', () => {
 	it('POST /api/calendar/sync keys its limit on the IP and user and answers 429 with Retry-After', async () => {
 		vi.mocked(assertRateLimit).mockRejectedValue(new RateLimitError('Calendar sync is cooling down.', 900));
 
-		await expectJson(await call['POST /api/calendar/sync'](), 429, { message: 'Calendar sync is cooling down.' }, { 'retry-after': '900' });
+		await expectJson(
+			await call['POST /api/calendar/sync'](),
+			429,
+			{ message: 'Calendar sync is cooling down.' },
+			{ 'retry-after': '900' }
+		);
 		expect(assertRateLimit).toHaveBeenCalledWith(`calendar-sync:${CLIENT_IP}:${USER_ID}`, {
 			limit: 6,
 			windowMs: 60 * 60 * 1000,
@@ -682,26 +928,38 @@ describe('calendar routes', () => {
 		expect(syncCalendarProvidersForUser).not.toHaveBeenCalled();
 	});
 
-	it.each(['POST /api/calendar/sync', 'GET /api/calendar/sync/cron'])('%s answers the calendar sync errors with their status', async (name) => {
-		const dataFunction = name.includes('cron') ? syncCalendarProvidersForConnectedUsers : syncCalendarProvidersForUser;
-		for (const error of syncErrors()) {
-			vi.mocked(dataFunction).mockRejectedValue(error);
-			await expectJson(await call[name](), error.status, { message: error.message });
-		}
-		expect(syncErrors().map((error) => error.status)).toEqual([409, 502, 503]);
+	it.each(['POST /api/calendar/sync', 'GET /api/calendar/sync/cron'])(
+		'%s answers the calendar sync errors with their status',
+		async (name) => {
+			const dataFunction = name.includes('cron')
+				? syncCalendarProvidersForConnectedUsers
+				: syncCalendarProvidersForUser;
+			for (const error of syncErrors()) {
+				vi.mocked(dataFunction).mockRejectedValue(error);
+				await expectJson(await call[name](), error.status, { message: error.message });
+			}
+			expect(syncErrors().map((error) => error.status)).toEqual([409, 502, 503]);
 
-		for (const failure of [new TaskWriteError('A default workspace board could not be created.', 500), new Error('connection reset')]) {
-			vi.mocked(dataFunction).mockRejectedValue(failure);
-			await expect(call[name]()).rejects.toBe(failure);
+			for (const failure of [
+				new TaskWriteError('A default workspace board could not be created.', 500),
+				new Error('connection reset')
+			]) {
+				vi.mocked(dataFunction).mockRejectedValue(failure);
+				await expect(call[name]()).rejects.toBe(failure);
+			}
 		}
-	});
+	);
 
 	it('GET /api/calendar/sync/cron answers 503 without a secret and 401 to a wrong one', async () => {
 		delete process.env.CRON_SECRET;
-		await expectJson(await call['GET /api/calendar/sync/cron'](), 503, { message: 'CRON_SECRET is required before background calendar sync can run.' });
+		await expectJson(await call['GET /api/calendar/sync/cron'](), 503, {
+			message: 'CRON_SECRET is required before background calendar sync can run.'
+		});
 
 		process.env.CRON_SECRET = CRON_SECRET;
-		const wrong = createEvent('GET', { headers: { authorization: 'Bearer cron-secret-with-enough-lengtH', 'x-cron-secret': 'short' } });
+		const wrong = createEvent('GET', {
+			headers: { authorization: 'Bearer cron-secret-with-enough-lengtH', 'x-cron-secret': 'short' }
+		});
 		await expectJson(await calendarCronRoute.GET(wrong), 401, { message: 'Calendar sync cron authentication failed.' });
 		expect(syncCalendarProvidersForConnectedUsers).not.toHaveBeenCalled();
 	});
@@ -727,8 +985,15 @@ describe('calendar routes', () => {
 
 	it('POST /api/calendar/tokens answers its limit, a missing secret and the token cap', async () => {
 		const create = call['POST /api/calendar/tokens'];
-		vi.mocked(assertRateLimit).mockRejectedValueOnce(new RateLimitError('Too many calendar feed token creation requests.', 3600));
-		await expectJson(await create(), 429, { message: 'Too many calendar feed token creation requests.' }, { 'retry-after': '3600' });
+		vi.mocked(assertRateLimit).mockRejectedValueOnce(
+			new RateLimitError('Too many calendar feed token creation requests.', 3600)
+		);
+		await expectJson(
+			await create(),
+			429,
+			{ message: 'Too many calendar feed token creation requests.' },
+			{ 'retry-after': '3600' }
+		);
 		expect(assertRateLimit).toHaveBeenCalledWith(`calendar-token-create:${CLIENT_IP}:${USER_ID}`, {
 			limit: 5,
 			windowMs: 60 * 60 * 1000,
@@ -737,12 +1002,19 @@ describe('calendar routes', () => {
 		expect(createCalendarTokenForUser).not.toHaveBeenCalled();
 
 		vi.mocked(createCalendarTokenForUser).mockRejectedValue(new CalendarTokenConfigurationError());
-		await expectJson(await create(), 503, { message: 'CALENDAR_TOKEN_SECRET must be configured before calendar subscription tokens can be used.' });
+		await expectJson(await create(), 503, {
+			message: 'CALENDAR_TOKEN_SECRET must be configured before calendar subscription tokens can be used.'
+		});
 
-		vi.mocked(createCalendarTokenForUser).mockRejectedValue(new CalendarTokenLimitError('Calendar feeds are limited to 5 active tokens per user.'));
+		vi.mocked(createCalendarTokenForUser).mockRejectedValue(
+			new CalendarTokenLimitError('Calendar feeds are limited to 5 active tokens per user.')
+		);
 		await expectJson(await create(), 429, { message: 'Calendar feeds are limited to 5 active tokens per user.' });
 
-		for (const failure of [new TaskWriteError('A default workspace board could not be created.', 500), new Error('connection reset')]) {
+		for (const failure of [
+			new TaskWriteError('A default workspace board could not be created.', 500),
+			new Error('connection reset')
+		]) {
 			vi.mocked(createCalendarTokenForUser).mockRejectedValue(failure);
 			await expect(create()).rejects.toBe(failure);
 		}
@@ -750,7 +1022,12 @@ describe('calendar routes', () => {
 
 	describe('GET /api/calendar/subscriptions/[token].ics', () => {
 		it('answers a token of the wrong shape and an unknown token with 404', async () => {
-			await expectText(await subscriptionRoute.GET(createEvent('GET', { params: { token: 'not-a-token' } })), 404, 'Not found', { 'cache-control': 'no-store' });
+			await expectText(
+				await subscriptionRoute.GET(createEvent('GET', { params: { token: 'not-a-token' } })),
+				404,
+				'Not found',
+				{ 'cache-control': 'no-store' }
+			);
 
 			vi.mocked(getCalendarTasksForToken).mockResolvedValue(null);
 			await expectText(await call['GET /api/calendar/subscriptions/[token].ics'](), 404, 'Not found');
@@ -758,15 +1035,24 @@ describe('calendar routes', () => {
 
 		it('answers a missing token secret with 503 and a spent limit with 429', async () => {
 			vi.mocked(getCalendarTasksForToken).mockRejectedValue(new CalendarTokenConfigurationError());
-			await expectText(await call['GET /api/calendar/subscriptions/[token].ics'](), 503, 'Calendar token configuration is unavailable.');
+			await expectText(
+				await call['GET /api/calendar/subscriptions/[token].ics'](),
+				503,
+				'Calendar token configuration is unavailable.'
+			);
 
 			vi.mocked(assertVolatileRateLimit).mockImplementation(() => {
 				throw new RateLimitError('Too many calendar feed requests.', 45);
 			});
-			await expectText(await call['GET /api/calendar/subscriptions/[token].ics'](), 429, 'Too many calendar feed requests.', {
-				'retry-after': '45',
-				'cache-control': 'no-store'
-			});
+			await expectText(
+				await call['GET /api/calendar/subscriptions/[token].ics'](),
+				429,
+				'Too many calendar feed requests.',
+				{
+					'retry-after': '45',
+					'cache-control': 'no-store'
+				}
+			);
 		});
 
 		it('lets any other error through', async () => {
@@ -782,11 +1068,17 @@ describe('calendar routes', () => {
 
 		it('connect redirects to the provider, or back with the error message', async () => {
 			vi.mocked(createCalendarProviderAuthorizationUrl).mockResolvedValue('https://accounts.example/auth');
-			await expect(call['GET /api/calendar/providers/[provider]/connect']()).rejects.toMatchObject({ status: 302, location: 'https://accounts.example/auth' });
+			await expect(call['GET /api/calendar/providers/[provider]/connect']()).rejects.toMatchObject({
+				status: 302,
+				location: 'https://accounts.example/auth'
+			});
 
 			for (const error of syncErrors()) {
 				vi.mocked(createCalendarProviderAuthorizationUrl).mockRejectedValue(error);
-				await expect(call['GET /api/calendar/providers/[provider]/connect']()).rejects.toMatchObject({ status: 302, location: back({ message: error.message }) });
+				await expect(call['GET /api/calendar/providers/[provider]/connect']()).rejects.toMatchObject({
+					status: 302,
+					location: back({ message: error.message })
+				});
 			}
 
 			const failure = new TaskWriteError('A default workspace board could not be created.', 500);
@@ -801,12 +1093,19 @@ describe('calendar routes', () => {
 				location: createCalendarSyncRedirect({ status: 'connected', provider: 'google' })
 			});
 
-			await expect(providerCallbackRoute.GET(createEvent('GET', { path: '/api/calendar/providers/google/callback?state=state' })))
-				.rejects.toMatchObject({ status: 302, location: back({ message: 'Calendar OAuth callback is missing code or state.' }) });
+			await expect(
+				providerCallbackRoute.GET(createEvent('GET', { path: '/api/calendar/providers/google/callback?state=state' }))
+			).rejects.toMatchObject({
+				status: 302,
+				location: back({ message: 'Calendar OAuth callback is missing code or state.' })
+			});
 
 			for (const error of syncErrors()) {
 				vi.mocked(completeCalendarProviderAuthorization).mockRejectedValue(error);
-				await expect(call['GET /api/calendar/providers/[provider]/callback']()).rejects.toMatchObject({ status: 302, location: back({ message: error.message }) });
+				await expect(call['GET /api/calendar/providers/[provider]/callback']()).rejects.toMatchObject({
+					status: 302,
+					location: back({ message: error.message })
+				});
 			}
 
 			const failure = new TaskWriteError('A default workspace board could not be created.', 500);

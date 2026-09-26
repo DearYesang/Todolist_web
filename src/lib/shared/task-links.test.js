@@ -49,26 +49,34 @@ describe('splitTextIntoLinkParts', () => {
 		{
 			name: 'real backup: parenthesised seoulfuture link',
 			input: '서울미래인재재단(https://www.seoulfuture.or.kr/home/kor/main.do)',
-			links: [{
-				value: 'https://www.seoulfuture.or.kr/home/kor/main.do',
-				href: 'https://www.seoulfuture.or.kr/home/kor/main.do'
-			}]
+			links: [
+				{
+					value: 'https://www.seoulfuture.or.kr/home/kor/main.do',
+					href: 'https://www.seoulfuture.or.kr/home/kor/main.do'
+				}
+			]
 		},
 		{
 			name: 'real backup: parenthesised databricks link',
-			input: 'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you)',
-			links: [{
-				value: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
-				href: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you'
-			}]
+			input:
+				'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you)',
+			links: [
+				{
+					value: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
+					href: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you'
+				}
+			]
 		},
 		{
 			name: 'link after an opener that is never closed',
-			input: 'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
-			links: [{
-				value: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
-				href: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you'
-			}]
+			input:
+				'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
+			links: [
+				{
+					value: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you',
+					href: 'https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you'
+				}
+			]
 		},
 		{
 			name: 'trailing period',
@@ -143,18 +151,22 @@ describe('splitTextIntoLinkParts', () => {
 		{
 			name: 'unencoded Hangul query value',
 			input: 'https://search.naver.com/search.naver?query=맛집',
-			links: [{
-				value: 'https://search.naver.com/search.naver?query=맛집',
-				href: 'https://search.naver.com/search.naver?query=%EB%A7%9B%EC%A7%91'
-			}]
+			links: [
+				{
+					value: 'https://search.naver.com/search.naver?query=맛집',
+					href: 'https://search.naver.com/search.naver?query=%EB%A7%9B%EC%A7%91'
+				}
+			]
 		},
 		{
 			name: 'unencoded Hangul query values between parameters',
 			input: 'https://a.com/s?q=서울맛집&page=2&sort=최신, 참고',
-			links: [{
-				value: 'https://a.com/s?q=서울맛집&page=2&sort=최신',
-				href: 'https://a.com/s?q=%EC%84%9C%EC%9A%B8%EB%A7%9B%EC%A7%91&page=2&sort=%EC%B5%9C%EC%8B%A0'
-			}]
+			links: [
+				{
+					value: 'https://a.com/s?q=서울맛집&page=2&sort=최신',
+					href: 'https://a.com/s?q=%EC%84%9C%EC%9A%B8%EB%A7%9B%EC%A7%91&page=2&sort=%EC%B5%9C%EC%8B%A0'
+				}
+			]
 		},
 		{
 			name: 'unencoded Hangul fragment',
@@ -175,18 +187,22 @@ describe('splitTextIntoLinkParts', () => {
 		{
 			name: 'Hangul words joined by an underscore',
 			input: 'https://ko.wikipedia.org/wiki/대한민국_임시정부',
-			links: [{
-				value: 'https://ko.wikipedia.org/wiki/대한민국_임시정부',
-				href: 'https://ko.wikipedia.org/wiki/%EB%8C%80%ED%95%9C%EB%AF%BC%EA%B5%AD_%EC%9E%84%EC%8B%9C%EC%A0%95%EB%B6%80'
-			}]
+			links: [
+				{
+					value: 'https://ko.wikipedia.org/wiki/대한민국_임시정부',
+					href: 'https://ko.wikipedia.org/wiki/%EB%8C%80%ED%95%9C%EB%AF%BC%EA%B5%AD_%EC%9E%84%EC%8B%9C%EC%A0%95%EB%B6%80'
+				}
+			]
 		},
 		{
 			name: 'a hyphenated Hangul slug',
 			input: 'https://blog.example.com/2024/01/서울-여행',
-			links: [{
-				value: 'https://blog.example.com/2024/01/서울-여행',
-				href: 'https://blog.example.com/2024/01/%EC%84%9C%EC%9A%B8-%EC%97%AC%ED%96%89'
-			}]
+			links: [
+				{
+					value: 'https://blog.example.com/2024/01/서울-여행',
+					href: 'https://blog.example.com/2024/01/%EC%84%9C%EC%9A%B8-%EC%97%AC%ED%96%89'
+				}
+			]
 		},
 		{
 			// Accepted trade-off: a Hangul run that ends the URL cannot be told
@@ -413,24 +429,30 @@ describe('collectSubtreeLinks', () => {
 			'서울미래인재재단(https://www.seoulfuture.or.kr/home/kor/main.do)',
 			'메모'
 		]),
-		task('conferences', '학회 검색 리스트', [
-			'https://kss.or.kr/,',
-			'www.kams.or.kr.',
-			'KSBMB https://www.ksbmb.or.kr',
-			'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you)'
-		], { parentId: 'explore', collapsed: true }),
-		task('papers', '논문 검색 리스트', [
-			'https://pubmed.ncbi.nlm.nih.gov/',
-			'https://scholar.google.com/'
-		], { parentId: 'explore' }),
-		task('grants', '지원금 탐색', [
-			'https://www.iris.go.kr/',
-			'https://www.ntis.go.kr/'
-		], { parentId: 'explore', done: [true, false] })
+		task(
+			'conferences',
+			'학회 검색 리스트',
+			[
+				'https://kss.or.kr/,',
+				'www.kams.or.kr.',
+				'KSBMB https://www.ksbmb.or.kr',
+				'Databricks(https://www.databricks.com/kr/resources/webinar/databricks-kr-learning-festival-april2026/thank-you)'
+			],
+			{ parentId: 'explore', collapsed: true }
+		),
+		task('papers', '논문 검색 리스트', ['https://pubmed.ncbi.nlm.nih.gov/', 'https://scholar.google.com/'], {
+			parentId: 'explore'
+		}),
+		task('grants', '지원금 탐색', ['https://www.iris.go.kr/', 'https://www.ntis.go.kr/'], {
+			parentId: 'explore',
+			done: [true, false]
+		})
 	];
 
 	it('counts 2 own links and 10 including children', () => {
-		const root = /** @type {typeof externalInfo[number]} */ (externalInfo.find((candidate) => candidate.id === 'explore'));
+		const root = /** @type {typeof externalInfo[number]} */ (
+			externalInfo.find((candidate) => candidate.id === 'explore')
+		);
 
 		expect(extractTaskLinks(root)).toHaveLength(2);
 		const links = collectSubtreeLinks(buildTaskIndex(externalInfo), 'explore');

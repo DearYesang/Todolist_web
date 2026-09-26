@@ -1,32 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import {
-	normalizePasskeyRegistrationBody,
-	normalizePasskeyRegistrationRequest
-} from './passkey-request.js';
+import { normalizePasskeyRegistrationBody, normalizePasskeyRegistrationRequest } from './passkey-request.js';
 
 describe('passkey registration request normalization', () => {
 	it('adds a platform transport when the browser omits transports', () => {
-		const body = /** @type {any} */ (normalizePasskeyRegistrationBody({
-			response: {
-				id: 'credential-id',
+		const body = /** @type {any} */ (
+			normalizePasskeyRegistrationBody({
 				response: {
-					clientDataJSON: 'client-data',
-					attestationObject: 'attestation'
+					id: 'credential-id',
+					response: {
+						clientDataJSON: 'client-data',
+						attestationObject: 'attestation'
+					}
 				}
-			}
-		}));
+			})
+		);
 
 		expect(body.response.response.transports).toEqual(['internal']);
 	});
 
 	it('preserves browser-provided transports', () => {
-		const body = /** @type {any} */ (normalizePasskeyRegistrationBody({
-			response: {
+		const body = /** @type {any} */ (
+			normalizePasskeyRegistrationBody({
 				response: {
-					transports: ['hybrid']
+					response: {
+						transports: ['hybrid']
+					}
 				}
-			}
-		}));
+			})
+		);
 
 		expect(body.response.response.transports).toEqual(['hybrid']);
 	});

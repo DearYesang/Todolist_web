@@ -23,11 +23,7 @@
 {#if links.length >= 2}
     <!-- The visible label is the accessible name (voice control matches what
          is on screen); the longer wording is the tooltip and description. -->
-    <button
-        type="button"
-        class="btn btn-small btn-open-links"
-        title={description}
-        onclick={handleClick}>
+    <button type="button" class="btn btn-small btn-open-links" title={description} onclick={handleClick}>
         <span aria-hidden="true">🔗</span>
         <span>{label}</span>
     </button>

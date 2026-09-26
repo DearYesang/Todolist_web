@@ -35,22 +35,26 @@ describe('/api/calendar/sync/cron route', () => {
 	it('requires a configured cron secret', async () => {
 		delete process.env.CRON_SECRET;
 
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/calendar/sync/cron'),
-			url: new URL('https://todo.example.com/api/calendar/sync/cron')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/calendar/sync/cron'),
+				url: new URL('https://todo.example.com/api/calendar/sync/cron')
+			})
+		);
 
 		expect(response.status).toBe(503);
 		expect(syncCalendarProvidersForConnectedUsers).not.toHaveBeenCalled();
 	});
 
 	it('rejects requests without the cron secret', async () => {
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/calendar/sync/cron', {
-				headers: { authorization: 'Bearer wrong-secret' }
-			}),
-			url: new URL('https://todo.example.com/api/calendar/sync/cron')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/calendar/sync/cron', {
+					headers: { authorization: 'Bearer wrong-secret' }
+				}),
+				url: new URL('https://todo.example.com/api/calendar/sync/cron')
+			})
+		);
 
 		expect(response.status).toBe(401);
 		expect(syncCalendarProvidersForConnectedUsers).not.toHaveBeenCalled();
@@ -63,10 +67,12 @@ describe('/api/calendar/sync/cron route', () => {
 		/** @type {Array<Record<string, string>>} */
 		const headerSets = [{ authorization: `Bearer ${secret}` }, { 'x-cron-secret': secret }];
 		for (const headers of headerSets) {
-			const response = await GET(/** @type {any} */ ({
-				request: new Request('https://todo.example.com/api/calendar/sync/cron', { headers }),
-				url: new URL('https://todo.example.com/api/calendar/sync/cron')
-			}));
+			const response = await GET(
+				/** @type {any} */ ({
+					request: new Request('https://todo.example.com/api/calendar/sync/cron', { headers }),
+					url: new URL('https://todo.example.com/api/calendar/sync/cron')
+				})
+			);
 
 			expect(response.status).toBe(401);
 			expect(await response.json()).toEqual({ message: 'Calendar sync cron authentication failed.' });
@@ -82,13 +88,15 @@ describe('/api/calendar/sync/cron route', () => {
 			results: []
 		});
 
-		const response = await POST(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/calendar/sync/cron?maxUsers=3', {
-				method: 'POST',
-				headers: { authorization: 'Bearer cron-secret-with-enough-length' }
-			}),
-			url: new URL('https://todo.example.com/api/calendar/sync/cron?maxUsers=3')
-		}));
+		const response = await POST(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/calendar/sync/cron?maxUsers=3', {
+					method: 'POST',
+					headers: { authorization: 'Bearer cron-secret-with-enough-length' }
+				}),
+				url: new URL('https://todo.example.com/api/calendar/sync/cron?maxUsers=3')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(200);

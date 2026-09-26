@@ -246,7 +246,9 @@
                                 {item.task.status === 'done' ? '☑️' : '🗓️'} {item.task.text}
                             </span>
                             {#if item.task.subtasks.length > 0}
-                                <small class="gantt-checklist-count">{item.task.subtasks.filter((subtask) => subtask.done).length}/{item.task.subtasks.length}</small>
+                                <small class="gantt-checklist-count"
+                                    >{item.task.subtasks.filter((subtask) => subtask.done).length}/{item.task.subtasks
+                                        .length}</small>
                             {/if}
                         </div>
 
@@ -266,7 +268,8 @@
                                     {#if item.task.subtasks.length > 3}
                                         <small>+{item.task.subtasks.length - 3}개</small>
                                     {/if}
-                                    <button class="btn btn-small" type="button" onclick={() => openTask(item.task.id)}>상세</button>
+                                    <button class="btn btn-small" type="button" onclick={() => openTask(item.task.id)}
+                                        >상세</button>
                                 </div>
                             </div>
                         {/if}
@@ -313,13 +316,15 @@
                                     class="resize-handle start"
                                     aria-hidden="true"
                                     title="시작일 조절"
-                                    onpointerdown={(event) => startResize(event, item.task, 'start')}></div>
+                                    onpointerdown={(event) => startResize(event, item.task, 'start')}>
+                                </div>
                                 <span class="bar-inner-text">{item.task.text}</span>
                                 <div
                                     class="resize-handle end"
                                     aria-hidden="true"
                                     title="마감일 조절"
-                                    onpointerdown={(event) => startResize(event, item.task, 'end')}></div>
+                                    onpointerdown={(event) => startResize(event, item.task, 'end')}>
+                                </div>
                             </div>
                         </div>
                     </div>

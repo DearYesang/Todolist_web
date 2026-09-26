@@ -91,9 +91,7 @@ export function createPointerDndController(options) {
 	 */
 	function ownsEvent(event) {
 		if (state.phase === 'idle') return false;
-		return state.pointerId === undefined
-			|| event.pointerId === undefined
-			|| event.pointerId === state.pointerId;
+		return state.pointerId === undefined || event.pointerId === undefined || event.pointerId === state.pointerId;
 	}
 
 	/**
@@ -270,11 +268,15 @@ export function createPointerDndController(options) {
 			removeTrap();
 			cancelExpiry();
 		};
-		removeTrap = listen('click', (/** @type {PointerLike & { stopPropagation?: () => void }} */ event) => {
-			event.preventDefault?.();
-			event.stopPropagation?.();
-			disarm();
-		}, { capture: true });
+		removeTrap = listen(
+			'click',
+			(/** @type {PointerLike & { stopPropagation?: () => void }} */ event) => {
+				event.preventDefault?.();
+				event.stopPropagation?.();
+				disarm();
+			},
+			{ capture: true }
+		);
 		// Input events dispatch before timer callbacks, so a zero-delay timer
 		// expires the trap only after any post-drag click has already fired.
 		cancelExpiry = setTimer(disarm, 0);
@@ -456,7 +458,13 @@ function createAutoScroller({ edgePx = 72, maxStepPx = 14 } = {}) {
 		const container = findScrollableAncestor(document.elementFromPoint(pointerX, pointerY));
 		if (container) {
 			const rect = container.getBoundingClientRect();
-			const delta = edgeDelta(pointerY, Math.max(rect.top, 0), Math.min(rect.bottom, viewportHeight), edgePx, maxStepPx);
+			const delta = edgeDelta(
+				pointerY,
+				Math.max(rect.top, 0),
+				Math.min(rect.bottom, viewportHeight),
+				edgePx,
+				maxStepPx
+			);
 			if (delta !== 0) {
 				const before = container.scrollTop;
 				container.scrollTop += delta;
@@ -519,8 +527,8 @@ function findScrollableAncestor(element) {
 	let current = element instanceof HTMLElement ? element : null;
 	while (current && current !== document.body) {
 		const style = getComputedStyle(current);
-		const scrollsY = (style.overflowY === 'auto' || style.overflowY === 'scroll')
-			&& current.scrollHeight > current.clientHeight;
+		const scrollsY =
+			(style.overflowY === 'auto' || style.overflowY === 'scroll') && current.scrollHeight > current.clientHeight;
 		if (scrollsY) {
 			return current;
 		}

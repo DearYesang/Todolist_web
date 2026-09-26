@@ -59,7 +59,10 @@ export async function requestEmailVerificationCode(payload, fetcher = globalThis
 			}
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Account API request failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body) ?? `Account API request failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Email verification request could not be completed.');
 	}
@@ -102,11 +105,16 @@ async function requestRecoveryCodes(method, fetcher) {
 			return {
 				ok: true,
 				summary: 'summary' in body ? body.summary : body,
-				...('codes' in body && Array.isArray(body.codes) ? { codes: body.codes.filter((code) => typeof code === 'string') } : {})
+				...('codes' in body && Array.isArray(body.codes)
+					? { codes: body.codes.filter((code) => typeof code === 'string') }
+					: {})
 			};
 		}
 
-		return createErrorResult(response.status, readErrorMessage(body) ?? `Account API request failed with status ${response.status}.`);
+		return createErrorResult(
+			response.status,
+			readErrorMessage(body) ?? `Account API request failed with status ${response.status}.`
+		);
 	} catch {
 		return createErrorResult(0, 'Recovery code request could not be completed.');
 	}

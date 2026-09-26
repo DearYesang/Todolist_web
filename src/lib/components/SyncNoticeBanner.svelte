@@ -40,10 +40,13 @@
                                 class="btn btn-small"
                                 onclick={() => applyLocalConflict(conflict)}
                                 disabled={!canApplyLocalConflict(conflict)}
-                                title={canApplyLocalConflict(conflict) ? '내 오프라인 변경을 최신 서버 상태 위에 다시 적용합니다.' : '이 충돌은 내역 저장 후 수동 확인이 안전합니다.'}>
+                                title={canApplyLocalConflict(conflict)
+                                    ? '내 오프라인 변경을 최신 서버 상태 위에 다시 적용합니다.'
+                                    : '이 충돌은 내역 저장 후 수동 확인이 안전합니다.'}>
                                 내 변경 적용
                             </button>
-                            <button class="btn btn-small" onclick={() => keepServerConflict(conflict)}>서버 유지</button>
+                            <button class="btn btn-small" onclick={() => keepServerConflict(conflict)}
+                                >서버 유지</button>
                         </div>
                     </div>
                 {/each}

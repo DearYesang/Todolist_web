@@ -30,7 +30,8 @@ export function createCalendarSyncRedirect(options) {
  * @param {string | null} description
  */
 export function createCalendarOAuthErrorMessage(provider, error, description = null) {
-	const providerName = provider === 'google' ? 'Google Calendar' : provider === 'microsoft' ? 'Microsoft Calendar' : '외부 캘린더';
+	const providerName =
+		provider === 'google' ? 'Google Calendar' : provider === 'microsoft' ? 'Microsoft Calendar' : '외부 캘린더';
 	if (provider === 'google' && error === 'access_denied') {
 		return `${providerName} 접근이 차단되었습니다. Google Cloud OAuth 앱이 Testing 상태라면 로그인한 Google 계정을 Test users에 추가한 뒤 다시 시도하세요.`;
 	}

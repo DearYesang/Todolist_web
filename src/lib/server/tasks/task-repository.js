@@ -1,9 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
-import {
-	findOrCreateCategoryRow,
-	getCategoryRowForBoard
-} from '$lib/server/categories/category-service.js';
+import { findOrCreateCategoryRow, getCategoryRowForBoard } from '$lib/server/categories/category-service.js';
 import {
 	getFirstBoardForUser,
 	getOrCreatePersonalBoardForUser,
@@ -60,7 +57,12 @@ export async function listTasksForBoard(boardId) {
 	const checklistRows = await db
 		.select()
 		.from(schema.checklistItems)
-		.where(inArray(schema.checklistItems.taskId, taskRows.map((task) => task.id)))
+		.where(
+			inArray(
+				schema.checklistItems.taskId,
+				taskRows.map((task) => task.id)
+			)
+		)
 		.orderBy(asc(schema.checklistItems.position), asc(schema.checklistItems.createdAt));
 
 	return mapTaskRowsToClientTasks(taskRows, checklistRows);
@@ -151,7 +153,8 @@ async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
 		// by its name, found, reactivated or created as if typed; the stale
 		// version check above keeps a stale copy from getting here. Older
 		// clients get the 400 they always did.
-		const category = await getCategoryRowForBoard(db, boardId, input.categoryId)
+		const category =
+			(await getCategoryRowForBoard(db, boardId, input.categoryId))
 			?? (input.categoryByName === true ? await findCategoryRowByPatchName(db, boardId, userId, input) : null);
 		if (!category) {
 			throw new TaskWriteError('Category was not found on this board.');
@@ -217,13 +220,16 @@ export async function updateTaskForUser(userId, taskId, payload) {
 	const nextStartDate = typeof input.startDate === 'string' ? input.startDate : existing.startDate;
 	const nextEndDate = typeof input.endDate === 'string' ? input.endDate : existing.endDate;
 	assertValidTaskDateRange(nextStartDate, nextEndDate);
-	const nextCategory = hasCategoryIdPatch || hasCategoryNamePatch
-		? await resolveCategoryForTaskPatch(db, existing.boardId, userId, input)
-		: { id: existing.categoryId, name: existing.category };
+	const nextCategory =
+		hasCategoryIdPatch || hasCategoryNamePatch
+			? await resolveCategoryForTaskPatch(db, existing.boardId, userId, input)
+			: { id: existing.categoryId, name: existing.category };
 
 	let nextStatus = typeof input.status === 'string' ? input.status : existing.status;
 	let nextParentTaskId = hasParentPatch
-		? typeof input.parentId === 'string' ? input.parentId : null
+		? typeof input.parentId === 'string'
+			? input.parentId
+			: null
 		: existing.parentTaskId;
 	if (nextParentTaskId) {
 		const parent = await getWritableParentTask(db, existing.boardId, nextParentTaskId);
@@ -242,20 +248,24 @@ export async function updateTaskForUser(userId, taskId, payload) {
 	const now = new Date();
 	const [updated] = await db
 		.update(schema.tasks)
-		.set(buildTaskPatchSet(input, existing, {
-			nextStatus,
-			nextParentTaskId,
-			nextCategory,
-			nextStartDate,
-			nextEndDate,
-			now
-		}))
-		.where(and(
-			eq(schema.tasks.id, existing.id),
-			eq(schema.tasks.boardId, existing.boardId),
-			isNull(schema.tasks.deletedAt),
-			...(expectedVersion === null ? [] : [eq(schema.tasks.version, expectedVersion)])
-		))
+		.set(
+			buildTaskPatchSet(input, existing, {
+				nextStatus,
+				nextParentTaskId,
+				nextCategory,
+				nextStartDate,
+				nextEndDate,
+				now
+			})
+		)
+		.where(
+			and(
+				eq(schema.tasks.id, existing.id),
+				eq(schema.tasks.boardId, existing.boardId),
+				isNull(schema.tasks.deletedAt),
+				...(expectedVersion === null ? [] : [eq(schema.tasks.version, expectedVersion)])
+			)
+		)
 		.returning();
 
 	if (!updated) {
@@ -316,7 +326,7 @@ export function buildTaskPatchSet(input, existing, computed) {
 	}
 	if (hasField(input, 'status') || computed.nextStatus !== existing.status) {
 		set.status = computed.nextStatus;
-		set.completedAt = computed.nextStatus === 'done' ? existing.completedAt ?? computed.now : null;
+		set.completedAt = computed.nextStatus === 'done' ? (existing.completedAt ?? computed.now) : null;
 	}
 
 	return set;
@@ -356,9 +366,10 @@ export async function deleteTaskCascadeForUser(userId, taskId, payload = undefin
  * @param {number | null} expectedVersion
  */
 export function buildCascadeDeleteStatement(task, now, expectedVersion) {
-	const versionGuard = expectedVersion === null
-		? sql`true`
-		: sql`exists (
+	const versionGuard =
+		expectedVersion === null
+			? sql`true`
+			: sql`exists (
 			select 1 from ${schema.tasks} as root
 			where root.id = ${task.id}
 				and root.version = ${expectedVersion}

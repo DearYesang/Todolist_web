@@ -145,8 +145,24 @@ function expectBackupValues(insertedValues) {
 		})
 	]);
 	expect(insertedValues.checklist_items).toEqual([
-		{ id: expect.any(String), taskId: parent.id, text: 'First', done: true, position: '1783339200.000', createdAt: NOW, updatedAt: NOW },
-		{ id: expect.any(String), taskId: parent.id, text: 'Second', done: false, position: '1783339200.001', createdAt: NOW, updatedAt: NOW }
+		{
+			id: expect.any(String),
+			taskId: parent.id,
+			text: 'First',
+			done: true,
+			position: '1783339200.000',
+			createdAt: NOW,
+			updatedAt: NOW
+		},
+		{
+			id: expect.any(String),
+			taskId: parent.id,
+			text: 'Second',
+			done: false,
+			position: '1783339200.001',
+			createdAt: NOW,
+			updatedAt: NOW
+		}
 	]);
 }
 
@@ -192,12 +208,14 @@ describe('task import writes', () => {
 		]);
 		expectBackupValues(insertedValues);
 		expect(result.summary).toEqual(BACKUP_SUMMARY);
-		expect(result.tasks.map((task) => ({
-			text: task.text,
-			status: task.status,
-			parentId: task.parentId,
-			subtasks: task.subtasks.map((item) => item.text)
-		}))).toEqual([
+		expect(
+			result.tasks.map((task) => ({
+				text: task.text,
+				status: task.status,
+				parentId: task.parentId,
+				subtasks: task.subtasks.map((item) => item.text)
+			}))
+		).toEqual([
 			{ text: 'Parent', status: 'doing', parentId: null, subtasks: ['First', 'Second'] },
 			{ text: 'Solo', status: 'done', parentId: null, subtasks: [] },
 			{ text: 'Child', status: 'doing', parentId: insertedValues.tasks[0].id, subtasks: [] }
@@ -268,7 +286,9 @@ describe('task import writes', () => {
 
 		const statements = batchMock.mock.calls[0][0];
 		expect(statements).toHaveLength(1);
-		expect(statements[0].toSQL().sql).toMatch(/^update "tasks" set .* "deleted_at" = \$2 where \("tasks"\."board_id" = \$3/);
+		expect(statements[0].toSQL().sql).toMatch(
+			/^update "tasks" set .* "deleted_at" = \$2 where \("tasks"\."board_id" = \$3/
+		);
 		expect(result).toEqual({
 			tasks: [],
 			summary: {

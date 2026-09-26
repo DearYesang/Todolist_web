@@ -3,11 +3,7 @@ import { APIError } from 'better-auth/api';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 import { ApiError } from '$lib/server/http/api-error.js';
-import {
-	assertRateLimit,
-	createRateLimitHeaders,
-	RateLimitError
-} from '$lib/server/security/rate-limit.js';
+import { assertRateLimit, createRateLimitHeaders, RateLimitError } from '$lib/server/security/rate-limit.js';
 
 const EMAIL_VERIFICATION_PREFIX = 'passkey-email-verification:';
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
@@ -73,9 +69,8 @@ export function parsePasskeyRegistrationContext(context) {
 
 	const email = normalizeAccountEmail(parsed?.email);
 	const name = typeof parsed?.name === 'string' && parsed.name.trim() ? parsed.name.trim() : email;
-	const emailVerificationCode = typeof parsed?.emailVerificationCode === 'string'
-		? parsed.emailVerificationCode.trim()
-		: '';
+	const emailVerificationCode =
+		typeof parsed?.emailVerificationCode === 'string' ? parsed.emailVerificationCode.trim() : '';
 	const recoveryCode = typeof parsed?.recoveryCode === 'string' ? parsed.recoveryCode.trim() : '';
 
 	if (!isAccountEmail(email)) {
@@ -200,12 +195,14 @@ export async function createRecoveryCodesForUser(userId) {
 	const db = getDb();
 
 	await db.delete(schema.accountRecoveryCodes).where(eq(schema.accountRecoveryCodes.userId, userId));
-	await db.insert(schema.accountRecoveryCodes).values(codes.map((code) => ({
-		userId,
-		codeHash: hashRecoveryCode(userId, code),
-		createdAt: now,
-		usedAt: null
-	})));
+	await db.insert(schema.accountRecoveryCodes).values(
+		codes.map((code) => ({
+			userId,
+			codeHash: hashRecoveryCode(userId, code),
+			createdAt: now,
+			usedAt: null
+		}))
+	);
 
 	return {
 		codes,
@@ -238,10 +235,7 @@ export async function assertValidRecoveryCodeForEmail(email, code) {
 			'Too many invalid recovery code attempts.',
 			'PASSKEY_RECOVERY_CODE_RATE_LIMITED'
 		);
-		throwPasskeyInputError(
-			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
-			'INVALID_PASSKEY_RECOVERY_CODE'
-		);
+		throwPasskeyInputError('복구 코드가 맞지 않거나 이미 사용되었습니다.', 'INVALID_PASSKEY_RECOVERY_CODE');
 	}
 }
 
@@ -258,10 +252,7 @@ export async function consumeRecoveryCodeForEmail(email, code) {
 			'Too many invalid recovery code attempts.',
 			'PASSKEY_RECOVERY_CODE_RATE_LIMITED'
 		);
-		throwPasskeyInputError(
-			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
-			'INVALID_PASSKEY_RECOVERY_CODE'
-		);
+		throwPasskeyInputError('복구 코드가 맞지 않거나 이미 사용되었습니다.', 'INVALID_PASSKEY_RECOVERY_CODE');
 	}
 
 	const [updated] = await getDb()
@@ -270,10 +261,7 @@ export async function consumeRecoveryCodeForEmail(email, code) {
 		.where(and(eq(schema.accountRecoveryCodes.id, record.id), isNull(schema.accountRecoveryCodes.usedAt)))
 		.returning({ id: schema.accountRecoveryCodes.id });
 	if (!updated) {
-		throwPasskeyInputError(
-			'복구 코드가 맞지 않거나 이미 사용되었습니다.',
-			'INVALID_PASSKEY_RECOVERY_CODE'
-		);
+		throwPasskeyInputError('복구 코드가 맞지 않거나 이미 사용되었습니다.', 'INVALID_PASSKEY_RECOVERY_CODE');
 	}
 }
 
@@ -302,10 +290,14 @@ async function recordFailedPasskeyAttempt(scope, subject, message, code) {
 		});
 	} catch (error) {
 		if (error instanceof RateLimitError) {
-			throw new APIError('TOO_MANY_REQUESTS', {
-				message: error.message,
-				code
-			}, createRateLimitHeaders(error));
+			throw new APIError(
+				'TOO_MANY_REQUESTS',
+				{
+					message: error.message,
+					code
+				},
+				createRateLimitHeaders(error)
+			);
 		}
 
 		throw error;
@@ -325,10 +317,12 @@ async function findValidEmailVerification(email, code) {
 	const [record] = await getDb()
 		.select()
 		.from(schema.verification)
-		.where(and(
-			eq(schema.verification.identifier, getEmailVerificationIdentifier(normalizedEmail)),
-			gt(schema.verification.expiresAt, new Date())
-		))
+		.where(
+			and(
+				eq(schema.verification.identifier, getEmailVerificationIdentifier(normalizedEmail)),
+				gt(schema.verification.expiresAt, new Date())
+			)
+		)
 		.limit(1);
 
 	if (!record) {
@@ -361,11 +355,13 @@ async function findValidRecoveryCode(email, code) {
 	const [record] = await getDb()
 		.select()
 		.from(schema.accountRecoveryCodes)
-		.where(and(
-			eq(schema.accountRecoveryCodes.userId, user.id),
-			eq(schema.accountRecoveryCodes.codeHash, hashRecoveryCode(user.id, code)),
-			isNull(schema.accountRecoveryCodes.usedAt)
-		))
+		.where(
+			and(
+				eq(schema.accountRecoveryCodes.userId, user.id),
+				eq(schema.accountRecoveryCodes.codeHash, hashRecoveryCode(user.id, code)),
+				isNull(schema.accountRecoveryCodes.usedAt)
+			)
+		)
 		.limit(1);
 
 	return record ?? null;
@@ -434,16 +430,18 @@ function normalizeRecoveryCode(value) {
 }
 
 function getAccountSecuritySecret() {
-	const secret = process.env.ACCOUNT_RECOVERY_SECRET
-		?? process.env.BETTER_AUTH_SECRET
-		?? process.env.AUTH_SECRET;
+	const secret = process.env.ACCOUNT_RECOVERY_SECRET ?? process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET;
 
 	if (!secret || isPlaceholderSecret(secret)) {
-		throw new AccountSecurityConfigurationError('ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.');
+		throw new AccountSecurityConfigurationError(
+			'ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.'
+		);
 	}
 
 	if (process.env.NODE_ENV === 'production' && secret.length < 32) {
-		throw new AccountSecurityConfigurationError('Account recovery secrets must be at least 32 characters in production.');
+		throw new AccountSecurityConfigurationError(
+			'Account recovery secrets must be at least 32 characters in production.'
+		);
 	}
 
 	return secret;
@@ -490,7 +488,9 @@ async function deliverEmailVerification(message) {
 		return { previewCode: true };
 	}
 
-	throw new AccountSecurityConfigurationError('EMAIL_DELIVERY_WEBHOOK_URL must be configured before email verification can be used in production.');
+	throw new AccountSecurityConfigurationError(
+		'EMAIL_DELIVERY_WEBHOOK_URL must be configured before email verification can be used in production.'
+	);
 }
 
 /**
@@ -544,10 +544,7 @@ function randomId() {
  * @param {string | undefined} value
  */
 function parseEmailList(value) {
-	return (value ?? '')
-		.split(',')
-		.map(normalizeAccountEmail)
-		.filter(isAccountEmail);
+	return (value ?? '').split(',').map(normalizeAccountEmail).filter(isAccountEmail);
 }
 
 /**

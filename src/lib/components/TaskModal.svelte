@@ -1,5 +1,11 @@
 <script>
-    import { assignTaskCategory, categories, deleteTaskCascade, taskIndex, updateTask } from '$lib/client/task-store.js';
+    import {
+        assignTaskCategory,
+        categories,
+        deleteTaskCascade,
+        taskIndex,
+        updateTask
+    } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getDeleteTaskConfirmMessage,
@@ -17,8 +23,8 @@
     let { taskId, onclose } = $props();
 
     const task = $derived($taskIndex.byId.get(taskId) ?? null);
-    const parentTask = $derived(task?.parentId ? $taskIndex.byId.get(task.parentId) ?? null : null);
-    const childCount = $derived(task ? $taskIndex.childrenByParentId.get(task.id)?.length ?? 0 : 0);
+    const parentTask = $derived(task?.parentId ? ($taskIndex.byId.get(task.parentId) ?? null) : null);
+    const childCount = $derived(task ? ($taskIndex.childrenByParentId.get(task.id)?.length ?? 0) : 0);
 
     /**
      * The category is not one of these fields: it goes through
@@ -140,7 +146,8 @@
                         id="modal-task-text"
                         type="text"
                         value={task.text}
-                        oninput={(event) => updateField('text', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
+                        oninput={(event) =>
+                            updateField('text', /** @type {HTMLInputElement} */ (event.currentTarget).value)} />
                 </div>
 
                 <div class="form-section">
@@ -158,7 +165,8 @@
                         <select
                             id="modal-priority"
                             value={task.priority}
-                            onchange={(event) => updateField('priority', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
+                            onchange={(event) =>
+                                updateField('priority', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
                             <option value="high">{PRIORITY_LABELS.high}</option>
                             <option value="medium">{PRIORITY_LABELS.medium}</option>
                             <option value="low">{PRIORITY_LABELS.low}</option>
@@ -170,7 +178,8 @@
                         <select
                             id="modal-urgency"
                             value={task.urgency}
-                            onchange={(event) => updateField('urgency', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
+                            onchange={(event) =>
+                                updateField('urgency', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
                             <option value="urgent">{URGENCY_LABELS.urgent}</option>
                             <option value="normal">{URGENCY_LABELS.normal}</option>
                         </select>
@@ -199,7 +208,8 @@
                         <select
                             id="modal-status"
                             value={task.status}
-                            onchange={(event) => updateField('status', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
+                            onchange={(event) =>
+                                updateField('status', /** @type {HTMLSelectElement} */ (event.currentTarget).value)}>
                             <option value="todo">{STATUS_LABELS.todo}</option>
                             <option value="doing">{STATUS_LABELS.doing}</option>
                             <option value="done">{STATUS_LABELS.done}</option>

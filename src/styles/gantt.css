@@ -42,7 +42,9 @@
     padding-right: 12px;
     border-bottom: 1px solid var(--border-light);
     overflow: hidden;
-    transition: height var(--transition), background var(--transition);
+    transition:
+        height var(--transition),
+        background var(--transition);
 }
 
 .gantt-sidebar-title {
@@ -241,7 +243,9 @@
     width: 12px;
     opacity: 0;
     cursor: ew-resize;
-    transition: opacity var(--transition), background var(--transition);
+    transition:
+        opacity var(--transition),
+        background var(--transition);
 }
 
 .resize-handle::before,

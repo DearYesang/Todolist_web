@@ -24,9 +24,10 @@ export async function POST({ request, url }) {
 			tooLargeMessage: 'Import payload is too large.'
 		});
 		const mode = url.searchParams.get('mode') === 'replace' ? 'replace' : 'append';
-		const result = mode === 'replace'
-			? await replaceTasksForUser(authResult.user.id, payload)
-			: await importTasksForUser(authResult.user.id, payload);
+		const result =
+			mode === 'replace'
+				? await replaceTasksForUser(authResult.user.id, payload)
+				: await importTasksForUser(authResult.user.id, payload);
 		return json(result, {
 			status: 201,
 			headers: {

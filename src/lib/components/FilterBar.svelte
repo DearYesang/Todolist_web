@@ -68,13 +68,8 @@
 
     <div class="filter-divider"></div>
     <span class="filter-label">카테고리</span>
-    <button class="filter-chip manage-categories-chip" onclick={() => isCategoryManagerOpen = true}>
-        관리
-    </button>
-    <button
-        class="filter-chip"
-        class:active={$filters.category === 'all'}
-        onclick={() => setCategoryFilter('all')}>
+    <button class="filter-chip manage-categories-chip" onclick={() => (isCategoryManagerOpen = true)}> 관리 </button>
+    <button class="filter-chip" class:active={$filters.category === 'all'} onclick={() => setCategoryFilter('all')}>
         전체
     </button>
 
@@ -84,7 +79,9 @@
             class="filter-chip category-chip"
             class:active={category.id ? $filters.categoryId === category.id : $filters.category === category.name}
             onclick={() => setCategoryFilter(category.id ?? category.name, category.name)}
-            style={(category.id ? $filters.categoryId === category.id : $filters.category === category.name) ? `background:${color.bg}; color:${color.fg}; border-color:${color.border};` : ''}>
+            style={(category.id ? $filters.categoryId === category.id : $filters.category === category.name)
+                ? `background:${color.bg}; color:${color.fg}; border-color:${color.border};`
+                : ''}>
             <span>{category.name}</span>
             <small>{category.active}</small>
         </button>
@@ -92,5 +89,5 @@
 </div>
 
 {#if isCategoryManagerOpen}
-    <CategoryManager onclose={() => isCategoryManagerOpen = false} />
+    <CategoryManager onclose={() => (isCategoryManagerOpen = false)} />
 {/if}

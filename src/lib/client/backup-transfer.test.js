@@ -56,7 +56,11 @@ function createDialogs({ replace = false } = {}) {
 		}),
 		notify: vi.fn((/** @type {string} */ message) => {
 			// The board is already updated when the message is shown.
-			events.push(`notify:${message} [${get(tasks).map((task) => task.text).join(', ')}]`);
+			events.push(
+				`notify:${message} [${get(tasks)
+					.map((task) => task.text)
+					.join(', ')}]`
+			);
 		})
 	};
 }
@@ -113,7 +117,9 @@ describe('importing a backup file', () => {
 
 		expect(dialogs.confirmReplace).not.toHaveBeenCalled();
 		expect(fetcher).toHaveBeenCalledWith('/api/import', expect.anything());
-		expect(dialogs.events).toEqual(['notify:데이터를 성공적으로 불러왔습니다. 가져온 작업: 1개. [Server imported task]']);
+		expect(dialogs.events).toEqual([
+			'notify:데이터를 성공적으로 불러왔습니다. 가져온 작업: 1개. [Server imported task]'
+		]);
 	});
 
 	it('imports on this device and queues the import when the server is unavailable', async () => {
@@ -126,12 +132,14 @@ describe('importing a backup file', () => {
 			`confirm:${REPLACE_QUESTION}`,
 			'notify:오프라인 상태라 이 기기에 먼저 불러왔습니다. 온라인이 되면 서버와 다른 기기에 자동 반영을 시도합니다. [File task]'
 		]);
-		expect(loadOfflineQueue()).toEqual([expect.objectContaining({
-			type: 'import.tasks',
-			mode: 'replace',
-			payload: [{ id: 'file-task', text: 'File task', status: 'doing' }],
-			localTaskIds: ['file-task']
-		})]);
+		expect(loadOfflineQueue()).toEqual([
+			expect.objectContaining({
+				type: 'import.tasks',
+				mode: 'replace',
+				payload: [{ id: 'file-task', text: 'File task', status: 'doing' }],
+				localTaskIds: ['file-task']
+			})
+		]);
 		expect(get(filters).priority).toBe('all');
 	});
 
@@ -190,7 +198,10 @@ describe('exporting a backup file', () => {
 	it('saves the server export under the local date', async () => {
 		vi.useFakeTimers({ toFake: ['Date'] });
 		vi.setSystemTime(new Date(2026, 8, 24, 8, 30));
-		vi.stubGlobal('fetch', vi.fn(async () => jsonResponse([SERVER_TASK])));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => jsonResponse([SERVER_TASK]))
+		);
 		const fake = createFakeEnvironment();
 
 		await exportTaskBackup(fake.environment);
@@ -203,7 +214,10 @@ describe('exporting a backup file', () => {
 
 	it('saves the tasks on this device when the server export fails', async () => {
 		openCachedBoard([EXISTING]);
-		vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ message: 'Database unavailable.' }, { status: 503 })));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => jsonResponse({ message: 'Database unavailable.' }, { status: 503 }))
+		);
 		const fake = createFakeEnvironment();
 
 		await exportTaskBackup(fake.environment);

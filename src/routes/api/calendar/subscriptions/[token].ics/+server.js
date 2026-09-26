@@ -1,9 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
-import {
-	CalendarTokenConfigurationError,
-	getCalendarTasksForToken
-} from '$lib/server/calendar/tokens.js';
+import { CalendarTokenConfigurationError, getCalendarTasksForToken } from '$lib/server/calendar/tokens.js';
 import {
 	assertVolatileRateLimit,
 	createRateLimitHeaders,

@@ -60,8 +60,9 @@ describe('parseLocalDateNoon', () => {
 			useTimeZone(timeZone);
 			const date = parseLocalDateNoon('2026-09-24');
 
-			expect([date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes()])
-				.toEqual([2026, 8, 24, 12, 0]);
+			expect([date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes()]).toEqual([
+				2026, 8, 24, 12, 0
+			]);
 		}
 	});
 

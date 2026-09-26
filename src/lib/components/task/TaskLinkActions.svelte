@@ -13,9 +13,11 @@
     // Walks the full task index, not a lane's filtered children, so
     // collapsed, filtered and other-column descendants still count. It
     // starts with ownLinks, so it is never the shorter list.
-    const subtreeLinks = $derived(show !== 'own' && $taskIndex.childrenByParentId.has(task.id)
-        ? collectSubtreeLinks($taskIndex, task.id)
-        : ownLinks);
+    const subtreeLinks = $derived(
+        show !== 'own' && $taskIndex.childrenByParentId.has(task.id)
+            ? collectSubtreeLinks($taskIndex, task.id)
+            : ownLinks
+    );
 </script>
 
 {#snippet ownButton()}

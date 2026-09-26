@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuthUser } from '$lib/server/auth/session.js';
-import {
-	createCalendarTokenForUser,
-	listCalendarTokensForUser
-} from '$lib/server/calendar/tokens.js';
+import { createCalendarTokenForUser, listCalendarTokensForUser } from '$lib/server/calendar/tokens.js';
 import { resetRateLimitBuckets } from '$lib/server/security/rate-limit.js';
 import { GET, POST } from './+server.js';
 
@@ -32,9 +29,11 @@ describe('/api/calendar/tokens route', () => {
 		const tokenRecord = createTokenRecord();
 		vi.mocked(listCalendarTokensForUser).mockResolvedValue([tokenRecord]);
 
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/calendar/tokens')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/calendar/tokens')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
@@ -50,7 +49,24 @@ describe('/api/calendar/tokens route', () => {
 		});
 
 		for (let index = 0; index < 5; index += 1) {
-			const response = await POST(/** @type {any} */ ({
+			const response = await POST(
+				/** @type {any} */ ({
+					request: new Request('https://todo.example.com/api/calendar/tokens', {
+						method: 'POST',
+						headers: {
+							'content-type': 'application/json',
+							'x-forwarded-for': '203.0.113.5'
+						},
+						body: JSON.stringify({ name: 'Feed' })
+					}),
+					getClientAddress: () => '203.0.113.5'
+				})
+			);
+			expect(response.status).toBe(201);
+		}
+
+		const blocked = await POST(
+			/** @type {any} */ ({
 				request: new Request('https://todo.example.com/api/calendar/tokens', {
 					method: 'POST',
 					headers: {
@@ -60,21 +76,8 @@ describe('/api/calendar/tokens route', () => {
 					body: JSON.stringify({ name: 'Feed' })
 				}),
 				getClientAddress: () => '203.0.113.5'
-			}));
-			expect(response.status).toBe(201);
-		}
-
-		const blocked = await POST(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/calendar/tokens', {
-				method: 'POST',
-				headers: {
-					'content-type': 'application/json',
-					'x-forwarded-for': '203.0.113.5'
-				},
-				body: JSON.stringify({ name: 'Feed' })
-			}),
-			getClientAddress: () => '203.0.113.5'
-		}));
+			})
+		);
 
 		expect(blocked.status).toBe(429);
 		expect(blocked.headers.get('retry-after')).toEqual(expect.any(String));

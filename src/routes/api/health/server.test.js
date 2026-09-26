@@ -9,18 +9,22 @@ afterEach(() => {
 
 describe('/api/health', () => {
 	it('returns non-secret readiness details', async () => {
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/health'),
-			url: new URL('https://todo.example.com/api/health')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/health'),
+				url: new URL('https://todo.example.com/api/health')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
-		expect(body).toEqual(expect.objectContaining({
-			ok: true,
-			databaseConfigured: expect.any(Boolean),
-			checks: expect.any(Array)
-		}));
+		expect(body).toEqual(
+			expect.objectContaining({
+				ok: true,
+				databaseConfigured: expect.any(Boolean),
+				checks: expect.any(Array)
+			})
+		);
 		expect(JSON.stringify(body)).not.toContain('replace-with');
 	});
 
@@ -29,10 +33,12 @@ describe('/api/health', () => {
 		delete process.env.DATABASE_URL;
 		delete process.env.BETTER_AUTH_SECRET;
 
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/health?strict=true'),
-			url: new URL('https://todo.example.com/api/health?strict=true')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/health?strict=true'),
+				url: new URL('https://todo.example.com/api/health?strict=true')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(503);
@@ -46,14 +52,16 @@ describe('/api/health', () => {
 		process.env.HEALTH_DETAILS_TOKEN = 'health-token-with-more-than-32-characters';
 		delete process.env.DATABASE_URL;
 
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/health?strict=true', {
-				headers: {
-					authorization: 'Bearer health-token-with-more-than-32-characters'
-				}
-			}),
-			url: new URL('https://todo.example.com/api/health?strict=true')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/health?strict=true', {
+					headers: {
+						authorization: 'Bearer health-token-with-more-than-32-characters'
+					}
+				}),
+				url: new URL('https://todo.example.com/api/health?strict=true')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(503);
@@ -66,14 +74,16 @@ describe('/api/health', () => {
 		process.env.HEALTH_DETAILS_TOKEN = 'health-token-with-more-than-32-characters';
 		delete process.env.DATABASE_URL;
 
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/health?strict=true', {
-				headers: {
-					authorization: 'Bearer health-token-with-more-than-32-characteré'
-				}
-			}),
-			url: new URL('https://todo.example.com/api/health?strict=true')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/health?strict=true', {
+					headers: {
+						authorization: 'Bearer health-token-with-more-than-32-characteré'
+					}
+				}),
+				url: new URL('https://todo.example.com/api/health?strict=true')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(503);
@@ -86,14 +96,16 @@ describe('/api/health', () => {
 		process.env.HEALTH_DETAILS_TOKEN = 'health-token-with-more-than-32-characters';
 		delete process.env.DATABASE_URL;
 
-		const response = await GET(/** @type {any} */ ({
-			request: new Request('https://todo.example.com/api/health?strict=true', {
-				headers: {
-					authorization: 'Bearer health-token-with-more-than-32-characterz'
-				}
-			}),
-			url: new URL('https://todo.example.com/api/health?strict=true')
-		}));
+		const response = await GET(
+			/** @type {any} */ ({
+				request: new Request('https://todo.example.com/api/health?strict=true', {
+					headers: {
+						authorization: 'Bearer health-token-with-more-than-32-characterz'
+					}
+				}),
+				url: new URL('https://todo.example.com/api/health?strict=true')
+			})
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(503);

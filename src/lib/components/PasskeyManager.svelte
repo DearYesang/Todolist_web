@@ -1,9 +1,5 @@
 <script>
-    import {
-        deleteUserPasskey,
-        listUserPasskeys,
-        updateUserPasskeyName
-    } from '$lib/client/passkey-management-api.js';
+    import { deleteUserPasskey, listUserPasskeys, updateUserPasskeyName } from '$lib/client/passkey-management-api.js';
     import { createFallbackPasskeyName, formatPasskeyMeta, getAuthErrorMessage } from '$lib/client/auth-labels.js';
 
     // The registered-passkey list under the account controls. It stays
@@ -17,12 +13,7 @@
      *   authMessage: string;
      *   authError: string;
      * }} */
-    let {
-        open,
-        isWorking = $bindable(),
-        authMessage = $bindable(),
-        authError = $bindable()
-    } = $props();
+    let { open, isWorking = $bindable(), authMessage = $bindable(), authError = $bindable() } = $props();
 
     let passkeyListLoading = $state(false);
     let passkeyListError = $state('');
@@ -74,7 +65,7 @@
                 return;
             }
 
-            managedPasskeys = managedPasskeys.map((item) => item.id === passkey.id ? result.passkey : item);
+            managedPasskeys = managedPasskeys.map((item) => (item.id === passkey.id ? result.passkey : item));
             passkeyDrafts = { ...passkeyDrafts, [result.passkey.id]: result.passkey.name || nextName };
             authMessage = '패스키 이름을 저장했습니다. Apple 선택 화면은 기존 이름을 계속 표시할 수 있습니다.';
         } finally {
@@ -156,21 +147,27 @@
                             <small>{formatPasskeyMeta(passkey)}</small>
                         </div>
                         <div class="passkey-row-actions">
-                            <button class="btn btn-small" onclick={() => saveManagedPasskeyName(passkey)} disabled={isWorking}>
+                            <button
+                                class="btn btn-small"
+                                onclick={() => saveManagedPasskeyName(passkey)}
+                                disabled={isWorking}>
                                 저장
                             </button>
                             <button
                                 class="btn btn-small btn-danger"
                                 onclick={() => removeManagedPasskey(passkey)}
                                 disabled={isWorking || managedPasskeys.length <= 1}
-                                title={managedPasskeys.length <= 1 ? '마지막 패스키는 삭제하지 않는 것이 안전합니다.' : '패스키 삭제'}>
+                                title={managedPasskeys.length <= 1
+                                    ? '마지막 패스키는 삭제하지 않는 것이 안전합니다.'
+                                    : '패스키 삭제'}>
                                 삭제
                             </button>
                         </div>
                     </div>
                 {/each}
             </div>
-            <span class="auth-status">Apple 패스키 선택 화면의 기존 이름은 기기 캐시 때문에 그대로 보일 수 있습니다.</span>
+            <span class="auth-status"
+                >Apple 패스키 선택 화면의 기존 이름은 기기 캐시 때문에 그대로 보일 수 있습니다.</span>
         {/if}
     </div>
 {/if}

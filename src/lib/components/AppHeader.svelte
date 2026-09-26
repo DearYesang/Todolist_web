@@ -12,11 +12,7 @@
      *   showOfflineStatus: boolean;
      *   oncleardone: () => void;
      * }} */
-    let {
-        appUnlocked,
-        showOfflineStatus,
-        oncleardone
-    } = $props();
+    let { appUnlocked, showOfflineStatus, oncleardone } = $props();
 
     /** @typedef {import('$lib/shared/task-rules.js').AppView} AppView */
 
@@ -80,7 +76,11 @@
     {#if appUnlocked}
         <div class="view-toggle">
             {#each APP_VIEWS as view (view)}
-                <button class="view-btn" class:active={$currentView === view} onclick={() => chooseView(view)} aria-label="{VIEW_BUTTONS[view].label} 뷰">
+                <button
+                    class="view-btn"
+                    class:active={$currentView === view}
+                    onclick={() => chooseView(view)}
+                    aria-label="{VIEW_BUTTONS[view].label} 뷰">
                     <span class="view-icon" aria-hidden="true">{VIEW_BUTTONS[view].icon}</span>
                     <span class="view-label">{VIEW_BUTTONS[view].label}</span>
                 </button>
@@ -114,7 +114,11 @@
                 <span class="action-icon" aria-hidden="true">📂</span>
                 <span class="action-label">불러오기</span>
             </button>
-            <button class="btn utility-action" onclick={() => exportTaskBackup()} aria-label="백업 JSON 내보내기" title="백업 JSON 내보내기">
+            <button
+                class="btn utility-action"
+                onclick={() => exportTaskBackup()}
+                aria-label="백업 JSON 내보내기"
+                title="백업 JSON 내보내기">
                 <span class="action-icon" aria-hidden="true">💾</span>
                 <span class="action-label">내보내기</span>
             </button>

@@ -29,10 +29,12 @@ afterEach(() => {
 describe('server hook API write guard', () => {
 	it('rejects cross-site unsafe API writes', async () => {
 		const response = await handle({
-			event: /** @type {any} */ (createEvent('POST', '/api/tasks', {
-				origin: 'https://evil.example',
-				'sec-fetch-site': 'cross-site'
-			})),
+			event: /** @type {any} */ (
+				createEvent('POST', '/api/tasks', {
+					origin: 'https://evil.example',
+					'sec-fetch-site': 'cross-site'
+				})
+			),
 			resolve: vi.fn(async () => new Response('ok'))
 		});
 
@@ -97,20 +99,43 @@ describe('server hook auth availability', () => {
 	});
 
 	it.each([
-		{ name: 'an API route without a database', pathname: '/api/tasks', databaseConfigured: false, configurationError: null },
-		{ name: 'an API route with an auth configuration error', pathname: '/api/tasks', databaseConfigured: true, configurationError: 'BETTER_AUTH_SECRET is missing.' },
-		{ name: 'an auth route with a working auth service', pathname: '/api/auth/get-session', databaseConfigured: true, configurationError: null },
-		{ name: 'an app page with a working auth service', pathname: '/', databaseConfigured: true, configurationError: null }
-	])('passes $name to the route with the security headers', async ({ pathname, databaseConfigured, configurationError }) => {
-		authState.databaseConfigured = databaseConfigured;
-		authState.configurationError = configurationError;
-		const { resolve, response } = await runHandle(pathname);
+		{
+			name: 'an API route without a database',
+			pathname: '/api/tasks',
+			databaseConfigured: false,
+			configurationError: null
+		},
+		{
+			name: 'an API route with an auth configuration error',
+			pathname: '/api/tasks',
+			databaseConfigured: true,
+			configurationError: 'BETTER_AUTH_SECRET is missing.'
+		},
+		{
+			name: 'an auth route with a working auth service',
+			pathname: '/api/auth/get-session',
+			databaseConfigured: true,
+			configurationError: null
+		},
+		{
+			name: 'an app page with a working auth service',
+			pathname: '/',
+			databaseConfigured: true,
+			configurationError: null
+		}
+	])(
+		'passes $name to the route with the security headers',
+		async ({ pathname, databaseConfigured, configurationError }) => {
+			authState.databaseConfigured = databaseConfigured;
+			authState.configurationError = configurationError;
+			const { resolve, response } = await runHandle(pathname);
 
-		expect(resolve).toHaveBeenCalledOnce();
-		expect(await response.text()).toBe('ok');
-		expect(response.headers.get('x-frame-options')).toBe('DENY');
-		expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
-	});
+			expect(resolve).toHaveBeenCalledOnce();
+			expect(await response.text()).toBe('ok');
+			expect(response.headers.get('x-frame-options')).toBe('DENY');
+			expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
+		}
+	);
 });
 
 describe('open-all links isolation headers', () => {
@@ -130,18 +155,21 @@ describe('open-all links isolation headers', () => {
 		}
 	];
 
-	it.each(cases)('sends COOP same-origin and no-referrer on $name responses', async ({ method, pathname, headers, production }) => {
-		if (production) {
-			process.env.NODE_ENV = 'production';
-		}
-		const response = await handle({
-			event: /** @type {any} */ (createEvent(method, pathname, headers)),
-			resolve: vi.fn(async () => new Response('ok'))
-		});
+	it.each(cases)(
+		'sends COOP same-origin and no-referrer on $name responses',
+		async ({ method, pathname, headers, production }) => {
+			if (production) {
+				process.env.NODE_ENV = 'production';
+			}
+			const response = await handle({
+				event: /** @type {any} */ (createEvent(method, pathname, headers)),
+				resolve: vi.fn(async () => new Response('ok'))
+			});
 
-		expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin');
-		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
-	});
+			expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+			expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+		}
+	);
 });
 
 /**

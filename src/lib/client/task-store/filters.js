@@ -9,21 +9,21 @@ export const filters = writable({ ...DEFAULT_FILTERS });
  * @param {import('../../shared/task-domain.js').PriorityFilter} value
  */
 export function setPriorityFilter(value) {
-    filters.update((current) => ({ ...current, priority: value }));
+	filters.update((current) => ({ ...current, priority: value }));
 }
 
 /**
  * @param {import('../../shared/task-domain.js').UrgencyFilter} value
  */
 export function setUrgencyFilter(value) {
-    filters.update((current) => ({ ...current, urgency: value }));
+	filters.update((current) => ({ ...current, urgency: value }));
 }
 
 /**
  * @param {string} value
  */
 export function setSearchFilter(value) {
-    filters.update((current) => ({ ...current, search: value }));
+	filters.update((current) => ({ ...current, search: value }));
 }
 
 /**
@@ -31,20 +31,20 @@ export function setSearchFilter(value) {
  * @param {string | null} [name]
  */
 export function setCategoryFilter(value, name = null) {
-    if (value === 'all') {
-        filters.update((current) => ({ ...current, category: 'all', categoryId: 'all' }));
-        return;
-    }
+	if (value === 'all') {
+		filters.update((current) => ({ ...current, category: 'all', categoryId: 'all' }));
+		return;
+	}
 
-    filters.update((current) => ({
-        ...current,
-        category: name ?? value,
-        categoryId: isServerId(value) ? value : 'all'
-    }));
+	filters.update((current) => ({
+		...current,
+		category: name ?? value,
+		categoryId: isServerId(value) ? value : 'all'
+	}));
 }
 
 export function resetFilters() {
-    filters.set({ ...DEFAULT_FILTERS });
+	filters.set({ ...DEFAULT_FILTERS });
 }
 
 /**
@@ -55,10 +55,8 @@ export function resetFilters() {
  * @param {{ id?: string | null; name: string } | null} target
  */
 export function renameCategoryFilter(source, target) {
-    filters.update((current) => {
-        const categoryMatches = current.category === source.name || (source.id && current.categoryId === source.id);
-        return categoryMatches
-            ? { ...current, category: target?.name || 'all', categoryId: target?.id ?? 'all' }
-            : current;
-    });
+	filters.update((current) => {
+		const categoryMatches = current.category === source.name || (source.id && current.categoryId === source.id);
+		return categoryMatches ? { ...current, category: target?.name || 'all', categoryId: target?.id ?? 'all' } : current;
+	});
 }

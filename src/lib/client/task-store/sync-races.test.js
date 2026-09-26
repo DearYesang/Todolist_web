@@ -3,12 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import { normalizeTask } from '../../shared/task-domain.js';
-import {
-	mergeTasks,
-	replaceTasks,
-	setTaskStorageOwner,
-	tasks
-} from './task-cache.js';
+import { mergeTasks, replaceTasks, setTaskStorageOwner, tasks } from './task-cache.js';
 import {
 	applyServerTaskSnapshot,
 	drainPendingTaskSyncsToOfflineQueue,
@@ -50,10 +45,7 @@ describe('sync race conditions', () => {
 	afterEach(async () => {
 		// A failing test can leave an unsettled request in a chain; cap the
 		// wait and force-reset so one failure cannot wedge the whole file.
-		await Promise.race([
-			waitForPendingTaskSyncs(),
-			new Promise((resolve) => setTimeout(resolve, 500))
-		]);
+		await Promise.race([waitForPendingTaskSyncs(), new Promise((resolve) => setTimeout(resolve, 500))]);
 		resetTaskSyncStateForTests();
 		replaceTasks([]);
 		setTaskStorageOwner(null);
@@ -65,10 +57,13 @@ describe('sync race conditions', () => {
 		const deferred = createDeferred();
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
-		vi.stubGlobal('fetch', vi.fn((_url, init) => {
-			bodies.push(JSON.parse(init.body));
-			return deferred.promise;
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((_url, init) => {
+				bodies.push(JSON.parse(init.body));
+				return deferred.promise;
+			})
+		);
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		updateTask(SERVER_TASK_ID, { text: 'Three' });
@@ -78,9 +73,11 @@ describe('sync race conditions', () => {
 		expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 		expect(bodies[0]).toMatchObject({ text: 'Three', expectedVersion: 3 });
 
-		deferred.resolve(jsonResponse({
-			task: { id: SERVER_TASK_ID, text: 'Three', version: 4 }
-		}));
+		deferred.resolve(
+			jsonResponse({
+				task: { id: SERVER_TASK_ID, text: 'Three', version: 4 }
+			})
+		);
 		await waitForPendingTaskSyncs();
 
 		expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -95,10 +92,13 @@ describe('sync race conditions', () => {
 		const responses = [first, second];
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
-		vi.stubGlobal('fetch', vi.fn((_url, init) => {
-			bodies.push(JSON.parse(init.body));
-			return responses[bodies.length - 1].promise;
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((_url, init) => {
+				bodies.push(JSON.parse(init.body));
+				return responses[bodies.length - 1].promise;
+			})
+		);
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -106,9 +106,11 @@ describe('sync race conditions', () => {
 
 		// A second edit lands while the first PATCH is still in flight.
 		updateTask(SERVER_TASK_ID, { priority: 'high' });
-		first.resolve(jsonResponse({
-			task: { id: SERVER_TASK_ID, text: 'Two', priority: 'medium', version: 4 }
-		}));
+		first.resolve(
+			jsonResponse({
+				task: { id: SERVER_TASK_ID, text: 'Two', priority: 'medium', version: 4 }
+			})
+		);
 		await settleMicrotasks();
 
 		// The in-flight response may only advance the version; the newer
@@ -117,9 +119,11 @@ describe('sync race conditions', () => {
 		expect(globalThis.fetch).toHaveBeenCalledTimes(2);
 		expect(bodies[1]).toMatchObject({ priority: 'high', expectedVersion: 4 });
 
-		second.resolve(jsonResponse({
-			task: { id: SERVER_TASK_ID, text: 'Two', priority: 'high', version: 5 }
-		}));
+		second.resolve(
+			jsonResponse({
+				task: { id: SERVER_TASK_ID, text: 'Two', priority: 'high', version: 5 }
+			})
+		);
 		await waitForPendingTaskSyncs();
 		expect(get(tasks)[0]).toMatchObject({ priority: 'high', version: 5 });
 		expect(loadOfflineQueue()).toEqual([]);
@@ -131,19 +135,24 @@ describe('sync race conditions', () => {
 		const deleteResponse = createDeferred();
 		/** @type {{ method: string; body: string | undefined }[]} */
 		const requests = [];
-		vi.stubGlobal('fetch', vi.fn((_url, init) => {
-			requests.push({ method: init.method, body: init.body });
-			return requests.length === 1 ? patchResponse.promise : deleteResponse.promise;
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((_url, init) => {
+				requests.push({ method: init.method, body: init.body });
+				return requests.length === 1 ? patchResponse.promise : deleteResponse.promise;
+			})
+		);
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
 		deleteTaskCascade(SERVER_TASK_ID);
 		expect(get(tasks)).toEqual([]);
 
-		patchResponse.resolve(jsonResponse({
-			task: { id: SERVER_TASK_ID, text: 'Two', version: 4 }
-		}));
+		patchResponse.resolve(
+			jsonResponse({
+				task: { id: SERVER_TASK_ID, text: 'Two', version: 4 }
+			})
+		);
 		await settleMicrotasks();
 
 		// The PATCH response must not resurrect the deleted task.
@@ -169,10 +178,13 @@ describe('sync race conditions', () => {
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
 		const extraResponse = createDeferred();
-		vi.stubGlobal('fetch', vi.fn((_url, init) => {
-			bodies.push(JSON.parse(init.body));
-			return [firstResponse.promise, secondResponse][bodies.length - 1] ?? extraResponse.promise;
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((_url, init) => {
+				bodies.push(JSON.parse(init.body));
+				return [firstResponse.promise, secondResponse][bodies.length - 1] ?? extraResponse.promise;
+			})
+		);
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -260,9 +272,14 @@ describe('sync race conditions', () => {
 		expect(secondFlush).toMatchObject({ flushed: 0, blocked: true });
 		expect(fetcher).toHaveBeenCalledTimes(1);
 
-		deferred.resolve(jsonResponse({
-			task: { id: SERVER_TASK_ID, text: 'Created offline' }
-		}, { status: 201 }));
+		deferred.resolve(
+			jsonResponse(
+				{
+					task: { id: SERVER_TASK_ID, text: 'Created offline' }
+				},
+				{ status: 201 }
+			)
+		);
 		await expect(firstFlush).resolves.toMatchObject({ flushed: 1, remaining: 0, blocked: false });
 		expect(fetcher).toHaveBeenCalledTimes(1);
 		expect(loadOfflineQueue()).toEqual([]);
@@ -361,10 +378,13 @@ describe('sync race conditions', () => {
 		const responses = [first, second];
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
-		vi.stubGlobal('fetch', vi.fn((_url, init) => {
-			bodies.push(JSON.parse(init.body));
-			return responses[bodies.length - 1].promise;
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((_url, init) => {
+				bodies.push(JSON.parse(init.body));
+				return responses[bodies.length - 1].promise;
+			})
+		);
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -426,9 +446,14 @@ describe('sync race conditions', () => {
 		updateTask(createdId, { text: 'Mine 2' });
 		await settleMicrotasks();
 
-		createResponse.resolve(jsonResponse({
-			task: { id: createdId, text: 'Write report', status: 'todo', version: 1 }
-		}, { status: 201 }));
+		createResponse.resolve(
+			jsonResponse(
+				{
+					task: { id: createdId, text: 'Write report', status: 'todo', version: 1 }
+				},
+				{ status: 201 }
+			)
+		);
 		await created;
 		// The POST's answer is no newer than the listed copy, so the edit stays.
 		expect(get(tasks)).toEqual([expect.objectContaining({ id: createdId, text: 'Mine 2', version: 1 })]);
@@ -436,7 +461,10 @@ describe('sync race conditions', () => {
 		firstPatchResponse.resolve(jsonResponse({ task: { id: createdId, text: 'Mine 1', status: 'todo', version: 2 } }));
 		await waitForPendingTaskSyncs();
 
-		expect(patchBodies.map((body) => [body.text, body.expectedVersion])).toEqual([['Mine 1', 1], ['Mine 2', 2]]);
+		expect(patchBodies.map((body) => [body.text, body.expectedVersion])).toEqual([
+			['Mine 1', 1],
+			['Mine 2', 2]
+		]);
 		expect(get(tasks)).toEqual([expect.objectContaining({ id: createdId, text: 'Mine 2', version: 3 })]);
 		expect(loadOfflineQueue()).toEqual([]);
 	});
@@ -448,10 +476,13 @@ describe('sync race conditions', () => {
 		const patchResponse = createDeferred();
 		/** @type {{ url: string; body: string }[]} */
 		const requests = [];
-		vi.stubGlobal('fetch', vi.fn((url, init) => {
-			requests.push({ url, body: init.body });
-			return requests.length === 1 ? createResponse.promise : patchResponse.promise;
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((url, init) => {
+				requests.push({ url, body: init.body });
+				return requests.length === 1 ? createResponse.promise : patchResponse.promise;
+			})
+		);
 
 		addSubtask(SERVER_TASK_ID, 'First');
 		const localItemId = get(tasks)[0]?.subtasks[0]?.id;
@@ -460,28 +491,35 @@ describe('sync race conditions', () => {
 		// Rename while the create request has not returned a server item id yet.
 		renameSubtask(SERVER_TASK_ID, /** @type {string} */ (localItemId), 'Renamed');
 
-		createResponse.resolve(jsonResponse({
-			task: {
-				id: SERVER_TASK_ID,
-				text: 'Task',
-				version: 2,
-				subtasks: [{ id: serverItemId, text: 'First', done: false }]
-			}
-		}, { status: 201 }));
+		createResponse.resolve(
+			jsonResponse(
+				{
+					task: {
+						id: SERVER_TASK_ID,
+						text: 'Task',
+						version: 2,
+						subtasks: [{ id: serverItemId, text: 'First', done: false }]
+					}
+				},
+				{ status: 201 }
+			)
+		);
 		await settleMicrotasks();
 
 		expect(requests[1]).toMatchObject({
 			url: `/api/tasks/${SERVER_TASK_ID}/checklist/${serverItemId}`,
 			body: JSON.stringify({ text: 'Renamed' })
 		});
-		patchResponse.resolve(jsonResponse({
-			task: {
-				id: SERVER_TASK_ID,
-				text: 'Task',
-				version: 3,
-				subtasks: [{ id: serverItemId, text: 'Renamed', done: false }]
-			}
-		}));
+		patchResponse.resolve(
+			jsonResponse({
+				task: {
+					id: SERVER_TASK_ID,
+					text: 'Task',
+					version: 3,
+					subtasks: [{ id: serverItemId, text: 'Renamed', done: false }]
+				}
+			})
+		);
 		await waitForPendingTaskSyncs();
 		expect(loadOfflineQueue()).toEqual([]);
 		expect(get(tasks)[0]?.subtasks[0]).toMatchObject({ id: serverItemId, text: 'Renamed' });
@@ -489,9 +527,12 @@ describe('sync race conditions', () => {
 
 	it('coalesces a chained rename into the queued create when the create request fails', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
-		vi.stubGlobal('fetch', vi.fn(async () => {
-			throw new Error('offline');
-		}));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				throw new Error('offline');
+			})
+		);
 
 		addSubtask(SERVER_TASK_ID, 'First');
 		const localItemId = get(tasks)[0]?.subtasks[0]?.id;
@@ -510,12 +551,12 @@ describe('sync race conditions', () => {
 	it('keeps busy tasks safe from stale cross-tab writes while adopting the rest', async () => {
 		const otherTaskId = '33333333-3333-4333-8333-333333333333';
 		const localOnlyTask = normalizeTask({ id: 'local-pending', text: 'Local only' });
-		replaceTasks([
-			normalizeTask({ id: SERVER_TASK_ID, text: 'Mine', version: 4 }),
-			localOnlyTask
-		]);
+		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Mine', version: 4 }), localOnlyTask]);
 		const deferred = createDeferred();
-		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => deferred.promise)
+		);
 
 		updateTask(SERVER_TASK_ID, { text: 'Mine edited' });
 		await settleMicrotasks();
@@ -588,7 +629,10 @@ describe('sync race conditions', () => {
 	it('drains an edit to a checklist item whose create is in flight as a re-create with final state', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
 		const deferred = createDeferred();
-		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => deferred.promise)
+		);
 
 		addSubtask(SERVER_TASK_ID, 'First');
 		await settleMicrotasks();
@@ -608,21 +652,29 @@ describe('sync race conditions', () => {
 			text: 'Renamed'
 		});
 
-		deferred.resolve(jsonResponse({
-			task: {
-				id: SERVER_TASK_ID,
-				text: 'Task',
-				version: 2,
-				subtasks: [{ id: '22222222-2222-4222-8222-222222222222', text: 'First', done: false }]
-			}
-		}, { status: 201 }));
+		deferred.resolve(
+			jsonResponse(
+				{
+					task: {
+						id: SERVER_TASK_ID,
+						text: 'Task',
+						version: 2,
+						subtasks: [{ id: '22222222-2222-4222-8222-222222222222', text: 'First', done: false }]
+					}
+				},
+				{ status: 201 }
+			)
+		);
 		await waitForPendingTaskSyncs();
 	});
 
 	it('coalesces a drained rename into a drained create instead of duplicating the item', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'One', version: 1 })]);
 		const deferred = createDeferred();
-		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => deferred.promise)
+		);
 
 		// Occupy the chain so the checklist ops stay queued-but-unstarted.
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
@@ -647,7 +699,10 @@ describe('sync race conditions', () => {
 	it('drains a delete of a never-created checklist item as a no-op', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
 		const deferred = createDeferred();
-		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => deferred.promise)
+		);
 
 		addSubtask(SERVER_TASK_ID, 'Ephemeral');
 		await settleMicrotasks();
@@ -658,9 +713,14 @@ describe('sync race conditions', () => {
 
 		expect(loadOfflineQueue()).toEqual([]);
 
-		deferred.resolve(jsonResponse({
-			task: { id: SERVER_TASK_ID, text: 'Task', version: 2, subtasks: [] }
-		}, { status: 201 }));
+		deferred.resolve(
+			jsonResponse(
+				{
+					task: { id: SERVER_TASK_ID, text: 'Task', version: 2, subtasks: [] }
+				},
+				{ status: 201 }
+			)
+		);
 		await waitForPendingTaskSyncs();
 	});
 
@@ -712,7 +772,7 @@ describe('sync race conditions', () => {
 		expect(fetcher).not.toHaveBeenCalled();
 	});
 
-	it('converges on another tab\'s task cache write instead of clobbering it', () => {
+	it("converges on another tab's task cache write instead of clobbering it", () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'This tab' })]);
 		const otherTabTasks = [normalizeTask({ id: SERVER_TASK_ID, text: 'Other tab', version: 2 })];
 		const setItemCallsBefore = /** @type {import('vitest').Mock} */ (globalThis.localStorage.setItem).mock.calls.length;
@@ -724,8 +784,9 @@ describe('sync race conditions', () => {
 
 		expect(get(tasks)[0]).toMatchObject({ text: 'Other tab', version: 2 });
 		// The external update must not be persisted back (no write echo).
-		expect(/** @type {import('vitest').Mock} */ (globalThis.localStorage.setItem).mock.calls.length)
-			.toBe(setItemCallsBefore);
+		expect(/** @type {import('vitest').Mock} */ (globalThis.localStorage.setItem).mock.calls.length).toBe(
+			setItemCallsBefore
+		);
 
 		handleExternalTaskStorageEvent({
 			key: 'kanbanTasks:someone-else',
