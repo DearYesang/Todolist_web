@@ -281,6 +281,37 @@ describe('settling task writes before sign-out', () => {
         });
     });
 
+    // Review finding on f86c6fa. A checklist write carries no version, so
+    // the version of its answer can count another device's edit as well as
+    // this write: here another device renamed the task (version 2) before
+    // the toggle landed (version 3). Moved to version 3, the queued edit,
+    // which sends every field of the task, would overwrite that rename at
+    // the next sync without a 409.
+    it.fails('keeps the queued later edit on its version when the checklist write in flight lands past another device\'s edit', async () => {
+        replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] })]);
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        toggleSubtask(TASK_ID, ITEM.id);
+        await vi.advanceTimersByTimeAsync(0);
+        updateTask(TASK_ID, { priority: 'high' });
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        firstAnswer.resolve(jsonResponse({
+            task: { id: TASK_ID, text: 'Other device', version: 3, subtasks: [{ ...ITEM, done: true }] }
+        }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({
+                type: 'task.patch',
+                taskId: TASK_ID,
+                patch: expect.objectContaining({ text: 'Saved', priority: 'high', expectedVersion: 1 })
+            })
+        ]);
+    });
+
     // The same for checklist writes, still signed in (a cancelled "clear
     // local data" question, or a page kept after pagehide). The queue puts
     // a later patch of an item on top of an earlier one; the toggle in

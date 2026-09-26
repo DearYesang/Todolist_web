@@ -287,6 +287,25 @@ describe('offline write queue conflict behavior', () => {
 		]);
 	});
 
+	// A write that landed two versions or more past the queued edit also
+	// counts another device's edit, which the queued edit must meet as a
+	// 409 rather than overwrite.
+	it.fails('leaves a queued edit or delete that expects a version before the one the landed write started from', () => {
+		const patched = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+		const deleted = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({ type: 'task.patch', taskId: patched, patch: { text: 'A', expectedVersion: 1 } });
+		enqueueOfflineMutation({ type: 'task.delete', taskId: deleted, expectedVersion: 1 });
+
+		advanceQueuedTaskVersion(patched, 3);
+		advanceQueuedTaskVersion(deleted, 3);
+
+		expect(loadOfflineQueue().map((mutation) => {
+			if (mutation.type === 'task.patch') return mutation.patch.expectedVersion;
+			return mutation.type === 'task.delete' ? mutation.expectedVersion : null;
+		})).toEqual([1, 1]);
+	});
+
 	it('drops what a landed newer edit covers from the queue of a given owner', () => {
 		const taskId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 		const childId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
