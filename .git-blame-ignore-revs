@@ -3,4 +3,14 @@
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 # style: format the codebase with Prettier and check formatting in CI (#88)
+# This squash commit is almost entirely formatter output (171 files), but it
+# also carries a few real changes that blame will now attribute to earlier
+# commits:
+#   - the Prettier setup: .prettierrc, .prettierignore, this file, the
+#     prettier/prettier-plugin-svelte devDependencies, the format scripts,
+#     the CI Format step and the README/PR-template notes;
+#   - isRecoveryCodeSummary in src/lib/client/account-security-api.js,
+#     rewritten so Prettier could not move its JSDoc cast;
+#   - five <!-- prettier-ignore --> comments in Svelte components.
+# For those, read the commit itself: git show 8d45c21
 8d45c21ed69cfd4a5f9d54a019a05a494138109f
