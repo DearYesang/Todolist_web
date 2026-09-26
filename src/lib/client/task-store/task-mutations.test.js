@@ -1,9 +1,10 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
-import { jsonResponse } from '$lib/test-support/http.js';
+import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import { loadOfflineQueue, setOfflineQueueOwner } from '../offline-write-queue.js';
 import { createTask, importTasks, moveTask } from './task-mutations.js';
+import { applyServerTaskSnapshot } from './sync-engine.js';
 import { replaceTasks, tasks } from './task-cache.js';
 import { filters, resetFilters, setPriorityFilter } from './filters.js';
 
@@ -125,6 +126,28 @@ describe('creating a task from the add-task form', () => {
             parentId: SERVER_PARENT_ID
         }));
         expect(get(tasks).find((task) => task.id === SERVER_TASK_ID)?.parentId).toBe(SERVER_PARENT_ID);
+    });
+
+    it('merges the created task into the copy a sync added while the create was in flight', async () => {
+        const response = createDeferred();
+        fetcher.mockReturnValue(response.promise);
+
+        const created = createTask(formValues('Write report'));
+        // The server snapshot already lists the new task, edited on another
+        // device since.
+        applyServerTaskSnapshot([
+            { id: SERVER_PARENT_ID, text: 'Server parent', status: 'doing', version: 1 },
+            { id: SERVER_TASK_ID, text: 'Write report (edited)', status: 'todo', version: 2 }
+        ]);
+        response.resolve(jsonResponse({
+            task: { id: SERVER_TASK_ID, text: 'Write report', status: 'todo', version: 1 }
+        }, { status: 201 }));
+        const result = await created;
+
+        expect(result.ok).toBe(true);
+        expect(get(tasks).map((task) => task.id)).toEqual(['local-parent', SERVER_PARENT_ID, SERVER_TASK_ID]);
+        expect(get(tasks)[2]).toMatchObject({ text: 'Write report (edited)', version: 2 });
+        expect(loadOfflineQueue()).toEqual([]);
     });
 
     it('adds nothing and reports the form message when the server refuses the task', async () => {

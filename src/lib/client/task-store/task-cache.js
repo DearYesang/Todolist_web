@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
 import { getStorage, PENDING_VIEW_STORAGE_KEY } from './storage.js';
 
@@ -123,11 +123,20 @@ export function replaceTasks(nextTasks) {
 }
 
 /**
- * Adds a newly created task at the end of the list.
+ * Adds a newly created task at the end of the list. When the list already
+ * holds its id (a server sync that ran while the create was in flight added
+ * it), the task is merged into that copy instead: appended, it would be a
+ * second task with the same id, which normalizeTaskList later gives a new
+ * local id.
  * @param {import('../../shared/task-domain.js').Task} task
  */
 export function insertTask(task) {
-    tasks.update((current) => [...current, task]);
+    if (get(tasks).some((current) => current.id === task.id)) {
+        mergeTasks([task]);
+        return;
+    }
+
+    tasks.update((current) => normalizeTaskList([...current, task]));
 }
 
 /**
