@@ -8,6 +8,7 @@ export class CalendarTokenEncryptionError extends ApiError {
 	constructor(message) {
 		super(message, 503);
 		this.name = 'CalendarTokenEncryptionError';
+		this.answeredByDefault = false;
 	}
 }
 

@@ -467,6 +467,17 @@ describe('the task write API', () => {
 		await expect(call[name]()).rejects.toBe(failure);
 	});
 
+	it.each(TASK_WRITES)('%s lets a configuration error through', async (name, dataFunction) => {
+		for (const failure of [
+			new CalendarTokenConfigurationError(),
+			new CalendarTokenEncryptionError('CALENDAR_OAUTH_ENCRYPTION_KEY must be at least 32 bytes.'),
+			new AccountSecurityConfigurationError('ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.')
+		]) {
+			dataFunction.mockRejectedValue(failure);
+			await expect(call[name]()).rejects.toBe(failure);
+		}
+	});
+
 	it.each([
 		['GET /api/tasks', vi.mocked(taskRepository.listTasksForUser)],
 		['GET /api/export', vi.mocked(taskRepository.listTasksForUser)],

@@ -18,6 +18,7 @@ export class CalendarTokenConfigurationError extends ApiError {
 	constructor() {
 		super('CALENDAR_TOKEN_SECRET must be configured before calendar subscription tokens can be used.', 503);
 		this.name = 'CalendarTokenConfigurationError';
+		this.answeredByDefault = false;
 	}
 }
 

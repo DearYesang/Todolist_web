@@ -19,6 +19,7 @@ export class AccountSecurityConfigurationError extends ApiError {
 	constructor(message) {
 		super(message, 503);
 		this.name = 'AccountSecurityConfigurationError';
+		this.answeredByDefault = false;
 	}
 }
 

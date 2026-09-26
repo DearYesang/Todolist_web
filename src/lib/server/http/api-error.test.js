@@ -37,20 +37,21 @@ describe('ApiError', () => {
 	});
 
 	it.each([
-		[new TaskWriteError('Invalid task.'), 'TaskWriteError', 400],
-		[new TaskWriteError('Task changed on another device.', 409), 'TaskWriteError', 409],
-		[new RateLimitError('Too many requests.', 30), 'RateLimitError', 429],
-		[new CalendarTokenConfigurationError(), 'CalendarTokenConfigurationError', 503],
-		[new CalendarTokenLimitError('Too many tokens.'), 'CalendarTokenLimitError', 429],
-		[new CalendarTokenEncryptionError('No key.'), 'CalendarTokenEncryptionError', 503],
-		[new CalendarProviderError('Provider failed.'), 'CalendarProviderError', 502],
-		[new CalendarSyncError('Sync failed.'), 'CalendarSyncError', 500],
-		[new AccountSecurityConfigurationError('No secret.'), 'AccountSecurityConfigurationError', 503],
-		[new AccountSecurityPolicyError('Not allowed.'), 'AccountSecurityPolicyError', 403]
-	])('%s is an ApiError that keeps its name and status', (error, name, status) => {
+		[new TaskWriteError('Invalid task.'), 'TaskWriteError', 400, true],
+		[new TaskWriteError('Task changed on another device.', 409), 'TaskWriteError', 409, true],
+		[new RateLimitError('Too many requests.', 30), 'RateLimitError', 429, true],
+		[new CalendarTokenConfigurationError(), 'CalendarTokenConfigurationError', 503, false],
+		[new CalendarTokenLimitError('Too many tokens.'), 'CalendarTokenLimitError', 429, true],
+		[new CalendarTokenEncryptionError('No key.'), 'CalendarTokenEncryptionError', 503, false],
+		[new CalendarProviderError('Provider failed.'), 'CalendarProviderError', 502, true],
+		[new CalendarSyncError('Sync failed.'), 'CalendarSyncError', 500, true],
+		[new AccountSecurityConfigurationError('No secret.'), 'AccountSecurityConfigurationError', 503, false],
+		[new AccountSecurityPolicyError('Not allowed.'), 'AccountSecurityPolicyError', 403, true]
+	])('%s is an ApiError that keeps its name and status', (error, name, status, answeredByDefault) => {
 		expect(error).toBeInstanceOf(ApiError);
 		expect(error.name).toBe(name);
 		expect(error.status).toBe(status);
+		expect(error.answeredByDefault).toBe(answeredByDefault);
 	});
 
 	it('gives a RateLimitError its Retry-After header', () => {
@@ -83,6 +84,23 @@ describe('apiErrorResponse', () => {
 
 		expect(() => apiErrorResponse(failure)).toThrow(failure);
 		expect(() => apiErrorResponse('not an error')).toThrow('not an error');
+	});
+
+	it.each([
+		['CalendarTokenConfigurationError', new CalendarTokenConfigurationError(), CalendarTokenConfigurationError],
+		[
+			'CalendarTokenEncryptionError',
+			new CalendarTokenEncryptionError('CALENDAR_OAUTH_ENCRYPTION_KEY must be at least 32 bytes.'),
+			CalendarTokenEncryptionError
+		],
+		[
+			'AccountSecurityConfigurationError',
+			new AccountSecurityConfigurationError('ACCOUNT_RECOVERY_SECRET or BETTER_AUTH_SECRET must be configured before account recovery can be used.'),
+			AccountSecurityConfigurationError
+		]
+	])('throws %s again unless the route names its class', (_name, error, type) => {
+		expect(() => apiErrorResponse(error)).toThrow(error);
+		expect(apiErrorResponse(error, type).status).toBe(503);
 	});
 
 	it('answers only the named classes when a route names them', async () => {

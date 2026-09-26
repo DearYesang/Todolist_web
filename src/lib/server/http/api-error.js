@@ -19,26 +19,41 @@ export class ApiError extends Error {
 		this.name = 'ApiError';
 		this.status = status;
 		this.headers = headers;
+		/**
+		 * Whether a route that names no classes answers this error. The
+		 * configuration errors set it to false, because their messages name
+		 * environment variables: only a route that names their class
+		 * describes them to the client.
+		 */
+		this.answeredByDefault = true;
 	}
 }
 
 /**
  * The answer to an error a route caught. An ApiError becomes `{ message }`
  * with its status and headers; anything else is thrown again, so SvelteKit
- * logs it and answers 500.
+ * logs it and answers 500. A configuration error (answeredByDefault false)
+ * is thrown again too unless the route names its class, so a route whose
+ * data code comes to call calendar or account code still does not describe
+ * the server's configuration to the client.
  *
  * A route that answers only some ApiErrors names their classes, and the
  * others are thrown again too. The account and calendar routes do this so
  * they answer exactly the errors they answered before: a missing recovery
  * secret, for one, stays a logged 500 instead of being described to the
- * client.
+ * client, while the calendar token routes name
+ * CalendarTokenConfigurationError and answer it with its 503.
  *
  * @param {unknown} error
- * @param {...(new (...args: any[]) => ApiError)} types the ApiError classes to answer; all of them when none is named
+ * @param {...(new (...args: any[]) => ApiError)} types the ApiError classes to answer; when none is named, every ApiError but the configuration errors
  * @returns {Response}
  */
 export function apiErrorResponse(error, ...types) {
-	if (!(error instanceof ApiError) || (types.length > 0 && !types.some((type) => error instanceof type))) {
+	if (!(error instanceof ApiError)) {
+		throw error;
+	}
+	const answered = types.length > 0 ? types.some((type) => error instanceof type) : error.answeredByDefault;
+	if (!answered) {
 		throw error;
 	}
 
