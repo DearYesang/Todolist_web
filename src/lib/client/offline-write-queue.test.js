@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import {
+	advanceQueuedTaskVersion,
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,
 	getOfflineQueueOwner,
@@ -248,6 +249,36 @@ describe('offline write queue conflict behavior', () => {
 			expect.objectContaining({ ownerUserId: 'anonymous', taskId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' })
 		]);
 		expect(loadOfflineQueue()).toEqual([]);
+	});
+
+	it('moves a queued edit or delete of a task up to a newer version only', () => {
+		const patched = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+		const deleted = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+		const ahead = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+		const unversioned = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({ type: 'task.patch', taskId: patched, patch: { text: 'A', expectedVersion: 1 } });
+		enqueueOfflineMutation({ type: 'task.delete', taskId: deleted, expectedVersion: 1 });
+		enqueueOfflineMutation({ type: 'task.patch', taskId: ahead, patch: { text: 'C', expectedVersion: 5 } });
+		enqueueOfflineMutation({ type: 'task.patch', taskId: unversioned, patch: { text: 'D' } });
+		// The write landed while another user was signed in.
+		setOfflineQueueOwner('user-b');
+
+		for (const taskId of [patched, deleted, ahead, unversioned]) {
+			advanceQueuedTaskVersion(taskId, 3, { ownerId: 'user-a' });
+		}
+
+		expect(loadOfflineQueue()).toEqual([]);
+		setOfflineQueueOwner('user-a');
+		expect(loadOfflineQueue().map((mutation) => {
+			if (mutation.type === 'task.patch') return [mutation.taskId, mutation.patch];
+			return mutation.type === 'task.delete' ? [mutation.taskId, mutation.expectedVersion] : null;
+		})).toEqual([
+			[patched, { text: 'A', expectedVersion: 3 }],
+			[deleted, 3],
+			[ahead, { text: 'C', expectedVersion: 5 }],
+			[unversioned, { text: 'D' }]
+		]);
 	});
 
 	it('resolves child creates queued under local parents', async () => {

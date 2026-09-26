@@ -100,6 +100,42 @@ export function enqueueOfflineMutation(input, { ownerId = queueOwnerId } = {}) {
 	return nextQueue.length;
 }
 
+/**
+ * Moves the queued edit or delete of `taskId` in `ownerId`'s queue (the
+ * current owner's by default) up to `version`, when it expects an older
+ * one. For a task write that landed at `version` after a later edit of
+ * the task was queued behind it: the edit was made on top of that write,
+ * and sent with the version the write started from, it would meet a 409.
+ * An entry that expects `version` or newer, or no version, is left alone.
+ * @param {string} taskId
+ * @param {number} version
+ * @param {{ ownerId?: string }} [options]
+ */
+export function advanceQueuedTaskVersion(taskId, version, { ownerId = queueOwnerId } = {}) {
+	const owner = normalizeQueueOwner(ownerId);
+	const queue = loadOwnerQueue(owner);
+	let advanced = false;
+	const nextQueue = queue.map((mutation) => {
+		if (mutation.type === 'task.patch' && mutation.taskId === taskId) {
+			const expectedVersion = mutation.patch.expectedVersion;
+			if (typeof expectedVersion === 'number' && expectedVersion < version) {
+				advanced = true;
+				return { ...mutation, patch: { ...mutation.patch, expectedVersion: version } };
+			}
+		}
+		if (mutation.type === 'task.delete' && mutation.taskId === taskId) {
+			if (typeof mutation.expectedVersion === 'number' && mutation.expectedVersion < version) {
+				advanced = true;
+				return { ...mutation, expectedVersion: version };
+			}
+		}
+		return mutation;
+	});
+	if (advanced) {
+		saveOfflineQueue(nextQueue, owner);
+	}
+}
+
 export function getOfflineQueueSize() {
 	return loadOfflineQueue().length;
 }

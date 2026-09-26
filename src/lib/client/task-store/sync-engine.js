@@ -7,7 +7,12 @@ import {
     updateServerTask
 } from '../task-api.js';
 import { isServerId } from '../../shared/task-rules.js';
-import { enqueueOfflineMutation, getOfflineQueueOwner, loadOfflineQueue } from '../offline-write-queue.js';
+import {
+    advanceQueuedTaskVersion,
+    enqueueOfflineMutation,
+    getOfflineQueueOwner,
+    loadOfflineQueue
+} from '../offline-write-queue.js';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
 import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
 
@@ -28,7 +33,7 @@ import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
  * - taskStateQueued: while its request was out, a later snapshot patch or
  *   delete of the task moved to the queue. That write was built from the
  *   store after this one started, so it holds every field a snapshot
- *   patch sends, newer.
+ *   patch sends, newer, and the version this request started from.
  * @typedef {{
  *   taskId: string;
  *   queueOwnerId: string;
@@ -337,9 +342,11 @@ export async function waitForPendingTaskSyncs() {
  * to that user (TaskSyncWrite): if it fails in a way worth retrying after
  * the sign-out, it goes to that user's queue, not to whoever owns the
  * queue by then, and if it lands, its answer is applied only while the
- * store still holds that user's board. A failed task edit queues nothing
- * when a later edit of the task moved to the queue at the timeout: that
- * edit holds all of its fields, newer.
+ * store still holds that user's board. When a later edit of the task moved
+ * to the queue at the timeout, a failed task edit queues nothing, since
+ * that edit holds all of its fields, newer; and a request that lands
+ * moves that edit to the version it landed at, and changes only the
+ * version on the board.
  *
  * Until it settles, countPendingTaskSyncs counts the request, so the
  * "clear local data" question that follows includes it, and a confirmed
@@ -382,10 +389,13 @@ function rememberServerVersion(serverTask) {
  * only the version advances (plus any resolved checklist item ids, so a reload
  * cannot strand items under local ids) and optimistic fields stay untouched.
  * @param {import('../../shared/task-domain.js').Task} serverTask
+ * @param {{ newerEditQueued?: boolean }} [options]
+ *   newerEditQueued: a newer edit of the task is in the offline queue, not
+ *   in its chain
  */
-function applyServerTaskResult(serverTask) {
+function applyServerTaskResult(serverTask, { newerEditQueued = false } = {}) {
     rememberServerVersion(serverTask);
-    if (!queuedSnapshotSyncs.has(serverTask.id)) {
+    if (!newerEditQueued && !queuedSnapshotSyncs.has(serverTask.id)) {
         mergeTasks([serverTask], { insertMissing: false });
         return;
     }
@@ -825,15 +835,30 @@ function toServerTaskPatch(task) {
  * Applies a chained write's server answer, unless the store holds another
  * user's board by now: the answer is about the board the write was made
  * on, and a copy of the task there is no business of another user's.
+ *
+ * When a later edit of the task moved to the offline queue while the
+ * request was out, that edit expects the version the request started
+ * from. The request has now moved the task past it with the user's own
+ * write, so the queued edit moves to the answer's version, in the queue
+ * of the user it was made for, whoever's board the store holds; sent as
+ * it was, it would meet a 409 as a conflict with itself. On the board,
+ * only the version moves: the queued edit is newer than the answer.
  * @param {TaskSyncWrite} write
  * @param {import('../../shared/task-domain.js').Task} serverTask
  */
 function applyWriteResult(write, serverTask) {
-    if (write.discarded || getTaskStorageOwner() !== write.storeOwnerId) {
+    if (write.discarded) {
         return;
     }
 
-    applyServerTaskResult(serverTask);
+    if (write.taskStateQueued && typeof serverTask.version === 'number') {
+        advanceQueuedTaskVersion(serverTask.id, serverTask.version, { ownerId: write.queueOwnerId });
+    }
+    if (getTaskStorageOwner() !== write.storeOwnerId) {
+        return;
+    }
+
+    applyServerTaskResult(serverTask, { newerEditQueued: write.taskStateQueued });
 }
 
 /**

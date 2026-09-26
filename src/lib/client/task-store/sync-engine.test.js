@@ -242,7 +242,7 @@ describe('settling task writes before sign-out', () => {
     // the task moves past that version, and the next sync sends the edit into
     // a 409, which reports the user's own edit as a conflict. The late answer
     // also put the first edit's text back on the board over the second's.
-    it.fails('moves the queued later edit to the version the request in flight landed at', async () => {
+    it('moves the queued later edit to the version the request in flight landed at', async () => {
         const firstAnswer = createDeferred();
         vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
         updateTask(TASK_ID, { text: 'Edit 1' });

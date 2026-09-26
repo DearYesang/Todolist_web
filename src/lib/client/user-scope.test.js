@@ -492,7 +492,7 @@ describe('signing out while a task write is still in flight', () => {
 		expect(sent).toEqual(['Edit 1']);
 	});
 
-	it.fails('queues that edit on top of the write in flight when the write lands after the sign-out', async () => {
+	it('queues that edit on top of the write in flight when the write lands after the sign-out', async () => {
 		await editInFlight();
 		await signOut({
 			clearLocalData: false,
