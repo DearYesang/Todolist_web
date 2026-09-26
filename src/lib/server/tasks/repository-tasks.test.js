@@ -20,6 +20,8 @@ const TASK_ID = '11111111-1111-4111-8111-111111111111';
 const BOARD_ID = '22222222-2222-4222-8222-222222222222';
 const PARENT_ID = '44444444-4444-4444-8444-444444444444';
 const OTHER_PARENT_ID = '55555555-5555-4555-8555-555555555555';
+const CATEGORY_ID = '66666666-6666-4666-8666-666666666666';
+const NEW_CATEGORY_ID = '77777777-7777-4777-8777-777777777777';
 const WORKSPACE = { id: 'workspace-id', name: 'Personal', ownerUserId: USER_ID };
 const BOARD = { id: BOARD_ID, workspaceId: WORKSPACE.id, name: 'Inbox', defaultView: 'kanban' };
 
@@ -295,6 +297,68 @@ describe('task updates', () => {
 		await expect(updateTaskForUser(USER_ID, TASK_ID, { parentId: OTHER_PARENT_ID }))
 			.rejects.toMatchObject({ status: 400, message: 'Parent task was not found on this board.' });
 		expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'select tasks', 'select tasks']);
+	});
+
+	it('finds or creates the category by name when the patch names one without an id', async () => {
+		// The client sends its whole task with every patch. A category typed in
+		// the task panel that the catalog does not hold yet has a name and a
+		// null id, and must not be read as "no category".
+		const existing = createTaskRow({ category: '개발', categoryId: CATEGORY_ID });
+		const created = {
+			id: NEW_CATEGORY_ID,
+			boardId: BOARD_ID,
+			userId: USER_ID,
+			name: '신규 기획',
+			normalizedName: '신규 기획',
+			color: null,
+			sortOrder: 2,
+			hiddenAt: null,
+			archivedAt: null,
+			createdAt: NOW,
+			updatedAt: NOW
+		};
+		const statements = recordStatements(db, [
+			...AUTHORIZATION,
+			[existing],
+			[],
+			[{ nextSortOrder: 2 }],
+			[created],
+			[createTaskRow({ category: '신규 기획', categoryId: NEW_CATEGORY_ID, version: 4 })],
+			[],
+			[created]
+		]);
+
+		const task = await updateTaskForUser(USER_ID, TASK_ID, { category: ' 신규  기획 ', categoryId: null, expectedVersion: 3 });
+
+		expect(describeStatements(statements)).toEqual([
+			...AUTHORIZATION_STATEMENTS,
+			'select categories',
+			'select categories',
+			'insert categories',
+			'update tasks',
+			'select checklist_items',
+			'select categories'
+		]);
+		expect(statements[3].where.params).toEqual([BOARD_ID, '신규 기획']);
+		expect(statements[5].values).toMatchObject({ name: '신규 기획', normalizedName: '신규 기획', sortOrder: 2 });
+		expect(statements[6].set).toMatchObject({ category: '신규 기획', categoryId: NEW_CATEGORY_ID });
+		expect(task).toMatchObject({ category: '신규 기획', categoryId: NEW_CATEGORY_ID, categoryMeta: { id: NEW_CATEGORY_ID, name: '신규 기획' } });
+	});
+
+	it('clears the category when the patch sends a null id with an empty or missing name', async () => {
+		for (const patch of [{ category: '', categoryId: null }, { categoryId: null }]) {
+			const statements = recordStatements(db, [
+				...AUTHORIZATION,
+				[createTaskRow({ category: '개발', categoryId: CATEGORY_ID })],
+				[createTaskRow({ version: 4 })],
+				[]
+			]);
+
+			await updateTaskForUser(USER_ID, TASK_ID, patch);
+
+			expect(describeStatements(statements)).toEqual([...AUTHORIZATION_STATEMENTS, 'update tasks', 'select checklist_items']);
+			expect(statements[3].set).toMatchObject({ category: '', categoryId: null });
+		}
 	});
 
 	it('reports a stale version as 409, a vanished task as 404 and an unknown task as 404', async () => {

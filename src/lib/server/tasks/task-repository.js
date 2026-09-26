@@ -141,11 +141,7 @@ async function resolveCategoryForTaskCreate(db, boardId, userId, input) {
  * @param {ReturnType<typeof parseUpdateTaskInput>} input
  */
 async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
-	if (hasField(input, 'categoryId')) {
-		if (typeof input.categoryId !== 'string') {
-			return { id: null, name: '' };
-		}
-
+	if (typeof input.categoryId === 'string') {
 		const category = await getCategoryRowForBoard(db, boardId, input.categoryId);
 		if (!category) {
 			throw new TaskWriteError('Category was not found on this board.');
@@ -153,6 +149,10 @@ async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
 		return category;
 	}
 
+	// Without an id the name decides. The client sends categoryId: null with
+	// every task patch, also for a name it has no id for yet (typed in the task
+	// panel, or renamed offline), so a null id must not clear a named category.
+	// An empty or missing name still clears it.
 	const category = await findOrCreateCategoryRow(db, {
 		boardId,
 		userId,
