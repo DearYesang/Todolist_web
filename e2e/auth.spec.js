@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { recordDialogs } from './fixtures/page.js';
 
+const E2E_SESSION = {
+	session: { id: 'e2e-session', userId: 'e2e-user', expiresAt: '2099-01-01T00:00:00.000Z' },
+	user: { id: 'e2e-user', email: 'e2e@example.com', name: null }
+};
+
 test('keeps the private app locked before login', async ({ page }) => {
 	await page.goto('/');
 
@@ -150,14 +155,7 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 		const { pathname } = new URL(request.url());
 		const method = request.method();
 		if (pathname === '/api/auth/get-session') {
-			return route.fulfill({
-				json: signedIn
-					? {
-						session: { id: 'e2e-session', userId: 'e2e-user', expiresAt: '2099-01-01T00:00:00.000Z' },
-						user: { id: 'e2e-user', email: 'e2e@example.com', name: null }
-					}
-					: null
-			});
+			return route.fulfill({ json: signedIn ? E2E_SESSION : null });
 		}
 		if (pathname === '/api/auth/passkey/list-user-passkeys') {
 			return route.fulfill({ json: passkeys });
@@ -278,4 +276,104 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 		localStorage.getItem('kanbanOfflineWriteQueue:e2e-user'),
 		localStorage.getItem('kanbanTasks:e2e-user')
 	])).toEqual([null, '[]']);
+});
+
+/**
+ * Leaves a default view chosen offline in an earlier visit, not yet sent,
+ * with the account it was chosen under cached for offline unlock. Seeds once
+ * per test, so a reload keeps what the app did since.
+ * @param {import('@playwright/test').Page} page
+ */
+async function seedPendingDefaultView(page) {
+	await page.addInitScript(({ user }) => {
+		if (sessionStorage.getItem('e2e-view-seeded')) {
+			return;
+		}
+		sessionStorage.setItem('e2e-view-seeded', '1');
+		localStorage.setItem('todokanbanAuthScope', JSON.stringify({ ...user, cachedAt: Date.now() }));
+		localStorage.setItem('todokanbanPendingDefaultView', 'gantt');
+	}, { user: E2E_SESSION.user });
+}
+
+/** @param {import('@playwright/test').Page} page */
+function readPendingDefaultView(page) {
+	return page.evaluate(() => localStorage.getItem('todokanbanPendingDefaultView'));
+}
+
+test('keeps a default view chosen offline when the session check fails on a network that reports online', async ({ page }) => {
+	await seedPendingDefaultView(page);
+	// navigator.onLine stays true, but nothing reaches the server (captive
+	// Wi-Fi, an outage) until the reload below.
+	let reachable = false;
+	/** @type {unknown[]} */
+	const viewWrites = [];
+	await page.route('**/api/**', (route) => {
+		if (!reachable) {
+			return route.abort('internetdisconnected');
+		}
+		const request = route.request();
+		const { pathname } = new URL(request.url());
+		if (pathname === '/api/auth/get-session') {
+			return route.fulfill({ json: E2E_SESSION });
+		}
+		if (pathname === '/api/tasks') {
+			return route.fulfill({ json: { tasks: [] } });
+		}
+		if (pathname === '/api/categories') {
+			return route.fulfill({ json: { categories: [] } });
+		}
+		if (pathname === '/api/board/preferences' && request.method() === 'PATCH') {
+			viewWrites.push(request.postDataJSON());
+			return route.fulfill({ json: request.postDataJSON() });
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	// The failed check signs the app out: it forgets the cached account...
+	await expect.poll(() => page.evaluate(() => localStorage.getItem('todokanbanAuthScope'))).toBeNull();
+	await expect(page.locator('.locked-app-state .auth-panel')).toBeVisible();
+	// ...but no one signed out, so the view waits for the session to return.
+	expect(await readPendingDefaultView(page)).toBe('gantt');
+
+	reachable = true;
+	await page.reload();
+	await expect(page.locator('.header .auth-identity')).toHaveText('e2e@example.com');
+	await expect.poll(() => viewWrites).toEqual([{ defaultView: 'gantt' }]);
+	await expect.poll(() => readPendingDefaultView(page)).toBeNull();
+});
+
+test('drops a default view not yet sent when the user signs out and keeps the cache', async ({ page }) => {
+	await seedPendingDefaultView(page);
+	let signedIn = true;
+	/** @type {unknown[]} */
+	const viewWrites = [];
+	await page.route('**/api/**', (route) => {
+		const request = route.request();
+		const { pathname } = new URL(request.url());
+		if (pathname === '/api/auth/get-session') {
+			return route.fulfill({ json: signedIn ? E2E_SESSION : null });
+		}
+		if (pathname === '/api/auth/sign-out') {
+			signedIn = false;
+			return route.fulfill({ json: { success: true } });
+		}
+		if (pathname === '/api/board/preferences' && request.method() === 'PATCH') {
+			// The server cannot store it yet, so the view stays pending.
+			viewWrites.push(request.postDataJSON());
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	const panel = page.locator('.header .auth-panel');
+	await expect(panel.locator('.auth-identity')).toHaveText('e2e@example.com');
+	await expect.poll(() => viewWrites).toEqual([{ defaultView: 'gantt' }]);
+	expect(await readPendingDefaultView(page)).toBe('gantt');
+
+	// Left behind, the next account to sign in here would send it as its own.
+	await panel.getByRole('checkbox', { name: '캐시 삭제' }).uncheck();
+	await panel.getByRole('button', { name: '로그아웃' }).click();
+	await expect(page.locator('.locked-app-state .auth-panel')).toBeVisible();
+	expect(await readPendingDefaultView(page)).toBeNull();
 });

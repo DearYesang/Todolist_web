@@ -8,6 +8,7 @@
  * - view-preference.js: the current view and a pending server default view.
  * - filters.js: the board filters.
  * - category-store.js: the category catalog, its summaries and category edits.
+ * - owner.js: handing the board to the signed-in user.
  * - sync-engine.js: per-task server write chains, draining them to the offline
  *   queue, and server results that must not revert queued local edits.
  * - task-mutations.js: task creation, backup import, and optimistic task and
@@ -33,7 +34,7 @@ export const tasks = readonly(writableTasks);
 export const currentView = readonly(writableCurrentView);
 export const filters = readonly(writableFilters);
 
-export { clearLocalTaskCache, setTaskStorageOwner } from './task-store/task-cache.js';
+export { clearLocalTaskCache } from './task-store/task-cache.js';
 
 export {
     clearPendingDefaultView,
@@ -54,7 +55,6 @@ export {
     categories,
     categorySummaries,
     clearCategory,
-    clearCategoryCatalog,
     mergeCategory,
     renameCategory,
     reorderCategories,
@@ -62,6 +62,8 @@ export {
     updateCategoryColor,
     visibleCategorySummaries
 } from './task-store/category-store.js';
+
+export { setTaskStoreOwner } from './task-store/owner.js';
 
 export { drainPendingTaskSyncsToOfflineQueue } from './task-store/sync-engine.js';
 

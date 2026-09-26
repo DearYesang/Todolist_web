@@ -1,6 +1,6 @@
 import { get, writable } from 'svelte/store';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
-import { getStorage, PENDING_VIEW_STORAGE_KEY } from './storage.js';
+import { getStorage } from '../browser-storage.js';
 
 const STORAGE_KEY = 'kanbanTasks';
 const DEFAULT_STORAGE_OWNER = 'anonymous';
@@ -66,13 +66,21 @@ export function setTaskStorageOwner(ownerId) {
     tasks.set(loadInitialTasks());
 }
 
+/**
+ * The user whose tasks the store holds, or null for the signed-out
+ * (anonymous) cache.
+ * @returns {string | null}
+ */
+export function getTaskStorageOwner() {
+    return taskStorageOwner === DEFAULT_STORAGE_OWNER ? null : taskStorageOwner;
+}
+
 export function clearLocalTaskCache() {
     try {
         const storage = getStorage();
         if (!storage) return;
 
         storage.removeItem(getTaskStorageKey());
-        storage.removeItem(PENDING_VIEW_STORAGE_KEY);
         if (taskStorageOwner === DEFAULT_STORAGE_OWNER) {
             storage.removeItem(STORAGE_KEY);
         }

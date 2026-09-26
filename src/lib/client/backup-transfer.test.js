@@ -4,7 +4,7 @@ import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { jsonResponse } from '$lib/test-support/http.js';
 import { exportTaskBackup, importTaskBackup } from './backup-transfer.js';
 import { loadOfflineQueue, setOfflineQueueOwner } from './offline-write-queue.js';
-import { filters, setPriorityFilter, setTaskStorageOwner, tasks } from './task-store.js';
+import { filters, setPriorityFilter, setTaskStoreOwner, tasks } from './task-store.js';
 
 const REPLACE_QUESTION = '현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.';
 const EXISTING = { id: 'existing-task', text: 'Existing task', status: 'todo' };
@@ -20,8 +20,8 @@ const BOARD_OWNER = 'backup-test-user';
 function openCachedBoard(board) {
 	const storage = installMemoryStorage();
 	storage.set(`kanbanTasks:${BOARD_OWNER}`, JSON.stringify(board));
-	setTaskStorageOwner(null);
-	setTaskStorageOwner(BOARD_OWNER);
+	setTaskStoreOwner(null);
+	setTaskStoreOwner(BOARD_OWNER);
 }
 
 /**
@@ -74,7 +74,7 @@ describe('importing a backup file', () => {
 
 	afterEach(() => {
 		setOfflineQueueOwner(null);
-		setTaskStorageOwner(null);
+		setTaskStoreOwner(null);
 	});
 
 	it('replaces the board with the server import when the question is accepted', async () => {
@@ -164,7 +164,7 @@ describe('importing a backup file', () => {
 describe('exporting a backup file', () => {
 	afterEach(() => {
 		vi.useRealTimers();
-		setTaskStorageOwner(null);
+		setTaskStoreOwner(null);
 	});
 
 	function createFakeEnvironment() {
