@@ -1,29 +1,29 @@
-import { createId, normalizeTask } from '../shared/task-domain.js';
-import { isServerId } from '../shared/task-rules.js';
+import { createId, normalizeTask } from '../../shared/task-domain.js';
+import { isServerId } from '../../shared/task-rules.js';
 
 /**
  * @typedef {{
  *   text: string;
- *   priority: import('../shared/task-domain.js').TaskPriority;
- *   urgency: import('../shared/task-domain.js').TaskUrgency;
+ *   priority: import('../../shared/task-domain.js').TaskPriority;
+ *   urgency: import('../../shared/task-domain.js').TaskUrgency;
  *   category: string;
  *   startDate: string;
  *   endDate: string;
- *   parent: import('../shared/task-domain.js').Task | null;
+ *   parent: import('../../shared/task-domain.js').Task | null;
  * }} BuildTaskCreatePayloadInput
  *
  * @typedef {{
  *   payload: {
  *     text: string;
- *     status: import('../shared/task-domain.js').TaskStatus;
+ *     status: import('../../shared/task-domain.js').TaskStatus;
  *     startDate: string;
  *     endDate: string;
- *     priority: import('../shared/task-domain.js').TaskPriority;
- *     urgency: import('../shared/task-domain.js').TaskUrgency;
+ *     priority: import('../../shared/task-domain.js').TaskPriority;
+ *     urgency: import('../../shared/task-domain.js').TaskUrgency;
  *     category: string;
  *     parentId: string | null;
  *   };
- *   parent: import('../shared/task-domain.js').Task | null;
+ *   parent: import('../../shared/task-domain.js').Task | null;
  *   hasLocalParent: boolean;
  * }} TaskCreateDraft
  */
@@ -59,7 +59,7 @@ export function buildTaskCreateDraft(input) {
 
 /**
  * @param {TaskCreateDraft['payload']} payload
- * @param {import('../shared/task-domain.js').Task | null} parent
+ * @param {import('../../shared/task-domain.js').Task | null} parent
  */
 export function createLocalTaskFromDraft(payload, parent) {
 	return normalizeTask({

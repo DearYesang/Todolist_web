@@ -9,7 +9,9 @@
  * - category-store.js: the category catalog, its summaries and category edits.
  * - sync-engine.js: per-task server write chains, draining them to the offline
  *   queue, and server results that must not revert queued local edits.
- * - task-mutations.js: optimistic task and checklist edits.
+ * - task-mutations.js: task creation, backup import, and optimistic task and
+ *   checklist edits.
+ * - task-create.js: the add-task form's server payload and local task.
  * - cross-tab-sync.js: applying another tab's cache writes.
  *
  * The order of the exports below is the modules' load order. task-cache.js
@@ -71,8 +73,10 @@ export {
     addSubtask,
     assignParent,
     clearDoneTasks,
+    createTask,
     deleteSubtask,
     deleteTaskCascade,
+    importTasks,
     moveTask,
     renameSubtask,
     toggleCollapse,

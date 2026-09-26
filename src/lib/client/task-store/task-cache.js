@@ -123,6 +123,14 @@ export function replaceTasks(nextTasks) {
 }
 
 /**
+ * Adds a newly created task at the end of the list.
+ * @param {import('../../shared/task-domain.js').Task} task
+ */
+export function insertTask(task) {
+    tasks.update((current) => [...current, task]);
+}
+
+/**
  * @param {unknown[]} nextTasks
  * @param {{ insertMissing?: boolean }} [options]
  *   insertMissing: false keeps responses for locally deleted tasks from resurrecting them.
