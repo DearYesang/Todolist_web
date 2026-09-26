@@ -7,7 +7,7 @@ import {
 	replaceLocalTaskWithServerTask,
 	replaceTasks
 } from './task-cache.js';
-import { applyServerDefaultView } from './view-preference.js';
+import { setCurrentView } from './view-preference.js';
 import { applyServerCategoryCatalog } from './category-store.js';
 import {
 	applyServerTaskResults,
@@ -65,7 +65,7 @@ export async function syncServerTasks(fetcher = globalThis.fetch) {
 		}
 		const preferences = await getBoardPreferences(fetcher);
 		if (preferences.ok) {
-			applyServerDefaultView(preferences.defaultView);
+			setCurrentView(preferences.defaultView);
 		}
 	}
 

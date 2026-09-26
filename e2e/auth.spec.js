@@ -377,3 +377,51 @@ test('drops a default view not yet sent when the user signs out and keeps the ca
 	await expect(page.locator('.locked-app-state .auth-panel')).toBeVisible();
 	expect(await readPendingDefaultView(page)).toBeNull();
 });
+
+test('saves a chosen view as the default view and shows why the server refused one', async ({ page }) => {
+	/** @type {unknown[]} */
+	const viewWrites = [];
+	await page.route('**/api/**', (route) => {
+		const request = route.request();
+		const { pathname } = new URL(request.url());
+		if (pathname === '/api/auth/get-session') {
+			return route.fulfill({ json: E2E_SESSION });
+		}
+		if (pathname === '/api/tasks') {
+			return route.fulfill({ json: { tasks: [] } });
+		}
+		if (pathname === '/api/categories') {
+			return route.fulfill({ json: { categories: [] } });
+		}
+		if (pathname === '/api/board/preferences' && request.method() === 'GET') {
+			return route.fulfill({ json: { defaultView: 'gantt' } });
+		}
+		if (pathname === '/api/board/preferences' && request.method() === 'PATCH') {
+			const body = request.postDataJSON();
+			viewWrites.push(body);
+			return body.defaultView === 'matrix'
+				? route.fulfill({ status: 400, json: { message: 'Default view is invalid.' } })
+				: route.fulfill({ json: body });
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	await expect(page.locator('.header .auth-identity')).toHaveText('e2e@example.com');
+	// The sign-in sync applies the account's default view; choose after it.
+	await expect(page.getByRole('button', { name: '간트 뷰' })).toHaveClass(/active/);
+
+	await page.getByRole('button', { name: '칸반 뷰' }).click();
+	await expect.poll(() => viewWrites).toEqual([{ defaultView: 'kanban' }]);
+	await expect(page.getByRole('button', { name: '칸반 뷰' })).toHaveClass(/active/);
+	await expect(page.locator('.sync-notice')).toHaveCount(0);
+
+	// A refusal the view cannot wait out is shown, and nothing stays pending.
+	await page.getByRole('button', { name: '매트릭스 뷰' }).click();
+	const notice = page.locator('.sync-notice');
+	await expect(notice).toHaveText(/Default view is invalid\./);
+	await expect(notice).toHaveAttribute('role', 'status');
+	await expect(page.getByRole('button', { name: '매트릭스 뷰' })).toHaveClass(/active/);
+	expect(viewWrites).toEqual([{ defaultView: 'kanban' }, { defaultView: 'matrix' }]);
+	expect(await readPendingDefaultView(page)).toBeNull();
+});

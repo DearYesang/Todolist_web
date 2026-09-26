@@ -212,3 +212,52 @@ test('lists offline conflicts and applies, keeps or saves them', async ({ page }
 	await notice.getByRole('button', { name: '확인' }).click();
 	await expect(notice).toHaveCount(0);
 });
+
+test('refreshes the board from the header and says when it cannot', async ({ page, context }) => {
+	const taskId = '77777777-7777-4777-8777-777777777777';
+	let serverTasks = [{ id: taskId, text: 'Server task before refresh', status: 'todo', version: 1 }];
+	let serverReachable = true;
+	await page.route('**/api/**', (route) => {
+		const { pathname } = new URL(route.request().url());
+		if (pathname === '/api/auth/get-session') {
+			return route.fulfill({
+				json: {
+					session: { id: 'e2e-session', userId: 'e2e-user', expiresAt: '2099-01-01T00:00:00.000Z' },
+					user: { id: 'e2e-user', email: 'e2e@example.com', name: null }
+				}
+			});
+		}
+		if (pathname === '/api/tasks' && serverReachable) {
+			return route.fulfill({ json: { tasks: serverTasks } });
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	await expect(page.getByText('Server task before refresh')).toBeVisible();
+	const notice = page.locator('.sync-notice');
+	// The sign-in sync does not announce itself.
+	await expect(notice).toHaveCount(0);
+
+	const refresh = page.getByRole('button', { name: '새로고침', exact: true });
+	serverTasks = [{ id: taskId, text: 'Server task after refresh', status: 'todo', version: 2 }];
+	await refresh.click();
+	await expect(page.getByText('Server task after refresh')).toBeVisible();
+	await expect(notice).toHaveText(/^\s*최신 작업 목록으로 새로고침했습니다\.\s*확인\s*$/);
+	await expect(notice).toHaveAttribute('role', 'status');
+	await notice.getByRole('button', { name: '확인' }).click();
+	await expect(notice).toHaveCount(0);
+
+	// The server cannot be reached: the board stays as it is.
+	serverReachable = false;
+	await refresh.click();
+	await expect(notice).toHaveText(/^\s*지금은 서버에 연결할 수 없어 이 기기의 작업 목록을 유지합니다\.\s*확인\s*$/);
+	await expect(page.getByText('Server task after refresh')).toBeVisible();
+	await expect(refresh).toBeEnabled();
+
+	// Offline, a refresh says so instead of trying.
+	await context.setOffline(true);
+	await refresh.click();
+	await expect(notice).toHaveText(/^\s*오프라인 상태입니다\. 온라인으로 돌아오면 새로고침할 수 있습니다\.\s*확인\s*$/);
+	await context.setOffline(false);
+});

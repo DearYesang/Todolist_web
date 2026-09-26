@@ -1,25 +1,51 @@
 <script>
+    import { authClient } from '$lib/client/auth-client.js';
     import { exportTaskBackup, importTaskBackup } from '$lib/client/backup-transfer.js';
-    import { currentView } from '$lib/client/task-store.js';
+    import { refreshAppData, showNotice, syncStatus } from '$lib/client/sync-status.js';
+    import { currentView, selectView } from '$lib/client/task-store.js';
+    import { APP_VIEWS } from '$lib/shared/task-rules.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
 
     /** @type {{
      *   appUnlocked: boolean;
      *   showOfflineStatus: boolean;
-     *   isRefreshing: boolean;
-     *   onselectview: (view: import('$lib/shared/task-rules.js').AppView) => void;
-     *   onrefresh: () => void;
      *   oncleardone: () => void;
      * }} */
     let {
         appUnlocked,
         showOfflineStatus,
-        isRefreshing,
-        onselectview,
-        onrefresh,
         oncleardone
     } = $props();
+
+    /** @typedef {import('$lib/shared/task-rules.js').AppView} AppView */
+
+    /** @type {Record<AppView, { icon: string; label: string }>} */
+    const VIEW_BUTTONS = {
+        kanban: { icon: '📋', label: '칸반' },
+        gantt: { icon: '📊', label: '간트' },
+        matrix: { icon: '🧭', label: '매트릭스' }
+    };
+
+    const session = authClient.useSession();
+    const isRefreshing = $derived($syncStatus.isRefreshing);
+
+    /**
+     * @param {AppView} view
+     */
+    async function chooseView(view) {
+        const message = await selectView(view, { signedIn: Boolean($session.data?.user?.id) });
+        if (message !== null) {
+            showNotice(message);
+        }
+    }
+
+    function refresh() {
+        return refreshAppData({
+            refetchSession: () => $session.refetch(),
+            getUserId: () => $session.data?.user?.id
+        });
+    }
 
     /**
      * @param {Event} event
@@ -53,18 +79,12 @@
 
     {#if appUnlocked}
         <div class="view-toggle">
-            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => onselectview('kanban')} aria-label="칸반 뷰">
-                <span class="view-icon" aria-hidden="true">📋</span>
-                <span class="view-label">칸반</span>
-            </button>
-            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => onselectview('gantt')} aria-label="간트 뷰">
-                <span class="view-icon" aria-hidden="true">📊</span>
-                <span class="view-label">간트</span>
-            </button>
-            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => onselectview('matrix')} aria-label="매트릭스 뷰">
-                <span class="view-icon" aria-hidden="true">🧭</span>
-                <span class="view-label">매트릭스</span>
-            </button>
+            {#each APP_VIEWS as view (view)}
+                <button class="view-btn" class:active={$currentView === view} onclick={() => chooseView(view)} aria-label="{VIEW_BUTTONS[view].label} 뷰">
+                    <span class="view-icon" aria-hidden="true">{VIEW_BUTTONS[view].icon}</span>
+                    <span class="view-label">{VIEW_BUTTONS[view].label}</span>
+                </button>
+            {/each}
         </div>
     {/if}
 
@@ -77,7 +97,7 @@
             {/if}
             <button
                 class="btn refresh-btn primary-action"
-                onclick={onrefresh}
+                onclick={refresh}
                 disabled={isRefreshing}
                 aria-label={isRefreshing ? '새로고침 중' : '새로고침'}
                 title={isRefreshing ? '새로고침 중' : '새로고침'}>
