@@ -5,12 +5,8 @@ import {
 	getRecoveryCodeSummaryForUser,
 	revokeRecoveryCodesForUser
 } from '$lib/server/auth/account-security.js';
-import {
-	assertRateLimit,
-	createRateLimitHeaders,
-	createRateLimitKey,
-	RateLimitError
-} from '$lib/server/security/rate-limit.js';
+import { apiErrorResponse } from '$lib/server/http/api-error.js';
+import { assertRateLimit, createRateLimitKey, RateLimitError } from '$lib/server/security/rate-limit.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
@@ -47,14 +43,7 @@ export async function POST(event) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof RateLimitError) {
-			return json({ message: error.message }, {
-				status: error.status,
-				headers: createRateLimitHeaders(error)
-			});
-		}
-
-		throw error;
+		return apiErrorResponse(error, RateLimitError);
 	}
 }
 
@@ -78,13 +67,6 @@ export async function DELETE(event) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof RateLimitError) {
-			return json({ message: error.message }, {
-				status: error.status,
-				headers: createRateLimitHeaders(error)
-			});
-		}
-
-		throw error;
+		return apiErrorResponse(error, RateLimitError);
 	}
 }

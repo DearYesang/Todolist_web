@@ -8,12 +8,8 @@ import {
 	isAccountEmail,
 	normalizeAccountEmail
 } from '$lib/server/auth/account-security.js';
-import {
-	assertRateLimit,
-	createRateLimitHeaders,
-	createRateLimitKey,
-	RateLimitError
-} from '$lib/server/security/rate-limit.js';
+import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
+import { assertRateLimit, createRateLimitKey } from '$lib/server/security/rate-limit.js';
 
 const MAX_BODY_BYTES = 10_000;
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
@@ -30,19 +26,15 @@ export async function POST(event) {
 		return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 500 });
 	}
 
-	let payload;
-	try {
-		const contentLength = Number(request.headers.get('content-length') ?? '0');
-		if (contentLength > MAX_BODY_BYTES) {
-			return json({ message: 'Request body is too large.' }, { status: 413 });
-		}
-
-		payload = await request.json();
-	} catch {
-		return json({ message: 'Request body must be valid JSON.' }, { status: 400 });
+	const contentLength = Number(request.headers.get('content-length') ?? '0');
+	if (contentLength > MAX_BODY_BYTES) {
+		return json({ message: 'Request body is too large.' }, { status: 413 });
 	}
 
+	/** @type {any} */
+	let payload;
 	try {
+		payload = await readJsonBody(request);
 		const email = normalizeAccountEmail(payload?.email);
 		await assertRateLimit(createRateLimitKey(event, 'email-verification-ip'), {
 			limit: 20,
@@ -76,13 +68,6 @@ export async function POST(event) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof RateLimitError) {
-			return json({ message: error.message }, {
-				status: error.status,
-				headers: createRateLimitHeaders(error)
-			});
-		}
-
 		if (error instanceof AccountSecurityConfigurationError) {
 			return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: error.status });
 		}
@@ -91,7 +76,7 @@ export async function POST(event) {
 			return createGenericAcceptedResponse(typeof payload?.email === 'string' ? payload.email : '');
 		}
 
-		throw error;
+		return apiErrorResponse(error);
 	}
 }
 
