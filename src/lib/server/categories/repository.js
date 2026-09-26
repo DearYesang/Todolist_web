@@ -7,10 +7,10 @@ import {
 	getCategoryRowForBoard,
 	listCategoryRowsForBoard,
 	mapCategoryRowToClientCategory,
-	normalizeCategoryKey,
 	parseCategoryColor,
 	parseCategoryName
 } from './category-service.js';
+import { normalizeCategoryKey } from '$lib/shared/category-suggestions.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -127,7 +127,7 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 		return {
 			category: mapCategoryRowToClientCategory(updatedCategory[0]),
 			updatedTasks: updatedTasks.length,
-			taskVersions: toTaskVersions(updatedTasks)
+			taskVersions: updatedTasks
 		};
 	} catch (error) {
 		if (isUniqueConstraintError(error)) {
@@ -190,7 +190,7 @@ export async function mergeCategoryForUser(userId, sourceCategoryId, payload) {
 		source: mapCategoryRowToClientCategory(archivedSource[0] ?? source),
 		target: mapCategoryRowToClientCategory(target),
 		updatedTasks: updatedTasks.length,
-		taskVersions: toTaskVersions(updatedTasks)
+		taskVersions: updatedTasks
 	};
 }
 
@@ -237,7 +237,7 @@ export async function deleteCategoryForUser(userId, categoryId) {
 	return {
 		category: mapCategoryRowToClientCategory(archivedCategory[0] ?? category),
 		clearedTasks: clearedTasks.length,
-		taskVersions: toTaskVersions(clearedTasks)
+		taskVersions: clearedTasks
 	};
 }
 
@@ -279,13 +279,6 @@ export async function reorderCategoriesForUser(userId, payload) {
 	}
 
 	return listCategoriesForUser(userId);
-}
-
-/**
- * @param {{ id: string; version: number }[]} rows
- */
-function toTaskVersions(rows) {
-	return rows.map((row) => ({ id: row.id, version: row.version }));
 }
 
 /**

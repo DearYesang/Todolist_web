@@ -1,6 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
-import { findOrCreateCategoryRow, normalizeCategoryKey } from '$lib/server/categories/category-service.js';
+import { findOrCreateCategoryRow } from '$lib/server/categories/category-service.js';
+import { normalizeCategoryKey } from '$lib/shared/category-suggestions.js';
 import { getOrCreatePersonalBoardForUser } from './board-provisioning.js';
 import { planTaskImport } from './import-planner.js';
 import { attachCategoryMetaToTaskRow, mapTaskRowsToClientTasks } from './task-mapper.js';

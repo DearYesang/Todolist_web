@@ -6,7 +6,7 @@ import {
     updateServerCategory
 } from '../category-api.js';
 import { normalizeTaskList } from '../../shared/task-domain.js';
-import { normalizeCategoryName } from '../../shared/category-suggestions.js';
+import { normalizeCategoryKey, normalizeCategoryName } from '../../shared/category-suggestions.js';
 import { tasks } from './task-cache.js';
 import { filters } from './filters.js';
 import { applyServerTaskVersions, syncTaskSnapshot } from './sync-engine.js';
@@ -20,7 +20,7 @@ export const categories = derived([tasks, categoryCatalog], ([$tasks, $categoryC
         .map((category) => category.id));
     const hiddenCategoryNames = new Set($categoryCatalog
         .filter((category) => category.hiddenAt || category.archivedAt)
-        .map((category) => normalizeCategoryName(category.name).toLocaleLowerCase('ko'))
+        .map((category) => normalizeCategoryKey(category.name))
         .filter(Boolean));
     const names = new Set($categoryCatalog
         .filter((category) => !category.archivedAt && !category.hiddenAt)
@@ -28,7 +28,7 @@ export const categories = derived([tasks, categoryCatalog], ([$tasks, $categoryC
         .filter(Boolean));
     for (const task of $tasks) {
         const name = normalizeCategoryName(task.category);
-        const key = name.toLocaleLowerCase('ko');
+        const key = normalizeCategoryKey(name);
         if (
             task.categoryMeta?.hiddenAt
             || task.categoryMeta?.archivedAt
@@ -64,7 +64,7 @@ export const categorySummaries = derived([tasks, categoryCatalog], ([$tasks, $ca
     for (const task of $tasks) {
         const name = normalizeCategoryName(task.category);
         if (!name) continue;
-        const key = task.categoryId ? `id:${task.categoryId}` : `name:${normalizeCategoryName(name).toLocaleLowerCase('ko')}`;
+        const key = task.categoryId ? `id:${task.categoryId}` : `name:${normalizeCategoryKey(name)}`;
         const summary = summaryByKey.get(key) ?? {
             id: task.categoryId ?? null,
             name,
@@ -267,9 +267,9 @@ export async function reorderCategories(categoryIds) {
  */
 export function assignTaskCategory(taskId, name) {
     const categoryName = normalizeCategoryName(name);
-    const key = toCategoryKey(categoryName);
+    const key = normalizeCategoryKey(categoryName);
     const target = categoryName
-        ? get(categoryCatalog).find((category) => !category.archivedAt && toCategoryKey(category.name) === key) ?? null
+        ? get(categoryCatalog).find((category) => !category.archivedAt && normalizeCategoryKey(category.name) === key) ?? null
         : null;
 
     /** @type {import('../../shared/task-domain.js').Task | null} */
@@ -278,7 +278,7 @@ export function assignTaskCategory(taskId, name) {
         const task = current.find((candidate) => candidate.id === taskId);
         // The same name is a no-op, and keeps the task's own id when the
         // catalog has not loaded (offline) or does not list it.
-        if (!task || (toCategoryKey(task.category) === key && (!target || task.categoryId === target.id))) {
+        if (!task || (normalizeCategoryKey(task.category) === key && (!target || task.categoryId === target.id))) {
             return current;
         }
 
@@ -365,14 +365,6 @@ function toCategoryMeta(category) {
             archivedAt: category.archivedAt
         }
         : null;
-}
-
-/**
- * The key the server keeps category names unique by, per board.
- * @param {string} name
- */
-function toCategoryKey(name) {
-    return normalizeCategoryName(name).toLocaleLowerCase('ko');
 }
 
 /**

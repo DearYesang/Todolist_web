@@ -1,16 +1,9 @@
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { schema } from '$lib/server/db/index.js';
-import { normalizeCategoryName } from '$lib/shared/category-suggestions.js';
+import { normalizeCategoryKey, normalizeCategoryName } from '$lib/shared/category-suggestions.js';
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
-
-/**
- * @param {string} name
- */
-export function normalizeCategoryKey(name) {
-	return normalizeCategoryName(name).toLocaleLowerCase('ko');
-}
 
 /**
  * @param {typeof schema.categories.$inferSelect} row
