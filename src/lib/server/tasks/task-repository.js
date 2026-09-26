@@ -10,7 +10,7 @@ import {
 	getPersonalBoardForUser
 } from './board-provisioning.js';
 import { attachCategoryMetaToTaskRow, mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
-import { createPositionValue, getChecklistRowsForTask, getWritableTaskForUser } from './task-rows.js';
+import { createPositionValue, getWritableTaskForUser, loadClientTask } from './task-rows.js';
 import {
 	assertValidTaskDateRange,
 	parseCreateTaskInput,
@@ -232,9 +232,7 @@ export async function updateTaskForUser(userId, taskId, payload) {
 		throw new TaskWriteError('Task was not found.', 404);
 	}
 
-	const checklistRows = await getChecklistRowsForTask(db, updated.id);
-	const categoryRow = updated.categoryId ? await getCategoryRowForBoard(db, updated.boardId, updated.categoryId, { includeArchived: true }) : null;
-	return mapTaskRowToClientTask(attachCategoryMetaToTaskRow(updated, categoryRow), checklistRows);
+	return loadClientTask(db, updated);
 }
 
 /**

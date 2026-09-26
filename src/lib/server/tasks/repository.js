@@ -10,8 +10,8 @@
  * - import-repository.js: backup import and replace.
  * - board-provisioning.js: the Personal workspace and Inbox board, created on
  *   first use, and the board's default view.
- * - task-rows.js: the authorization read, the checklist read and the position
- *   values the writers share.
+ * - task-rows.js: the authorization read, the checklist read, the position
+ *   values and the client task a write answers with, which the writers share.
  */
 
 export {
