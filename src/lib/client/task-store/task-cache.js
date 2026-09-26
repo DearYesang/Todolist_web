@@ -95,6 +95,44 @@ export function getTaskStorageKey() {
 }
 
 /**
+ * Rewrites task `taskId` in the cached board of `ownerId` (null for the
+ * signed-out board) while the store holds another board: for a write made
+ * on that board that lands after the board moved on. The store's own board
+ * changes through the store. Nothing happens when that board or the task
+ * is not cached.
+ * @param {string | null} ownerId
+ * @param {string} taskId
+ * @param {(task: import('../../shared/task-domain.js').Task) => import('../../shared/task-domain.js').Task} update
+ */
+export function updateCachedTaskOf(ownerId, taskId, update) {
+    const owner = normalizeStorageOwner(ownerId);
+    if (owner === taskStorageOwner) {
+        return;
+    }
+
+    try {
+        const storage = getStorage();
+        const key = `${STORAGE_KEY}:${owner}`;
+        const raw = storage?.getItem(key);
+        if (!storage || !raw) return;
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+
+        const cached = normalizeTaskList(parsed);
+        const task = cached.find((current) => current.id === taskId);
+        if (!task) return;
+
+        const next = update(task);
+        if (next !== task) {
+            storage.setItem(key, JSON.stringify(cached.map((current) => current === task ? next : current)));
+        }
+    } catch (error) {
+        console.error('Failed to update a cached task', error);
+    }
+}
+
+/**
  * Runs task writes that came from another tab's storage event. That tab has
  * already persisted them, so the cache does not write them back.
  * @param {() => void} run

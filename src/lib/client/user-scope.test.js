@@ -496,7 +496,7 @@ describe('signing out while a task write is still in flight', () => {
 	// board, and the user's cached board keeps the version the write started
 	// from. The user's next sign-in here opens the board from that cache; an
 	// edit made before the first sync expects that version and meets a 409.
-	it.fails('moves the task in the user\'s cached board to the version a write that lands after the sign-out reached', async () => {
+	it('moves the task in the user\'s cached board to the version a write that lands after the sign-out reached', async () => {
 		await editInFlight();
 		await signOut({ clearLocalData: false });
 
@@ -512,7 +512,7 @@ describe('signing out while a task write is still in flight', () => {
 	// The same for an item whose create lands after the sign-out: the cache
 	// keeps its local id. With no create of that id left in the queue, an
 	// edit or delete of it before the user's first sync is dropped.
-	it.fails('gives the item in the user\'s cached board the id its create got after the sign-out', async () => {
+	it('gives the item in the user\'s cached board the id its create got after the sign-out', async () => {
 		addSubtask(TASK_ID, 'New');
 		await vi.advanceTimersByTimeAsync(0);
 		await signOut({ clearLocalData: false });

@@ -7,7 +7,8 @@ import {
     mergeTasks,
     replaceTasks,
     setTaskStorageOwner,
-    tasks
+    tasks,
+    updateCachedTaskOf
 } from './task-cache.js';
 import { resetFilters } from './filters.js';
 
@@ -137,5 +138,28 @@ describe('task storage owner scope', () => {
 
         setTaskStorageOwner('user-a');
         expect(get(tasks)).toEqual([taskA]);
+    });
+
+    it('rewrites a task in another user\'s cached board only', () => {
+        const taskA = normalizeTask({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', text: 'User A task', version: 1 });
+        const otherTaskA = normalizeTask({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', text: 'Other', version: 1 });
+        setTaskStorageOwner('user-a');
+        replaceTasks([taskA, otherTaskA]);
+        /** @param {import('../../shared/task-domain.js').Task} task */
+        const toVersion2 = (task) => ({ ...task, version: 2 });
+
+        // The store's own board changes through the store.
+        updateCachedTaskOf('user-a', taskA.id, toVersion2);
+        expect(get(tasks).map((task) => task.version)).toEqual([1, 1]);
+
+        setTaskStorageOwner('user-b');
+        replaceTasks([normalizeTask({ id: taskA.id, text: 'Same id on B', version: 1 })]);
+        updateCachedTaskOf('user-a', taskA.id, toVersion2);
+        updateCachedTaskOf('user-c', taskA.id, toVersion2);
+
+        expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['Same id on B', 1]]);
+        expect(storage.has('kanbanTasks:user-c')).toBe(false);
+        setTaskStorageOwner('user-a');
+        expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['User A task', 2], ['Other', 1]]);
     });
 });

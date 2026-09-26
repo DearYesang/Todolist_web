@@ -18,7 +18,7 @@ import {
     resolveQueuedChecklistCreate
 } from '../offline-write-queue.js';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
-import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
+import { getTaskStorageOwner, mergeTasks, tasks, updateCachedTaskOf } from './task-cache.js';
 
 /**
  * One server write in a task's chain, bound to the board it was made on:
@@ -476,24 +476,32 @@ function applyServerTaskResult(serverTask, { newerEditQueued = false } = {}) {
         return;
     }
 
-    tasks.update((current) => current.map((task) => {
-        if (task.id !== serverTask.id) {
-            return task;
-        }
+    tasks.update((current) => current.map((task) =>
+        task.id === serverTask.id ? advanceToServerTask(task, serverTask) : task
+    ));
+}
 
-        const next = typeof serverTask.version === 'number'
-            && (typeof task.version !== 'number' || serverTask.version > task.version)
-            ? { ...task, version: serverTask.version }
-            : task;
-        const subtasks = next.subtasks.map((item) => {
-            const resolvedId = resolvedChecklistItemIds.get(item.id);
-            return resolvedId ? { ...item, id: resolvedId } : item;
-        });
+/**
+ * A copy of a task newer than a server answer for it, moved on only where
+ * the answer is ahead: to the answer's version when newer, and to the
+ * server ids that creates in the task's chain gave its local checklist
+ * items.
+ * @param {import('../../shared/task-domain.js').Task} task
+ * @param {import('../../shared/task-domain.js').Task} serverTask
+ */
+function advanceToServerTask(task, serverTask) {
+    const next = typeof serverTask.version === 'number'
+        && (typeof task.version !== 'number' || serverTask.version > task.version)
+        ? { ...task, version: serverTask.version }
+        : task;
+    const subtasks = next.subtasks.map((item) => {
+        const resolvedId = resolvedChecklistItemIds.get(item.id);
+        return resolvedId ? { ...item, id: resolvedId } : item;
+    });
 
-        return subtasks.some((item, index) => item !== next.subtasks[index])
-            ? { ...next, subtasks }
-            : next;
-    }));
+    return subtasks.some((item, index) => item !== next.subtasks[index])
+        ? { ...next, subtasks }
+        : next;
 }
 
 /**
@@ -1012,7 +1020,8 @@ function toServerTaskPatch(task) {
 /**
  * Applies a chained write's server answer, unless the store holds another
  * user's board by now: the answer is about the board the write was made
- * on, and a copy of the task there is no business of another user's.
+ * on, and a copy of the task there is no business of another user's. The
+ * answer then moves the task in the cache of the board it was made on.
  *
  * When a later edit of the task moved to the offline queue while the
  * request was out, that edit expects the version the request started
@@ -1037,6 +1046,12 @@ function applyWriteResult(write, serverTask) {
         advanceQueuedTaskVersion(serverTask.id, serverTask.version, { ownerId: write.queueOwnerId });
     }
     if (getTaskStorageOwner() !== write.storeOwnerId) {
+        // That user's board opens from their cache at their next sign-in
+        // here, and an edit made on it before the first sync must not
+        // expect the version this write moved past, or name an item this
+        // write created by its local id. The cached copy already holds the
+        // write and any later edit, so only those move.
+        updateCachedTaskOf(write.storeOwnerId, serverTask.id, (task) => advanceToServerTask(task, serverTask));
         return;
     }
 
