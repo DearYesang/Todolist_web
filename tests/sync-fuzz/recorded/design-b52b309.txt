@@ -1,0 +1,4 @@
+     × T4: stops sending user A's queue once user B holds the queue 5ms
+     × T2: a queued task edit meets a 409 after the user's own checklist toggle lands 11ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  2 failed | 4 passed (6)

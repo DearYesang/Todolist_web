@@ -1,0 +1,30 @@
+R1a {"counted":0,"ua":[],"anonymous":["task.create:ua.t3:0"]}
+R1c {"signedOutWithoutDialog":true,"anonymousQueue":["task.create:ua.t3:0"],"anonymousCache":["ua.t3:0"]}
+R1b {"onBBoard":["ua.t3:0"],"bAccount":["ub.t1:0","ub.t2:0","ua.t3:0"],"aAccount":["ua.t1:0","ua.t2:0"]}
+R2 {"anonCacheAfterClear":[],"bBoard":["ua.t1:0","ua.t2:0"],"bCache":["ua.t1:0","ua.t2:0"]}
+R2b {"anonCache":["ua.t1:0","ua.t2:0"]}
+R3 {"sent":["patch:ua:ua.t1:1","404:ub:/api/tasks/00000000-0000-4000-8000-000000000003","create:ub:ua.t3:0"],"aQueue":[],"aServer":["ua.t1:1","ua.t2:0"],"bServer":["ub.t1:0","ub.t2:0","ua.t3:0"]}
+R4 {"boardTitleAfterPartialSync":"ua.t1:0","queuedAfterPartialSync":["ua.t1:1"],"queuedAfterPriority":[],"serverTitle":"ua.t1:0","conflicts":[]}
+R4b {"boardPriority":"medium","server":"ua.t2:1/medium","conflicts":[]}
+R5 {"server409":1,"conflicts":["task.patch:ua.t1:1"],"serverTitle":"ua.t1:0"}
+R5b {"conflicts":["task.delete:00000000-0000-4000-8000-000000000001"],"t1OnServer":true,"t1OnBoard":true}
+R6 {"titlesWritten":["ua.t1:2","ua.t1:1"],"serverTitle":"ua.t1:1","conflicts":[]}
+R6b {"items":["ua.i1~0","ua.i9~0"],"warn":["Dropped an offline edit that raced its own completed sync. checklist.create 112beb92-a2a7-453d-af5a-edbdfc656ffb"]}
+R7 {"boardItemsAfterDeleteAnswer":[],"queuedByDrain":[],"serverItem":{"id":"00000000-0000-4000-8000-000000000009","text":"ua.i9~0","done":false}}
+R8 {"copies":["1790438774678vspva-3","00000000-0000-4000-8000-000000000009"],"onServer":1}
+     × R1a: a task create still out at sign-out lands in the anonymous queue, not its user's 74ms
+     × R1c: with "clear local data" on, the in-flight create is not counted, no dialog is shown, and it ends up on the device anyway 8ms
+     × R1b: a task create still out when the next user signs in is created in that user's account 8ms
+     × R2: a sync snapshot answered after sign-out and the next sign-in is applied to the next user's board 6ms
+     × R2b: after "clear local data", a late snapshot writes the signed-out user's tasks to the anonymous cache 6ms
+     × R3: a queue sync keeps sending user A's queue with user B's session after B signs in 11ms
+     × R4: a queued task edit is dropped without a conflict after a queue sync reverted it on the board 7ms
+     × R4b: same, when a late sync snapshot reverted the queued edit on the board 8ms
+     × R5: a queued task edit meets a 409 after the same user's own checklist edit of the task lands 6ms
+     × R5b: deleting a task while the queue sync sends its queued edit meets a 409, and the task stays 7ms
+     × R6: a queue sync sends its stale copy of a queued edit after a newer edit of the task landed 7ms
+     × R6b: renaming a checklist item while the queue sync sends its queued create is dropped 6ms
+     × R7: a drain (pagehide, or the sign-out wait timing out) loses the edit of a new checklist item an earlier answer wiped from the board 6ms
+     × R8: a snapshot that already lists a task the queue sync just created leaves a permanent local duplicate 7ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  14 failed (14)

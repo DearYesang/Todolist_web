@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
+    "test:sync-fuzz": "vitest run --config tests/sync-fuzz/vitest.config.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --fail-on-warnings",
     "build": "vite build",
     "preview": "vite preview",
