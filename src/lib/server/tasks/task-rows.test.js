@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPositionValue } from './repository.js';
+import { createPositionValue } from './task-rows.js';
 
 describe('server task import planning', () => {
     it('creates sortable positions that fit numeric(20,10)', () => {

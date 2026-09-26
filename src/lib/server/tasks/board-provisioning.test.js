@@ -1,93 +1,21 @@
-import { getTableName } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '$lib/server/db/index.js';
+import { recordStatements } from '$lib/test-support/fake-db.js';
 import {
 	ensurePersonalBoardForUser,
 	getBoardPreferencesForUser,
-	listTasksForUser,
 	updateBoardPreferencesForUser
-} from './repository.js';
+} from './board-provisioning.js';
+import { listTasksForUser } from './task-repository.js';
 
 vi.mock('$lib/server/db/index.js', async () => {
-	const { drizzle } = await import('drizzle-orm/neon-http');
-	const { neon } = await import('@neondatabase/serverless');
-	const schema = await import('./../db/schema.js');
-	// neon-http performs no I/O until a query executes, so statements can be
-	// built against a fake URL.
-	const db = drizzle(neon('postgresql://user:pass@boards-test.invalid/db'), { schema });
-	return { getDb: () => db, schema };
+	const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+	return createFakeDbModule();
 });
 
 const USER_ID = 'user-id';
 const WORKSPACE = { id: 'workspace-id', name: 'Personal', ownerUserId: USER_ID };
 const BOARD = { id: 'board-id', workspaceId: WORKSPACE.id, name: 'Inbox', defaultView: 'matrix' };
-
-/**
- * Replaces db.select/insert/update with builder chains that record the table,
- * the rendered where clause, the inserted or set values and the other builder
- * steps of each statement. Each statement resolves to the next queued rows.
- * @param {any} db
- * @param {unknown[][]} results
- */
-function recordStatements(db, results) {
-	const queue = [...results];
-	/** @type {Record<string, unknown>[]} */
-	const statements = [];
-
-	/**
-	 * @param {string} kind
-	 * @param {any} table
-	 */
-	function createChain(kind, table) {
-		/** @type {Record<string, unknown> & { steps: string[] }} */
-		const statement = { kind, table: table ? getTableName(table) : null, steps: [] };
-		statements.push(statement);
-		const rows = queue.shift() ?? [];
-		/** @type {any} */
-		const chain = {
-			from: (/** @type {any} */ source) => {
-				statement.table = getTableName(source);
-				return chain;
-			},
-			where: (/** @type {import('drizzle-orm').SQL} */ condition) => {
-				const { sql: text, params } = new PgDialect().sqlToQuery(condition);
-				statement.where = { text, params };
-				return chain;
-			},
-			values: (/** @type {unknown} */ values) => {
-				statement.values = values;
-				return chain;
-			},
-			set: (/** @type {unknown} */ values) => {
-				statement.set = values;
-				return chain;
-			},
-			leftJoin: () => step(chain, statement, 'leftJoin'),
-			orderBy: () => step(chain, statement, 'orderBy'),
-			limit: () => step(chain, statement, 'limit'),
-			onConflictDoNothing: () => step(chain, statement, 'onConflictDoNothing'),
-			returning: () => step(chain, statement, 'returning'),
-			then: (/** @type {(rows: unknown[]) => unknown} */ resolve) => resolve(rows)
-		};
-		return chain;
-	}
-
-	vi.spyOn(db, 'select').mockImplementation(() => createChain('select', null));
-	vi.spyOn(db, 'insert').mockImplementation((table) => createChain('insert', table));
-	vi.spyOn(db, 'update').mockImplementation((table) => createChain('update', table));
-	return statements;
-}
-
-/**
- * @param {any} chain
- * @param {{ steps: string[] }} statement
- * @param {string} name
- */
-function step(chain, statement, name) {
-	statement.steps.push(name);
-	return chain;
-}
 
 const SELECT_WORKSPACE = {
 	kind: 'select',

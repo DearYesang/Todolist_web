@@ -22,11 +22,7 @@ const OWNING_MODULES = {
 // these names from repository.js, and the route tests replace the whole
 // module with vi.mock factories, so this list is the module's contract.
 const FUNCTIONS = [
-	'buildCascadeDeleteStatement',
-	'buildTaskPatchSet',
-	'buildTaskVersionBump',
 	'createChecklistItemForUser',
-	'createPositionValue',
 	'createTaskForUser',
 	'deleteChecklistItemForUser',
 	'deleteTaskCascadeForUser',
