@@ -2,30 +2,34 @@ import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
-import { normalizeTask } from '../shared/task-domain.js';
+import { normalizeTask } from '../../shared/task-domain.js';
 import {
-	addSubtask,
-	applyServerTaskSnapshot,
-	deleteSubtask,
-	deleteTaskCascade,
-	drainPendingTaskSyncsToOfflineQueue,
 	mergeTasks,
-	renameSubtask,
 	replaceTasks,
 	setTaskStorageOwner,
-	tasks,
-	updateTask,
+	tasks
+} from './task-cache.js';
+import {
+	applyServerTaskSnapshot,
+	drainPendingTaskSyncsToOfflineQueue,
+	resetTaskSyncStateForTests,
 	waitForPendingTaskSyncs
-} from './task-store.js';
-import { handleExternalTaskStorageEvent } from './task-store/cross-tab-sync.js';
-import { resetTaskSyncStateForTests } from './task-store/sync-engine.js';
+} from './sync-engine.js';
+import {
+	addSubtask,
+	deleteSubtask,
+	deleteTaskCascade,
+	renameSubtask,
+	updateTask
+} from './task-mutations.js';
+import { handleExternalTaskStorageEvent } from './cross-tab-sync.js';
 import {
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,
 	loadOfflineQueue,
 	setOfflineQueueOwner
-} from './offline-write-queue.js';
-import { syncServerTasks } from './task-sync.js';
+} from '../offline-write-queue.js';
+import { syncServerTasks } from './server-sync.js';
 
 const SERVER_TASK_ID = '11111111-1111-4111-8111-111111111111';
 

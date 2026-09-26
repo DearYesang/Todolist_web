@@ -25,12 +25,21 @@ const LAYER_RULES = [
 	{ layer: 'server', forbidden: ['client', 'components'] }
 ];
 const TEST_SUPPORT = 'lib/test-support/';
+const TASK_STORE_DIR = 'lib/client/task-store/';
+const TASK_STORE_FACADE = 'lib/client/task-store.js';
+const OFFLINE_QUEUE = 'lib/client/offline-write-queue.js';
 
 /** @param {string} file */
 const isTest = (file) => file.endsWith('.test.js');
 
 /** @param {string} file */
 const isProduction = (file) => !isTest(file) && !file.startsWith(TEST_SUPPORT);
+
+/**
+ * The task store facade or a file in its folder.
+ * @param {string} file
+ */
+const isInTaskStore = (file) => file === TASK_STORE_FACADE || file.startsWith(TASK_STORE_DIR);
 
 /** Every .js and .svelte file under src/, as a POSIX path relative to src/. */
 const files = readdirSync(SRC_DIR, { recursive: true, encoding: 'utf8' })
@@ -189,17 +198,22 @@ describe('source architecture', () => {
 	);
 
 	it('reaches the client task store modules only through task-store.js', () => {
-		// Components and the sync modules outside the folder use the facade;
-		// tests may import the module they test.
-		const storeDir = 'lib/client/task-store/';
-		const facade = 'lib/client/task-store.js';
+		// Components, the other client modules and their tests use the
+		// facade; the modules and tests inside the folder import each other.
 		expect(findImports((importer, imported) =>
-			isProduction(importer) && importer !== facade && !importer.startsWith(storeDir) && imported.startsWith(storeDir)
+			importer !== TASK_STORE_FACADE && !importer.startsWith(TASK_STORE_DIR) && imported.startsWith(TASK_STORE_DIR)
 		)).toEqual([]);
 	});
 
+	it('exports from task-store.js only names that production code outside the folder imports', async () => {
+		const facade = await import('./lib/client/task-store.js');
+		const imported = new Set(files
+			.filter((file) => isProduction(file) && !isInTaskStore(file))
+			.flatMap((file) => [...readNamedImports(file, TASK_STORE_FACADE).keys()]));
+		expect(Object.keys(facade).filter((name) => !imported.has(name))).toEqual([]);
+	});
+
 	it('writes the client task store stores only inside lib/client/task-store/', async () => {
-		const facadePath = 'lib/client/task-store.js';
 		/** @type {Record<string, unknown>} */
 		const facade = await import('./lib/client/task-store.js');
 		/** @param {unknown} value */
@@ -218,10 +232,10 @@ describe('source architecture', () => {
 		// `$store.field = ...` or `bind:value={$store...}`, which svelte-check
 		// lets through and which would only fail when they run.
 		const writes = files
-			.filter((file) => !file.startsWith('lib/client/task-store'))
+			.filter((file) => !isInTaskStore(file))
 			.flatMap((file) => {
 				const source = readSource(file);
-				return [...readNamedImports(file, facadePath)]
+				return [...readNamedImports(file, TASK_STORE_FACADE)]
 					.filter(([imported]) => storeNames.includes(imported))
 					.filter(([, local]) => [
 						new RegExp(`(?<![\\w$.])${local}\\s*\\.\\s*(?:set|update)\\s*\\(`),
@@ -231,6 +245,18 @@ describe('source architecture', () => {
 					.map(([imported]) => `${file} writes ${imported}`);
 			});
 		expect(writes).toEqual([]);
+	});
+
+	it('adds to and flushes the offline queue only from lib/client/task-store/', () => {
+		// Outside the folder, production code only scopes the queue to the
+		// signed-in user, counts its entries and clears it on sign-out.
+		const scopeNames = ['clearOfflineWriteQueue', 'getOfflineQueueSize', 'setOfflineQueueOwner'];
+		expect(files
+			.filter((file) => isProduction(file) && !isInTaskStore(file) && imports.get(file)?.includes(OFFLINE_QUEUE))
+			.filter((file) => {
+				const names = [...readNamedImports(file, OFFLINE_QUEUE).keys()];
+				return names.length === 0 || names.some((name) => !scopeNames.includes(name));
+			})).toEqual([]);
 	});
 
 	it('reaches the server task repository modules only through repository.js', () => {

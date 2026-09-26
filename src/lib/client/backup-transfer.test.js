@@ -4,12 +4,25 @@ import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { jsonResponse } from '$lib/test-support/http.js';
 import { exportTaskBackup, importTaskBackup } from './backup-transfer.js';
 import { loadOfflineQueue, setOfflineQueueOwner } from './offline-write-queue.js';
-import { filters, replaceTasks, setPriorityFilter, tasks } from './task-store.js';
+import { filters, setPriorityFilter, setTaskStorageOwner, tasks } from './task-store.js';
 
 const REPLACE_QUESTION = '현재 목록을 파일 내용으로 교체하시겠습니까? 취소하면 기존 목록에 추가합니다.';
 const EXISTING = { id: 'existing-task', text: 'Existing task', status: 'todo' };
 const SERVER_TASK = { id: '33333333-3333-4333-8333-333333333333', text: 'Server imported task', status: 'todo' };
 const FILE_TEXT = JSON.stringify([{ id: 'file-task', text: 'File task', status: 'doing' }]);
+const BOARD_OWNER = 'backup-test-user';
+
+/**
+ * Opens `board` as this device's cached board of a signed-in user, the way
+ * the app loads it: the task store is read-only outside its folder.
+ * @param {unknown[]} board
+ */
+function openCachedBoard(board) {
+	const storage = installMemoryStorage();
+	storage.set(`kanbanTasks:${BOARD_OWNER}`, JSON.stringify(board));
+	setTaskStorageOwner(null);
+	setTaskStorageOwner(BOARD_OWNER);
+}
 
 /**
  * @param {Partial<import('./task-api.js').TaskImportSummary>} [summary]
@@ -53,16 +66,15 @@ describe('importing a backup file', () => {
 	let fetcher;
 
 	beforeEach(() => {
-		installMemoryStorage();
+		openCachedBoard([EXISTING]);
 		fetcher = vi.fn();
 		vi.stubGlobal('fetch', fetcher);
-		replaceTasks([EXISTING]);
 		setPriorityFilter('high');
 	});
 
 	afterEach(() => {
 		setOfflineQueueOwner(null);
-		replaceTasks([]);
+		setTaskStorageOwner(null);
 	});
 
 	it('replaces the board with the server import when the question is accepted', async () => {
@@ -93,7 +105,7 @@ describe('importing a backup file', () => {
 	});
 
 	it('does not ask on an empty board', async () => {
-		replaceTasks([]);
+		openCachedBoard([]);
 		fetcher.mockResolvedValue(importedResponse());
 		const dialogs = createDialogs({ replace: true });
 
@@ -152,7 +164,7 @@ describe('importing a backup file', () => {
 describe('exporting a backup file', () => {
 	afterEach(() => {
 		vi.useRealTimers();
-		replaceTasks([]);
+		setTaskStorageOwner(null);
 	});
 
 	function createFakeEnvironment() {
@@ -190,7 +202,7 @@ describe('exporting a backup file', () => {
 	});
 
 	it('saves the tasks on this device when the server export fails', async () => {
-		replaceTasks([EXISTING]);
+		openCachedBoard([EXISTING]);
 		vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ message: 'Database unavailable.' }, { status: 503 })));
 		const fake = createFakeEnvironment();
 

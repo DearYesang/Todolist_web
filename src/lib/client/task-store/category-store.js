@@ -102,6 +102,14 @@ export function applyServerCategoryCatalog(nextCategories) {
 }
 
 /**
+ * Empties the catalog, which holds the categories of the board it was
+ * loaded for, until the next finished sync loads the current one.
+ */
+export function clearCategoryCatalog() {
+    categoryCatalog.set([]);
+}
+
+/**
  * @param {import('../category-api.js').ClientCategory[]} nextCategories
  */
 function normalizeCategoryCatalog(nextCategories) {
