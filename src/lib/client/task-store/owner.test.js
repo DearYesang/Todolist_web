@@ -60,16 +60,25 @@ describe('handing the board to a user', () => {
         expect(readBoardState()).toEqual({ catalog: [], categoryFilter: 'all', pendingView: 'gantt' });
     });
 
-    it.each([
-        { next: 'another user', nextUserId: 'user-b' },
-        { next: 'no user', nextUserId: null }
-    ])('resets the catalog, the filters and a pending view when a user hands over to $next', ({ nextUserId }) => {
+    it('resets the catalog, the filters and a pending view when a user hands over to another user', () => {
         setTaskStoreOwner('user-a');
         leaveBoardState();
 
-        setTaskStoreOwner(nextUserId);
+        setTaskStoreOwner('user-b');
 
-        expect(getTaskStorageOwner()).toBe(nextUserId);
+        expect(getTaskStorageOwner()).toBe('user-b');
         expect(readBoardState()).toEqual({ catalog: [], categoryFilter: 'all', pendingView: null });
+    });
+
+    it('keeps a pending view but not the catalog or filters when a user hands over to no user', () => {
+        // A failed session check does this too; sign-out drops the view
+        // itself.
+        setTaskStoreOwner('user-a');
+        leaveBoardState();
+
+        setTaskStoreOwner(null);
+
+        expect(getTaskStorageOwner()).toBeNull();
+        expect(readBoardState()).toEqual({ catalog: [], categoryFilter: 'all', pendingView: 'gantt' });
     });
 });

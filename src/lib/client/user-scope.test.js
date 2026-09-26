@@ -160,30 +160,43 @@ describe('user scope', () => {
 		expect(get(categories)).toEqual(['서버 카테고리']);
 	});
 
-	// Probes P2 and P3. Left behind, a pending view is sent by App.svelte's
-	// next sync as the default view of whoever signs in next.
-	it.each([
-		{ change: 'another user signs in', nextUserId: 'user-b' },
-		{ change: 'the user signs out', nextUserId: null }
-	])('drops the previous user\'s catalog, filters and pending default view when $change', async ({ nextUserId }) => {
+	/** Signs user A in and leaves a catalog, filters and a pending view. */
+	async function leaveUserABoardState() {
 		seedUserData('user-a', { taskText: 'User A task' });
 		applyUserScope('user-a');
 		await syncCategoryCatalog();
 		setCategoryFilter(CATEGORY_ID, '서버 카테고리');
 		setPriorityFilter('high');
 		markPendingDefaultView('gantt');
+	}
 
-		applyUserScope(nextUserId);
-
-		expect({
+	function readBoardState() {
+		return {
 			categories: get(categories),
 			filters: get(filters),
 			pendingView: readPendingDefaultView()
-		}).toEqual({
-			categories: [],
-			filters: DEFAULT_FILTERS,
-			pendingView: null
-		});
+		};
+	}
+
+	// Probes P2 and P3. Left behind, a pending view is sent by App.svelte's
+	// next sync as the default view of whoever signs in next.
+	it('drops the previous user\'s catalog, filters and pending default view when another user signs in', async () => {
+		await leaveUserABoardState();
+
+		applyUserScope('user-b');
+
+		expect(readBoardState()).toEqual({ categories: [], filters: DEFAULT_FILTERS, pendingView: null });
+	});
+
+	it('drops the catalog and filters but keeps a pending default view when the board goes to no user', async () => {
+		// A session check that fails on a network that reports online does
+		// this: the view is sent once the user's session is confirmed again.
+		// Sign-out drops it itself (AuthAccountControls.svelte).
+		await leaveUserABoardState();
+
+		applyUserScope(null);
+
+		expect(readBoardState()).toEqual({ categories: [], filters: DEFAULT_FILTERS, pendingView: 'gantt' });
 	});
 
 	it('keeps a pending default view when the app opens as the cached user', () => {
