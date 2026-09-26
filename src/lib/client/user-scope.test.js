@@ -176,8 +176,9 @@ describe('user scope', () => {
 		};
 	}
 
-	// Probes P2 and P3. Left behind, a pending view is sent by App.svelte's
-	// next sync as the default view of whoever signs in next.
+	// Probes P2 and P3. Left behind, a pending view is sent by the next
+	// sync (sync-status.js runServerSync) as the default view of whoever
+	// signs in next.
 	it('drops the previous user\'s catalog, filters and pending default view when another user signs in', async () => {
 		await leaveUserABoardState();
 

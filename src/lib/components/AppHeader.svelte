@@ -1,6 +1,7 @@
 <script>
     import { authClient } from '$lib/client/auth-client.js';
     import { exportTaskBackup, importTaskBackup } from '$lib/client/backup-transfer.js';
+    import { refreshAppData, showNotice, syncStatus } from '$lib/client/sync-status.js';
     import { currentView, selectView } from '$lib/client/task-store.js';
     import { APP_VIEWS } from '$lib/shared/task-rules.js';
     import AuthPanel from './AuthPanel.svelte';
@@ -9,18 +10,12 @@
     /** @type {{
      *   appUnlocked: boolean;
      *   showOfflineStatus: boolean;
-     *   isRefreshing: boolean;
-     *   onrefresh: () => void;
      *   oncleardone: () => void;
-     *   onnotice: (message: string) => void;
      * }} */
     let {
         appUnlocked,
         showOfflineStatus,
-        isRefreshing,
-        onrefresh,
-        oncleardone,
-        onnotice
+        oncleardone
     } = $props();
 
     /** @typedef {import('$lib/shared/task-rules.js').AppView} AppView */
@@ -33,6 +28,7 @@
     };
 
     const session = authClient.useSession();
+    const isRefreshing = $derived($syncStatus.isRefreshing);
 
     /**
      * @param {AppView} view
@@ -40,8 +36,15 @@
     async function chooseView(view) {
         const message = await selectView(view, { signedIn: Boolean($session.data?.user?.id) });
         if (message !== null) {
-            onnotice(message);
+            showNotice(message);
         }
+    }
+
+    function refresh() {
+        return refreshAppData({
+            refetchSession: () => $session.refetch(),
+            getUserId: () => $session.data?.user?.id
+        });
     }
 
     /**
@@ -94,7 +97,7 @@
             {/if}
             <button
                 class="btn refresh-btn primary-action"
-                onclick={onrefresh}
+                onclick={refresh}
                 disabled={isRefreshing}
                 aria-label={isRefreshing ? '새로고침 중' : '새로고침'}
                 title={isRefreshing ? '새로고침 중' : '새로고침'}>
