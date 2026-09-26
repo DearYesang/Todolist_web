@@ -3,6 +3,7 @@ import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import {
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,
+	getOfflineQueueOwner,
 	loadOfflineQueue,
 	setOfflineQueueOwner
 } from './offline-write-queue.js';
@@ -200,6 +201,53 @@ describe('offline write queue conflict behavior', () => {
 			ownerUserId: 'user-a',
 			type: 'task.patch'
 		});
+	});
+
+	it('adds a mutation to the queue of a given owner while another user is active', () => {
+		const taskId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+		setOfflineQueueOwner('user-a');
+		expect(getOfflineQueueOwner()).toBe('user-a');
+		enqueueOfflineMutation({ type: 'task.patch', taskId, patch: { text: 'A', priority: 'high' } });
+		setOfflineQueueOwner(null);
+		expect(getOfflineQueueOwner()).toBe('anonymous');
+
+		// A write user A made before signing out fails now.
+		expect(enqueueOfflineMutation({ type: 'task.patch', taskId, patch: { text: 'A2' } }, { ownerId: 'user-a' })).toBe(1);
+
+		expect(loadOfflineQueue()).toEqual([]);
+		expect(storage.has('kanbanOfflineWriteQueue:anonymous')).toBe(false);
+		setOfflineQueueOwner('user-a');
+		// Merged into user A's queue as if user A were active.
+		expect(loadOfflineQueue()).toEqual([
+			expect.objectContaining({
+				ownerUserId: 'user-a',
+				type: 'task.patch',
+				patch: { text: 'A2', priority: 'high' }
+			})
+		]);
+	});
+
+	it('adds a mutation for the signed-out owner under the per-owner key while a user is active', () => {
+		storage.set('kanbanOfflineWriteQueue', JSON.stringify([{
+			id: 'legacy-mutation',
+			type: 'task.delete',
+			taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+			createdAt: 1,
+			attempts: 0
+		}]));
+		setOfflineQueueOwner('user-a');
+
+		enqueueOfflineMutation({
+			type: 'task.delete',
+			taskId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+		}, { ownerId: 'anonymous' });
+
+		expect(storage.has('kanbanOfflineWriteQueue')).toBe(false);
+		expect(JSON.parse(storage.get('kanbanOfflineWriteQueue:anonymous') ?? '[]')).toEqual([
+			expect.objectContaining({ id: 'legacy-mutation' }),
+			expect.objectContaining({ ownerUserId: 'anonymous', taskId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' })
+		]);
+		expect(loadOfflineQueue()).toEqual([]);
 	});
 
 	it('resolves child creates queued under local parents', async () => {

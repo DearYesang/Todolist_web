@@ -79,19 +79,24 @@ let fallbackFlushInFlight = false;
  */
 
 /**
+ * Adds a mutation to the current owner's queue, or to `ownerId`'s: a write
+ * made before that user signed out goes to their queue, not to whoever
+ * owns the queue now.
  * @param {OfflineMutationInput} input
+ * @param {{ ownerId?: string }} [options] ownerId: an owner from getOfflineQueueOwner
  */
-export function enqueueOfflineMutation(input) {
-	const queue = loadOfflineQueue();
+export function enqueueOfflineMutation(input, { ownerId = queueOwnerId } = {}) {
+	const owner = normalizeQueueOwner(ownerId);
+	const queue = loadOwnerQueue(owner);
 	const mutation = {
 		...input,
 		id: input.id ?? createMutationId(),
-		ownerUserId: queueOwnerId,
+		ownerUserId: owner,
 		createdAt: Date.now(),
 		attempts: 0
 	};
 	const nextQueue = coalesceQueue(queue, mutation);
-	saveOfflineQueue(nextQueue);
+	saveOfflineQueue(nextQueue, owner);
 	return nextQueue.length;
 }
 
@@ -108,6 +113,14 @@ export function clearOfflineWriteQueue() {
  */
 export function setOfflineQueueOwner(ownerId) {
 	queueOwnerId = normalizeQueueOwner(ownerId);
+}
+
+/**
+ * The owner new mutations are queued for: a user id, or 'anonymous' when
+ * no one is signed in.
+ */
+export function getOfflineQueueOwner() {
+	return queueOwnerId;
 }
 
 /**
@@ -685,20 +698,28 @@ function shouldKeepForRetry(result) {
  * @returns {OfflineMutation[]}
  */
 export function loadOfflineQueue() {
+	return loadOwnerQueue(queueOwnerId);
+}
+
+/**
+ * @param {string} ownerId
+ * @returns {OfflineMutation[]}
+ */
+function loadOwnerQueue(ownerId) {
 	try {
 		const storage = getStorage();
 		if (!storage) {
 			return [];
 		}
 
-		const raw = storage.getItem(getOfflineQueueKey()) ?? readLegacyQueue(storage);
+		const raw = storage.getItem(getOfflineQueueKey(ownerId)) ?? readLegacyQueue(storage, ownerId);
 		if (!raw) {
 			return [];
 		}
 
 		const parsed = JSON.parse(raw);
 		return Array.isArray(parsed)
-			? parsed.filter(isOfflineMutation).filter(isCurrentOwnerMutation)
+			? parsed.filter(isOfflineMutation).filter((mutation) => isOwnedBy(mutation, ownerId))
 			: [];
 	} catch {
 		return [];
@@ -707,25 +728,26 @@ export function loadOfflineQueue() {
 
 /**
  * @param {OfflineMutation[]} queue
+ * @param {string} [ownerId]
  */
-function saveOfflineQueue(queue) {
+function saveOfflineQueue(queue, ownerId = queueOwnerId) {
 	try {
 		const storage = getStorage();
 		if (!storage) {
 			return;
 		}
 
-		const key = getOfflineQueueKey();
+		const key = getOfflineQueueKey(ownerId);
 		if (queue.length === 0) {
 			storage.removeItem(key);
-			if (queueOwnerId === DEFAULT_QUEUE_OWNER) {
+			if (ownerId === DEFAULT_QUEUE_OWNER) {
 				storage.removeItem(OFFLINE_QUEUE_KEY);
 			}
 			return;
 		}
 
 		storage.setItem(key, JSON.stringify(queue));
-		if (queueOwnerId === DEFAULT_QUEUE_OWNER) {
+		if (ownerId === DEFAULT_QUEUE_OWNER) {
 			storage.removeItem(OFFLINE_QUEUE_KEY);
 		}
 	} catch {
@@ -733,15 +755,19 @@ function saveOfflineQueue(queue) {
 	}
 }
 
-function getOfflineQueueKey() {
-	return `${OFFLINE_QUEUE_KEY}:${queueOwnerId}`;
+/**
+ * @param {string} ownerId
+ */
+function getOfflineQueueKey(ownerId) {
+	return `${OFFLINE_QUEUE_KEY}:${ownerId}`;
 }
 
 /**
  * @param {Storage} storage
+ * @param {string} ownerId
  */
-function readLegacyQueue(storage) {
-	return queueOwnerId === DEFAULT_QUEUE_OWNER ? storage.getItem(OFFLINE_QUEUE_KEY) : null;
+function readLegacyQueue(storage, ownerId) {
+	return ownerId === DEFAULT_QUEUE_OWNER ? storage.getItem(OFFLINE_QUEUE_KEY) : null;
 }
 
 /**
@@ -777,9 +803,10 @@ function isOfflineMutation(value) {
 
 /**
  * @param {OfflineMutation} mutation
+ * @param {string} ownerId
  */
-function isCurrentOwnerMutation(mutation) {
-	return (mutation.ownerUserId ?? DEFAULT_QUEUE_OWNER) === queueOwnerId;
+function isOwnedBy(mutation, ownerId) {
+	return (mutation.ownerUserId ?? DEFAULT_QUEUE_OWNER) === ownerId;
 }
 
 /**
