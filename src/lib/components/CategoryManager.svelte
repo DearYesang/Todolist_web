@@ -10,6 +10,7 @@
     } from '$lib/client/task-store.js';
     import { getCategoryColor } from '$lib/shared/task-domain.js';
 
+    /** @type {{ onclose: () => void }} */
     let { onclose } = $props();
 
     /** @type {string | null} */

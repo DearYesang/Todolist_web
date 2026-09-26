@@ -14,6 +14,7 @@
     import DateRangePicker from './DateRangePicker.svelte';
     import OpenLinksButton from './OpenLinksButton.svelte';
 
+    /** @type {{ taskId: string; onclose: () => void }} */
     let { taskId, onclose } = $props();
 
     const task = $derived($tasks.find((candidate) => candidate.id === taskId) || null);

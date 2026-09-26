@@ -12,6 +12,7 @@
     } from '$lib/shared/gantt-layout.js';
     import { getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
 
+    /** @type {{ openTask: (id: string) => void }} */
     let { openTask } = $props();
 
     const dayWidth = GANTT_DAY_WIDTH;

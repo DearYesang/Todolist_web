@@ -5,6 +5,7 @@
     import { buildColumnHierarchy, buildTaskIndex, canAssignParent } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
+    /** @type {{ openTask: (id: string) => void }} */
     let { openTask } = $props();
 
     const columns = [

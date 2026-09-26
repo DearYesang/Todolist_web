@@ -2,6 +2,16 @@
     import { getCategoryColor } from '$lib/shared/task-domain.js';
     import { suggestCategories } from '$lib/shared/category-suggestions.js';
 
+    /** @type {{
+     *   value?: string;
+     *   id?: string;
+     *   categories?: string[];
+     *   taskText?: string;
+     *   parentCategory?: string;
+     *   placeholder?: string;
+     *   onchange?: (value: string) => void;
+     *   oncommit?: (value: string) => void;
+     * }} */
     let {
         value = $bindable(''),
         id = 'category',

@@ -2,6 +2,12 @@
     import { formatLocalDate, parseLocalDateNoon, todayString } from '$lib/shared/local-date.js';
     import { normalizeDateRange } from '$lib/shared/task-domain.js';
 
+    /** @type {{
+     *   startDate: string;
+     *   endDate: string;
+     *   idPrefix?: string;
+     *   onchange?: (range: { startDate: string; endDate: string }) => void;
+     * }} */
     let {
         startDate = $bindable(),
         endDate = $bindable(),
