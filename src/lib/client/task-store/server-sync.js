@@ -38,11 +38,12 @@ export async function syncServerTasks(fetcher = globalThis.fetch) {
 		// Its answers are about that user's board: they go to the cache the
 		// board opens from at that user's next sign-in here, and stay off
 		// the board the store holds now, as does the server snapshot. Its
-		// conflicts are that user's too, and are not reported to the next.
-		// After a sign-out that cleared local data meanwhile, the answers
-		// go nowhere: the board is still that user's until the session
-		// refetch, but its data is gone from this device, as the user
-		// asked.
+		// conflicts are that user's too: the flush kept them in that user's
+		// queue for their next sync, and none are reported to the next
+		// user. After a sign-out that cleared local data meanwhile, the
+		// answers go nowhere: the board is still that user's until the
+		// session refetch, but its data is gone from this device, as the
+		// user asked.
 		if (!cacheCleared) {
 			updateCachedBoardOf(owner, (taskList) => applyFlushToTaskList(taskList, flushed));
 		}

@@ -818,7 +818,7 @@ describe('a sync of the offline queue that outlives its user', () => {
 	// flush takes it out of the user's queue as reported, and the sync
 	// reports no conflict to the board that follows: the edit is on neither
 	// the server nor the queue, and no one is told.
-	it.fails('keeps a queued edit that meets a 409 after the user signed out in that user\'s queue', async () => {
+	it('keeps a queued edit that meets a 409 after the user signed out in that user\'s queue', async () => {
 		seedUserA({ id: SERVER_TASK_ID, text: 'Mine', version: 1 }, {
 			type: 'task.patch',
 			taskId: SERVER_TASK_ID,
@@ -834,7 +834,7 @@ describe('a sync of the offline queue that outlives its user', () => {
 	// Verifier finding, older than PR #84. Once another user signed in,
 	// the flush went on with the rest of user A's queue, which the server
 	// took with user B's session: A's task created in B's account.
-	it.fails('sends no more of the user\'s queue once another user signed in', async () => {
+	it('sends no more of the user\'s queue once another user signed in', async () => {
 		seedUserA({ id: SERVER_TASK_ID, text: 'Mine', version: 1 }, {
 			type: 'task.patch',
 			taskId: SERVER_TASK_ID,

@@ -318,7 +318,12 @@ export function getOfflineQueueOwner() {
  * Sends the current owner's queue. The flush stays that owner's to the
  * end: when another owner takes the queue while a request is out (a
  * sign-out, or another user signing in), what it sent still leaves that
- * owner's queue, and what it keeps stays there.
+ * owner's queue, and what it keeps stays there. It sends nothing more
+ * then, since the next request would go out with another session, or
+ * with none; the same once the queue was cleared. A mutation that met a
+ * 409 stays in that owner's queue too, instead of being reported, as it
+ * would be to no one or to the next user: it meets its 409 again, and is
+ * reported, at the owner's next sync.
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<OfflineFlushResult>}
  */
@@ -400,6 +405,12 @@ async function executeFlush(fetcher, owner) {
 	let blocked = false;
 
 	for (let index = 0; index < queue.length; index += 1) {
+		if (queueOwnerId !== owner || queueClears !== clearsAtStart) {
+			blocked = true;
+			remaining.push(...queue.slice(index));
+			break;
+		}
+
 		const mutation = queue[index];
 		const executableMutation = withRefreshedExpectedVersion(
 			resolveOfflineMutationReferences(mutation, localTaskIds),
@@ -481,6 +492,10 @@ async function executeFlush(fetcher, owner) {
 		processedIds.add(mutation.id);
 	}
 
+	const ownerLeft = queueOwnerId !== owner && queueClears === clearsAtStart;
+	if (ownerLeft) {
+		conflicts.forEach((mutation) => processedIds.delete(mutation.id));
+	}
 	const finalQueue = reconcileQueueAfterFlush(remaining, processedIds, originalById, localTaskIds, owner);
 	saveOfflineQueue(finalQueue, owner);
 	return {
@@ -490,7 +505,7 @@ async function executeFlush(fetcher, owner) {
 		syncedTasks,
 		createdTasks,
 		completedImports,
-		conflicts
+		conflicts: ownerLeft ? [] : conflicts
 	};
 }
 

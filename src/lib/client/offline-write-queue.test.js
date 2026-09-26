@@ -740,6 +740,25 @@ describe('offline write queue conflict behavior', () => {
 		expect(storage.has('kanbanOfflineWriteQueue:user-a')).toBe(false);
 	});
 
+	// The user asked to drop what the queue held; what the flush has not
+	// sent yet is not sent after that.
+	it('sends nothing more of a queue that was cleared while the flush was out', async () => {
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({ type: 'task.patch', taskId: '55555555-5555-4555-8555-555555555555', patch: { text: 'First' } });
+		enqueueOfflineMutation({ type: 'task.delete', taskId: '66666666-6666-4666-8666-666666666666' });
+		const firstAnswer = createDeferred();
+		const fetcher = vi.fn().mockReturnValueOnce(firstAnswer.promise);
+
+		const flushing = flushOfflineWriteQueue(fetcher);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		clearOfflineWriteQueue();
+		firstAnswer.resolve(jsonResponse({ task: { id: '55555555-5555-4555-8555-555555555555', text: 'First', version: 2 } }));
+		await flushing;
+
+		expect(fetcher).toHaveBeenCalledTimes(1);
+		expect(storage.has('kanbanOfflineWriteQueue:user-a')).toBe(false);
+	});
+
 	it('drops a pending checklist create when the local item is deleted before sync', () => {
 		const taskId = '77777777-7777-4777-8777-777777777777';
 		const localItemId = 'local-checklist';
