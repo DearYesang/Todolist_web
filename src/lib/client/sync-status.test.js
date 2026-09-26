@@ -276,6 +276,10 @@ describe('sync status', () => {
 				]);
 				expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['My offline title', 4]]);
 			});
+			// Let anything still queued behind those answers go out, then check
+			// that no extra write followed (the fake server answers at once).
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(writes).toHaveLength(2);
 			expect(readStatus().conflicts.map((conflict) => conflict.id)).toEqual(['conflict-checklist']);
 		});
 
