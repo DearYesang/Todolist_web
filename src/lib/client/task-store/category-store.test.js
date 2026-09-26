@@ -5,19 +5,22 @@ import {
     assignTaskCategory,
     categories,
     categorySummaries,
+    clearCategory,
     mergeCategory,
     renameCategory
 } from './category-store.js';
 import { replaceTasks, tasks } from './task-cache.js';
 import { resetFilters } from './filters.js';
 import { resetTaskSyncStateForTests, waitForPendingTaskSyncs } from './sync-engine.js';
+import { updateTask } from './task-mutations.js';
 
 /**
  * @param {unknown} body
+ * @param {number} [status]
  */
-function jsonResponse(body) {
+function jsonResponse(body, status = 200) {
     return new Response(JSON.stringify(body), {
-        status: 200,
+        status,
         headers: { 'content-type': 'application/json' }
     });
 }
@@ -182,5 +185,71 @@ describe('assigning a task category', () => {
         expect(get(tasks)).toBe(before);
         await waitForPendingTaskSyncs();
         expect(patches).toEqual([]);
+    });
+});
+
+describe('task versions after a category write', () => {
+    const TASK_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const SOURCE = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: '공부', color: '#58a6ff', sortOrder: 0, hiddenAt: null, archivedAt: null };
+    const TARGET = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: '학습', color: null, sortOrder: 1, hiddenAt: null, archivedAt: null };
+    const ARCHIVED = { ...SOURCE, hiddenAt: '2026-07-06T12:00:00.000Z', archivedAt: '2026-07-06T12:00:00.000Z' };
+    /** @type {{ url: string; body: any }[]} */
+    let requests;
+    /** @type {Record<string, unknown>} */
+    let categoryResponse;
+    /** @type {number} The version of the task on the fake server. */
+    let serverVersion;
+
+    beforeEach(() => {
+        requests = [];
+        serverVersion = 3;
+        vi.stubGlobal('window', {});
+        vi.stubGlobal('navigator', { onLine: true });
+        vi.stubGlobal('fetch', vi.fn(async (/** @type {string} */ url, /** @type {RequestInit} */ init) => {
+            const body = init.body ? JSON.parse(String(init.body)) : undefined;
+            requests.push({ url, body });
+            if (url.startsWith('/api/categories/')) {
+                // Like the server, the category write bumps every task in it.
+                serverVersion += 1;
+                return jsonResponse({ ...categoryResponse, taskVersions: [{ id: TASK_ID, version: serverVersion }] });
+            }
+            if (body.expectedVersion !== serverVersion) {
+                return jsonResponse({ message: 'Task changed on another device. Sync and try again.' }, 409);
+            }
+            serverVersion += 1;
+            const current = get(tasks).find((task) => task.id === TASK_ID);
+            return jsonResponse({ task: { ...current, version: serverVersion } });
+        }));
+        replaceTasks([{ id: TASK_ID, text: 'Read', version: 3, category: '공부', categoryId: SOURCE.id, categoryMeta: SOURCE }]);
+        applyServerCategoryCatalog([SOURCE, TARGET]);
+    });
+
+    afterEach(async () => {
+        await waitForPendingTaskSyncs();
+        resetTaskSyncStateForTests();
+        replaceTasks([]);
+        applyServerCategoryCatalog([]);
+        vi.unstubAllGlobals();
+    });
+
+    // Fails until the client applies the taskVersions a category write
+    // returns: the edit goes out with the stale expectedVersion 3 and gets 409.
+    it.fails.each([
+        ['rename', () => renameCategory(SOURCE, '국어'), { category: { ...SOURCE, name: '국어' }, updatedTasks: 1 }, '국어'],
+        ['merge', () => mergeCategory(SOURCE, TARGET), { source: ARCHIVED, target: TARGET, updatedTasks: 1 }, '학습'],
+        ['delete', () => clearCategory(SOURCE), { category: ARCHIVED, clearedTasks: 1 }, '']
+    ])('edits a task after a category %s with the version the server gave it, without a false 409', async (_write, write, response, category) => {
+        categoryResponse = response;
+        const result = await write();
+
+        expect(result).toMatchObject({ ok: true, changed: 1 });
+        expect(get(tasks)[0]).toMatchObject({ category, version: 4 });
+
+        updateTask(TASK_ID, { text: 'Read more' });
+        await waitForPendingTaskSyncs();
+
+        expect(requests.filter((request) => request.url === `/api/tasks/${TASK_ID}`).map((request) => request.body))
+            .toEqual([expect.objectContaining({ text: 'Read more', category, expectedVersion: 4 })]);
+        expect(get(tasks)[0]).toMatchObject({ text: 'Read more', category, version: 5 });
     });
 });
