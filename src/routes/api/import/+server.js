@@ -20,7 +20,7 @@ export async function POST({ request, url }) {
 
 	try {
 		const payload = await readJsonBody(request, {
-			maxBytes: MAX_IMPORT_BYTES,
+			maxLength: MAX_IMPORT_BYTES,
 			tooLargeMessage: 'Import payload is too large.'
 		});
 		const mode = url.searchParams.get('mode') === 'replace' ? 'replace' : 'append';

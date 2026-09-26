@@ -68,19 +68,23 @@ export function apiErrorResponse(error, ...types) {
  * @param {{
  *   optional?: boolean;
  *   lenient?: boolean;
- *   maxBytes?: number;
+ *   maxLength?: number;
  *   tooLargeMessage?: string;
  * }} [options]
  *   - optional: an empty or blank body is no payload (undefined).
  *   - lenient: a body that is not JSON, or none, is `{}`.
- *   - maxBytes: a longer body is a 413 ApiError with `tooLargeMessage`,
- *     checked on its declared content-length before reading it and on the
- *     length of its text after.
+ *   - maxLength: a longer body is a 413 ApiError with `tooLargeMessage`.
+ *     It is checked twice: on the declared content-length, in bytes,
+ *     before reading, and on the text's `length`, in UTF-16 code units,
+ *     after. The second check is not a byte limit: a body sent without a
+ *     content-length whose text has multi-byte characters passes it with
+ *     more bytes than maxLength. The import route has always counted its
+ *     limit this way, and its limits stay as they are.
  * @returns {Promise<unknown>}
  */
 export async function readJsonBody(request, options = {}) {
-	const { optional = false, lenient = false, maxBytes, tooLargeMessage = 'Request body is too large.' } = options;
-	if (maxBytes !== undefined && Number(request.headers.get('content-length') ?? '0') > maxBytes) {
+	const { optional = false, lenient = false, maxLength, tooLargeMessage = 'Request body is too large.' } = options;
+	if (maxLength !== undefined && Number(request.headers.get('content-length') ?? '0') > maxLength) {
 		throw new ApiError(tooLargeMessage, 413);
 	}
 
@@ -91,7 +95,7 @@ export async function readJsonBody(request, options = {}) {
 		return invalidBody(lenient);
 	}
 
-	if (maxBytes !== undefined && text.length > maxBytes) {
+	if (maxLength !== undefined && text.length > maxLength) {
 		throw new ApiError(tooLargeMessage, 413);
 	}
 	if (optional && !text.trim()) {

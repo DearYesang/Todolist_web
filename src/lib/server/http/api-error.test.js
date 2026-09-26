@@ -143,15 +143,24 @@ describe('readJsonBody', () => {
 		expect(await readJsonBody(createRequest('{"name":"Feed"}'), { lenient: true })).toEqual({ name: 'Feed' });
 	});
 
-	it('refuses a body over maxBytes with a 413, by its declared length or by its text', async () => {
+	it('refuses a body over maxLength with a 413, by its declared length or by its text', async () => {
 		const tooLarge = { status: 413, message: 'Import payload is too large.' };
-		const options = { maxBytes: 10, tooLargeMessage: 'Import payload is too large.' };
+		const options = { maxLength: 10, tooLargeMessage: 'Import payload is too large.' };
 
 		await expect(readJsonBody(createRequest('[]', { 'content-length': '11' }), options)).rejects.toMatchObject(tooLarge);
 		await expect(readJsonBody(createRequest('[1,2,3,4,5]'), options)).rejects.toMatchObject(tooLarge);
 		expect(await readJsonBody(createRequest('[1,2,3,45]'), options)).toEqual([1, 2, 3, 45]);
 		await expect(readJsonBody(createRequest('[', { 'content-length': '1' }), options)).rejects.toMatchObject(invalidJson);
-		await expect(readJsonBody(createRequest('[1,2,3,4,5]'), { maxBytes: 10 }))
+		await expect(readJsonBody(createRequest('[1,2,3,4,5]'), { maxLength: 10 }))
 			.rejects.toMatchObject({ status: 413, message: 'Request body is too large.' });
+	});
+
+	it('counts the text after reading in characters, not bytes, as the import route always has', async () => {
+		// 10 characters, 18 bytes of UTF-8, sent without a content-length.
+		const body = '"éééééééé"';
+		expect(new TextEncoder().encode(body).byteLength).toBe(18);
+
+		expect(await readJsonBody(createRequest(body), { maxLength: 10 })).toBe('éééééééé');
+		await expect(readJsonBody(createRequest(body), { maxLength: 9 })).rejects.toMatchObject({ status: 413 });
 	});
 });
