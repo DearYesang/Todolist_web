@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { isServerTaskId } from '../task-create.js';
+import { isServerId } from '../../shared/task-rules.js';
 import { DEFAULT_FILTERS } from '../../shared/task-domain.js';
 
 /** @type {import('svelte/store').Writable<import('../../shared/task-domain.js').TaskFilters>} */
@@ -39,7 +39,7 @@ export function setCategoryFilter(value, name = null) {
     filters.update((current) => ({
         ...current,
         category: name ?? value,
-        categoryId: isServerTaskId(value) ? value : 'all'
+        categoryId: isServerId(value) ? value : 'all'
     }));
 }
 

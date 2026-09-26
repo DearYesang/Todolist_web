@@ -267,7 +267,7 @@
     }
 
     /**
-     * @param {'kanban' | 'gantt' | 'matrix'} view
+     * @param {import('$lib/shared/task-rules.js').AppView} view
      */
     async function selectView(view) {
         setCurrentView(view);

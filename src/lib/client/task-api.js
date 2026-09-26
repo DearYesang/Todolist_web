@@ -1,11 +1,11 @@
 import { normalizeTask, normalizeTaskList } from '../shared/task-domain.js';
 import { extractBackupTasks } from '../shared/task-backup.js';
+import { isAppView } from '../shared/task-rules.js';
 import { createFallbackResult, createHttpErrorResult, readJsonBody } from './http.js';
 
 // 429 must stay retryable: a throttled offline-queue flush keeps its
 // mutations queued for the next sync instead of dropping them.
 const FALLBACK_STATUSES = new Set([401, 409, 429, 503]);
-const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 
 /**
  * @typedef {{
@@ -63,7 +63,7 @@ const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
  *
  * @typedef {{
  *   ok: true;
- *   defaultView: 'kanban' | 'gantt' | 'matrix';
+ *   defaultView: import('../shared/task-rules.js').AppView;
  * } | {
  *   ok: false;
  *   fallback: boolean;
@@ -212,7 +212,7 @@ export async function getBoardPreferences(fetcher = globalThis.fetch) {
 }
 
 /**
- * @param {{ defaultView: 'kanban' | 'gantt' | 'matrix' }} preferences
+ * @param {{ defaultView: import('../shared/task-rules.js').AppView }} preferences
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<BoardPreferencesResult>}
  */
@@ -441,11 +441,11 @@ function isTasksResponse(body) {
 
 /**
  * @param {unknown} body
- * @returns {body is { defaultView: 'kanban' | 'gantt' | 'matrix' }}
+ * @returns {body is { defaultView: import('../shared/task-rules.js').AppView }}
  */
 function isBoardPreferencesResponse(body) {
 	const defaultView = /** @type {{ defaultView?: unknown } | null} */ (body)?.defaultView;
-	return typeof defaultView === 'string' && VALID_VIEWS.has(defaultView);
+	return isAppView(defaultView);
 }
 
 /**

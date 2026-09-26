@@ -31,7 +31,6 @@ export {
     applyServerDefaultView,
     clearPendingDefaultView,
     currentView,
-    isAppView,
     markPendingDefaultView,
     readPendingDefaultView,
     setCurrentView
@@ -82,5 +81,3 @@ export {
 } from './task-store/task-mutations.js';
 
 export { setupCrossTabTaskSync } from './task-store/cross-tab-sync.js';
-
-/** @typedef {import('./task-store/view-preference.js').AppView} AppView */

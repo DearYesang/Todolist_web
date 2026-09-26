@@ -1,10 +1,13 @@
 import { normalizeDateRange } from '$lib/shared/task-domain.js';
+import {
+	APP_VIEWS,
+	isOneOf,
+	TASK_PRIORITIES,
+	TASK_STATUSES,
+	TASK_URGENCIES,
+	UUID_PATTERN
+} from '$lib/shared/task-rules.js';
 
-const TASK_STATUSES = new Set(['todo', 'doing', 'done']);
-const TASK_PRIORITIES = new Set(['high', 'medium', 'low']);
-const TASK_URGENCIES = new Set(['urgent', 'normal']);
-const APP_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_TITLE_LENGTH = 300;
 const MAX_CATEGORY_LENGTH = 80;
 const MAX_CHECKLIST_TEXT_LENGTH = 500;
@@ -303,7 +306,7 @@ function parseExpectedVersion(value) {
 
 /**
  * @param {unknown} value
- * @param {Set<string>} allowed
+ * @param {readonly string[]} allowed
  * @param {string} label
  * @param {string} fallback
  */
@@ -317,11 +320,11 @@ function parseEnum(value, allowed, label, fallback) {
 
 /**
  * @param {unknown} value
- * @param {Set<string>} allowed
+ * @param {readonly string[]} allowed
  * @param {string} label
  */
 function parseRequiredEnum(value, allowed, label) {
-	if (typeof value !== 'string' || !allowed.has(value)) {
+	if (!isOneOf(allowed, value)) {
 		throw new TaskWriteError(`Invalid ${label}.`);
 	}
 

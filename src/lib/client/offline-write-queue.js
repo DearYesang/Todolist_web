@@ -7,7 +7,7 @@ import {
 	updateServerChecklistItem,
 	updateServerTask
 } from './task-api.js';
-import { isServerTaskId } from './task-create.js';
+import { isServerId as isServerTaskId } from '../shared/task-rules.js';
 
 const OFFLINE_QUEUE_KEY = 'kanbanOfflineWriteQueue';
 const DEFAULT_QUEUE_OWNER = 'anonymous';

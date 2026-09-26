@@ -1,6 +1,5 @@
 import { createId, normalizeTask } from '../shared/task-domain.js';
-
-const SERVER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { isServerId } from '../shared/task-rules.js';
 
 /**
  * @typedef {{
@@ -40,7 +39,7 @@ export function buildTaskCreateDraft(input) {
 	}
 
 	const parent = input.parent;
-	const hasLocalParent = Boolean(parent && !isServerTaskId(parent.id));
+	const hasLocalParent = Boolean(parent && !isServerId(parent.id));
 
 	return {
 		payload: {
@@ -77,11 +76,4 @@ export function createLocalTaskFromDraft(payload, parent) {
 		collapsed: false,
 		createdAt: Date.now()
 	});
-}
-
-/**
- * @param {unknown} value
- */
-export function isServerTaskId(value) {
-	return typeof value === 'string' && SERVER_UUID_PATTERN.test(value);
 }
