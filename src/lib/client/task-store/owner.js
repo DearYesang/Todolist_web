@@ -14,11 +14,18 @@ import { clearPendingDefaultView } from './view-preference.js';
  *   task panel their ids.
  * - The filters show everything again; a category filter would name the
  *   previous user's category.
- * - A default view still waiting to be sent is dropped when a signed-in
- *   user leaves: the next user's first sync would send it as theirs. When
- *   the app opens as the cached user (no user, then that user), it stays;
- *   it was set offline in an earlier visit, and the first sync once online
- *   sends it.
+ * - A default view still waiting to be sent is dropped when one signed-in
+ *   user hands the board straight to another: the new user's first sync
+ *   would send it as theirs. Every other change keeps it:
+ *   - No user, then a user: the app opening as the cached user. The view
+ *     was set offline in an earlier visit; the first sync once online
+ *     sends it.
+ *   - A user, then no user: a sign-out, which drops the view itself
+ *     (AuthAccountControls.svelte), or a session check that failed, as on
+ *     a network that reports online but reaches nothing (App.svelte). No
+ *     one signed out there, and the view is sent once that user's session
+ *     is confirmed again. The cost: if another user signs in next instead,
+ *     their first sync sends it as theirs.
  *
  * The same user again, as every session refetch applies it, changes
  * nothing.
@@ -33,7 +40,7 @@ export function setTaskStoreOwner(userId) {
 
     clearCategoryCatalog();
     resetFilters();
-    if (previousOwner !== null) {
+    if (previousOwner !== null && getTaskStorageOwner() !== null) {
         clearPendingDefaultView();
     }
 }

@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { authClient } from '$lib/client/auth-client.js';
     import { createRecoveryCodes, revokeRecoveryCodes } from '$lib/client/account-security-api.js';
+    import { clearPendingDefaultView } from '$lib/client/task-store.js';
     import { clearUserLocalData, countPendingLocalChanges } from '$lib/client/user-scope.js';
     import { createSuggestedPasskeyName, getAuthErrorMessage } from '$lib/client/auth-labels.js';
     import AuthStatus from './AuthStatus.svelte';
@@ -77,6 +78,11 @@
             }
 
             authMessage = '로그아웃되었습니다.';
+            // A default view not yet sent goes even when the cache stays:
+            // the next account to sign in here would send it as its own.
+            // Handing the board to no user keeps it, because a failed
+            // session check does that too.
+            clearPendingDefaultView();
             if (clearLocalDataOnSignOut) {
                 clearUserLocalData();
                 authMessage = '로그아웃했고 이 기기의 오프라인 캐시를 삭제했습니다.';

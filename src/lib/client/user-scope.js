@@ -100,8 +100,8 @@ export function applyUserScope(userId) {
 
 	scopedUserId = userId;
 	// Also resets what the previous user left on the board: the category
-	// catalog, the filters and, when a signed-in user leaves, a pending
-	// default view.
+	// catalog, the filters and, when one signed-in user hands over to
+	// another, a pending default view.
 	setTaskStoreOwner(userId);
 	setOfflineQueueOwner(userId);
 	setLinkOpenOwner(userId);
