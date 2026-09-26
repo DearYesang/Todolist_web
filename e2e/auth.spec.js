@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { cardByTitle } from './fixtures/board.js';
 import { recordDialogs } from './fixtures/page.js';
+
+const E2E_SESSION = {
+	session: { id: 'e2e-session', userId: 'e2e-user', expiresAt: '2099-01-01T00:00:00.000Z' },
+	user: { id: 'e2e-user', email: 'e2e@example.com', name: null }
+};
 
 test('keeps the private app locked before login', async ({ page }) => {
 	await page.goto('/');
@@ -150,14 +156,7 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 		const { pathname } = new URL(request.url());
 		const method = request.method();
 		if (pathname === '/api/auth/get-session') {
-			return route.fulfill({
-				json: signedIn
-					? {
-						session: { id: 'e2e-session', userId: 'e2e-user', expiresAt: '2099-01-01T00:00:00.000Z' },
-						user: { id: 'e2e-user', email: 'e2e@example.com', name: null }
-					}
-					: null
-			});
+			return route.fulfill({ json: signedIn ? E2E_SESSION : null });
 		}
 		if (pathname === '/api/auth/passkey/list-user-passkeys') {
 			return route.fulfill({ json: passkeys });
@@ -278,4 +277,70 @@ test('manages passkeys, recovery codes and sign-out for a signed-in account', as
 		localStorage.getItem('kanbanOfflineWriteQueue:e2e-user'),
 		localStorage.getItem('kanbanTasks:e2e-user')
 	])).toEqual([null, '[]']);
+});
+
+test('counts a task edit that fails while sign-out waits for it before asking to clear the cache', async ({ page }) => {
+	const TASK_ID = '88888888-8888-4888-8888-888888888888';
+	// Answers: keep the cache (cancel sign-out).
+	const dialogs = recordDialogs(page, [false]);
+	/** @type {string[]} */
+	const requests = [];
+	/** @type {(value?: unknown) => void} */
+	let answerPatch = () => {};
+	const patchAnswer = new Promise((resolve) => {
+		answerPatch = resolve;
+	});
+	await page.route('**/api/**', async (route) => {
+		const request = route.request();
+		const { pathname } = new URL(request.url());
+		const method = request.method();
+		if (pathname === '/api/auth/get-session') {
+			return route.fulfill({ json: E2E_SESSION });
+		}
+		if (pathname === '/api/tasks' && method === 'GET') {
+			return route.fulfill({ json: { tasks: [{ id: TASK_ID, text: 'Server task', status: 'todo', priority: 'medium', version: 1 }] } });
+		}
+		if (pathname === '/api/categories') {
+			return route.fulfill({ json: { categories: [] } });
+		}
+		if (pathname === `/api/tasks/${TASK_ID}` && method === 'PATCH') {
+			requests.push(`PATCH priority ${request.postDataJSON().priority}`);
+			// Held until the test has clicked sign-out; 503 is retryable, so
+			// the edit then moves to the offline queue.
+			await patchAnswer;
+			return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+		}
+		if (pathname === '/api/auth/sign-out') {
+			requests.push('sign-out');
+			return route.fulfill({ json: { success: true } });
+		}
+		return route.fulfill({ status: 503, json: { message: 'Database unavailable.' } });
+	});
+
+	await page.goto('/');
+	const modal = page.locator('.side-panel');
+	await cardByTitle(page, 'Server task').locator('.card-text').click();
+	await modal.locator('#modal-priority').selectOption('high');
+	await modal.locator('.close-btn').click();
+	await expect.poll(() => requests).toEqual(['PATCH priority high']);
+
+	// The offline queue is empty when sign-out starts. It waits for the edit
+	// in flight, which fails into the queue: the question counts it.
+	const panel = page.locator('.header .auth-panel');
+	const signOut = panel.getByRole('button', { name: '로그아웃' });
+	await expect(panel.getByRole('checkbox', { name: '캐시 삭제' })).toBeChecked();
+	await signOut.click();
+	await expect(signOut).toBeDisabled();
+	answerPatch();
+
+	await expect.poll(() => dialogs.length).toBe(1);
+	expect(dialogs[0]).toBe('confirm:아직 동기화되지 않은 오프라인 변경 1건이 있습니다. 로그아웃하면서 이 기기 캐시를 삭제할까요?');
+	await expect(panel.locator('.auth-status').first()).toHaveText('로그아웃을 취소했습니다. 먼저 Sync로 오프라인 변경을 동기화해 주세요.');
+	await expect(signOut).toBeEnabled();
+	await expect(panel.locator('.auth-identity')).toHaveText('e2e@example.com');
+	expect(requests).toEqual(['PATCH priority high']);
+	// The edit waits in the queue of the user still signed in.
+	expect(await page.evaluate(() => JSON.parse(localStorage.getItem('kanbanOfflineWriteQueue:e2e-user') ?? '[]'))).toMatchObject([
+		{ type: 'task.patch', taskId: TASK_ID, patch: { priority: 'high' }, ownerUserId: 'e2e-user' }
+	]);
 });
