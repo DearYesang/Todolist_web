@@ -257,14 +257,14 @@ describe('offline write queue conflict behavior', () => {
 		expect(loadOfflineQueue()).toEqual([]);
 	});
 
-	it('moves a queued edit or delete of a task up to a newer version only', () => {
+	it('moves a queued edit or delete of a task up to the next version only', () => {
 		const patched = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 		const deleted = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 		const ahead = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 		const unversioned = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 		setOfflineQueueOwner('user-a');
-		enqueueOfflineMutation({ type: 'task.patch', taskId: patched, patch: { text: 'A', expectedVersion: 1 } });
-		enqueueOfflineMutation({ type: 'task.delete', taskId: deleted, expectedVersion: 1 });
+		enqueueOfflineMutation({ type: 'task.patch', taskId: patched, patch: { text: 'A', expectedVersion: 2 } });
+		enqueueOfflineMutation({ type: 'task.delete', taskId: deleted, expectedVersion: 2 });
 		enqueueOfflineMutation({ type: 'task.patch', taskId: ahead, patch: { text: 'C', expectedVersion: 5 } });
 		enqueueOfflineMutation({ type: 'task.patch', taskId: unversioned, patch: { text: 'D' } });
 		// The write landed while another user was signed in.
@@ -290,7 +290,7 @@ describe('offline write queue conflict behavior', () => {
 	// A write that landed two versions or more past the queued edit also
 	// counts another device's edit, which the queued edit must meet as a
 	// 409 rather than overwrite.
-	it.fails('leaves a queued edit or delete that expects a version before the one the landed write started from', () => {
+	it('leaves a queued edit or delete that expects a version before the one the landed write started from', () => {
 		const patched = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 		const deleted = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 		setOfflineQueueOwner('user-a');

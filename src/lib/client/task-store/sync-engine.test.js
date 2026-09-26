@@ -287,7 +287,7 @@ describe('settling task writes before sign-out', () => {
     // the toggle landed (version 3). Moved to version 3, the queued edit,
     // which sends every field of the task, would overwrite that rename at
     // the next sync without a 409.
-    it.fails('keeps the queued later edit on its version when the checklist write in flight lands past another device\'s edit', async () => {
+    it('keeps the queued later edit on its version when the checklist write in flight lands past another device\'s edit', async () => {
         replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] })]);
         const firstAnswer = createDeferred();
         vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
@@ -309,6 +309,25 @@ describe('settling task writes before sign-out', () => {
                 taskId: TASK_ID,
                 patch: expect.objectContaining({ text: 'Saved', priority: 'high', expectedVersion: 1 })
             })
+        ]);
+    });
+
+    it('moves the queued later edit to the version the checklist write in flight landed at', async () => {
+        replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] })]);
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        toggleSubtask(TASK_ID, ITEM.id);
+        await vi.advanceTimersByTimeAsync(0);
+        updateTask(TASK_ID, { priority: 'high' });
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        firstAnswer.resolve(jsonResponse({ task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ ...ITEM, done: true }] } }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({ type: 'task.patch', patch: expect.objectContaining({ priority: 'high', expectedVersion: 2 }) })
         ]);
     });
 

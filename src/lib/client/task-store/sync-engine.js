@@ -436,9 +436,9 @@ export async function waitForPendingTaskSyncs() {
  * queue by then, and if it lands, its answer is applied only while the
  * store still holds that user's board. When a later edit of the task moved
  * to the queue at the timeout, a failed task edit queues nothing, since
- * that edit holds all of its fields, newer; and a request that lands
- * moves that edit to the version it landed at, and changes only the
- * version on the board. A failed checklist write queues only what later
+ * that edit holds all of its fields, newer; and a request that lands at
+ * the next version moves that edit to it, and changes only the version
+ * on the board. A failed checklist write queues only what later
  * queued writes of its item do not cover, and a checklist create that
  * lands turns them into writes of the item it made.
  *
@@ -1167,10 +1167,13 @@ function toServerTaskPatch(task) {
  *
  * When a later edit of the task moved to the offline queue while the
  * request was out, that edit expects the version the request started
- * from. The request has now moved the task past it with the user's own
- * write, so the queued edit moves to the answer's version, in the queue
- * of the user it was made for, whoever's board the store holds; sent as
- * it was, it would meet a 409 as a conflict with itself. On the board,
+ * from. An answer at the next version moved the task past it with the
+ * user's own write only, so the queued edit moves to the answer's
+ * version, in the queue of the user it was made for, whoever's board the
+ * store holds; sent as it was, it would meet a 409 as a conflict with
+ * itself. An answer further on also counts an edit made elsewhere (a
+ * checklist write expects no version), and the queued edit stays to meet
+ * it as a 409 (advanceQueuedTaskVersion). On the board,
  * only the version moves: the queued edit is newer than the answer. The
  * same holds for later checklist writes of the task queued meanwhile, and
  * for any change of the task the user's queue held from before: the board
