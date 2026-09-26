@@ -6,6 +6,7 @@ const STORAGE_KEY = 'kanbanTasks';
 const DEFAULT_STORAGE_OWNER = 'anonymous';
 
 let taskStorageOwner = DEFAULT_STORAGE_OWNER;
+let localTaskCacheClears = 0;
 
 /**
  * @returns {import('../../shared/task-domain.js').Task[]}
@@ -76,6 +77,7 @@ export function getTaskStorageOwner() {
 }
 
 export function clearLocalTaskCache() {
+    localTaskCacheClears += 1;
     try {
         const storage = getStorage();
         if (!storage) return;
@@ -88,6 +90,15 @@ export function clearLocalTaskCache() {
     } catch (error) {
         console.error('Failed to clear local task cache', error);
     }
+}
+
+/**
+ * How many times this page has cleared the cached board: a server answer
+ * that was asked for before a clear is about data the user deleted from
+ * this device since.
+ */
+export function countLocalTaskCacheClears() {
+    return localTaskCacheClears;
 }
 
 export function getTaskStorageKey() {

@@ -3,6 +3,7 @@ import { listServerCategories } from '../category-api.js';
 import { flushOfflineWriteQueue } from '../offline-write-queue.js';
 import { normalizeTaskList } from '../../shared/task-domain.js';
 import {
+	countLocalTaskCacheClears,
 	getTaskStorageOwner,
 	mergeIntoTaskList,
 	mergeTasks,
@@ -30,18 +31,26 @@ export async function syncServerTasks(fetcher = globalThis.fetch) {
 	// now, and stays that user's if the board goes to another user (a
 	// sign-out, or another user signing in) while a request is out.
 	const owner = getTaskStorageOwner();
+	const cacheClears = countLocalTaskCacheClears();
 	const flushed = await flushOfflineWriteQueue(fetcher);
-	if (getTaskStorageOwner() !== owner) {
+	const cacheCleared = countLocalTaskCacheClears() !== cacheClears;
+	if (getTaskStorageOwner() !== owner || cacheCleared) {
 		// Its answers are about that user's board: they go to the cache the
 		// board opens from at that user's next sign-in here, and stay off
 		// the board the store holds now, as does the server snapshot. Its
 		// conflicts are that user's too, and are not reported to the next.
-		updateCachedBoardOf(owner, (taskList) => applyFlushToTaskList(taskList, flushed));
+		// After a sign-out that cleared local data meanwhile, the answers
+		// go nowhere: the board is still that user's until the session
+		// refetch, but its data is gone from this device, as the user
+		// asked.
+		if (!cacheCleared) {
+			updateCachedBoardOf(owner, (taskList) => applyFlushToTaskList(taskList, flushed));
+		}
 		return {
 			ok: /** @type {false} */ (false),
 			fallback: true,
 			status: 0,
-			message: 'The signed-in user changed while offline mutations were being sent, so the sync stopped.',
+			message: 'The signed-in user changed or cleared local data while offline mutations were being sent, so the sync stopped.',
 			offlineConflicts: /** @type {import('../offline-write-queue.js').OfflineMutation[]} */ ([])
 		};
 	}

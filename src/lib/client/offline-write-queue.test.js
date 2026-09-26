@@ -661,7 +661,7 @@ describe('offline write queue conflict behavior', () => {
 	// A sign-out that clears local data empties the queue while a flush is
 	// out. A checked create's follow-up patch, queued when its checked
 	// state is throttled, then goes back into the cleared queue.
-	it.fails('queues no follow-up in a queue that was cleared while the flush was out', async () => {
+	it('queues no follow-up in a queue that was cleared while the flush was out', async () => {
 		const taskId = '55555555-5555-4555-8555-555555555555';
 		const serverItemId = '66666666-6666-4666-8666-666666666666';
 		setOfflineQueueOwner('user-a');

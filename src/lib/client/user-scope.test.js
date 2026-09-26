@@ -842,11 +842,11 @@ describe('a sync of the offline queue that outlives its user', () => {
 		};
 	}
 
-	it.fails('leaves the cleared cache empty when the answer comes before the board goes to no user', async () => {
+	it('leaves the cleared cache empty when the answer comes before the board goes to no user', async () => {
 		await expect(clearWhileImportIsOut({ answerAfterBoardLeaves: false })).resolves.toEqual({ userAQueue: null, userACache: [] });
 	});
 
-	it.fails('leaves the cleared cache empty when the answer comes after the board went to no user', async () => {
+	it('leaves the cleared cache empty when the answer comes after the board went to no user', async () => {
 		await expect(clearWhileImportIsOut({ answerAfterBoardLeaves: true })).resolves.toEqual({ userAQueue: null, userACache: [] });
 	});
 });

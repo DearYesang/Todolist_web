@@ -15,6 +15,7 @@ const FLUSH_LOCK_NAME = 'todokanban:offline-write-queue-flush';
 
 let queueOwnerId = DEFAULT_QUEUE_OWNER;
 let fallbackFlushInFlight = false;
+let queueClears = 0;
 
 /**
  * @typedef {{
@@ -260,6 +261,7 @@ export function getOfflineQueueSize() {
 }
 
 export function clearOfflineWriteQueue() {
+	queueClears += 1;
 	saveOfflineQueue([]);
 }
 
@@ -331,6 +333,7 @@ function withFlushLock(operation) {
  * @returns {Promise<OfflineFlushResult>}
  */
 async function executeFlush(fetcher, owner) {
+	const clearsAtStart = queueClears;
 	const queue = loadOwnerQueue(owner);
 	if (queue.length === 0) {
 		return createFlushResult([], false);
@@ -390,10 +393,17 @@ async function executeFlush(fetcher, owner) {
 		if (result.ok) {
 			flushed += 1;
 			processedIds.add(mutation.id);
-			if ('pendingDoneItemId' in result && typeof result.pendingDoneItemId === 'string' && 'taskId' in executableMutation) {
+			if (
+				'pendingDoneItemId' in result
+				&& typeof result.pendingDoneItemId === 'string'
+				&& 'taskId' in executableMutation
+				&& queueClears === clearsAtStart
+			) {
 				// A checked offline create landed its item but not the checked
 				// state; queue a retryable follow-up patch for the next flush.
 				// Mid-flush enqueues survive the post-flush reconciliation.
+				// After a sign-out cleared the queue meanwhile, nothing goes
+				// back into it.
 				enqueueOfflineMutation({
 					type: 'checklist.patch',
 					taskId: executableMutation.taskId,
