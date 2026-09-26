@@ -722,15 +722,20 @@ describe('a sync of the offline queue that outlives its user', () => {
 	});
 
 	/**
-	 * Seeds user A's cached board and offline queue.
+	 * Seeds user A's cached board and offline queue: 'mutation-a', then
+	 * 'mutation-b' and so on.
 	 * @param {Record<string, unknown>} localTask
-	 * @param {Record<string, unknown>} mutation
+	 * @param {Record<string, unknown>[]} mutations
 	 */
-	function seedUserA(localTask, mutation) {
+	function seedUserA(localTask, ...mutations) {
 		storage.set('kanbanTasks:user-a', JSON.stringify([localTask]));
-		storage.set('kanbanOfflineWriteQueue:user-a', JSON.stringify([
-			{ id: 'mutation-a', ownerUserId: 'user-a', createdAt: 1, attempts: 0, ...mutation }
-		]));
+		storage.set('kanbanOfflineWriteQueue:user-a', JSON.stringify(mutations.map((mutation, index) => ({
+			id: `mutation-${String.fromCharCode(97 + index)}`,
+			ownerUserId: 'user-a',
+			createdAt: index + 1,
+			attempts: 0,
+			...mutation
+		}))));
 		applyUserScope('user-a');
 	}
 
@@ -746,7 +751,12 @@ describe('a sync of the offline queue that outlives its user', () => {
 		expect(fetch).toHaveBeenCalledTimes(1);
 		applyUserScope(nextUserId);
 		firstAnswer.resolve(response);
-		await syncing;
+		return syncing;
+	}
+
+	/** The ids in user A's offline queue. */
+	function readUserAQueue() {
+		return JSON.parse(storage.get('kanbanOfflineWriteQueue:user-a') ?? '[]').map((/** @type {{ id: string }} */ mutation) => mutation.id);
 	}
 
 	/** @param {string} key */
@@ -801,6 +811,44 @@ describe('a sync of the offline queue that outlives its user', () => {
 			board: ['User B task'],
 			userBCache: [[USER_B_TASK.id, 'User B task']]
 		});
+	});
+
+	// Review finding on 7819023. The queued edit meets a 409, a conflict
+	// with an edit made on another device, after the user signed out. The
+	// flush takes it out of the user's queue as reported, and the sync
+	// reports no conflict to the board that follows: the edit is on neither
+	// the server nor the queue, and no one is told.
+	it.fails('keeps a queued edit that meets a 409 after the user signed out in that user\'s queue', async () => {
+		seedUserA({ id: SERVER_TASK_ID, text: 'Mine', version: 1 }, {
+			type: 'task.patch',
+			taskId: SERVER_TASK_ID,
+			patch: { text: 'A offline edit', expectedVersion: 1 }
+		});
+
+		const result = await syncWhileUserChanges(null, jsonResponse({ message: 'Conflict' }, { status: 409 }));
+
+		expect({ reported: result.offlineConflicts, userAQueue: readUserAQueue() })
+			.toEqual({ reported: [], userAQueue: ['mutation-a'] });
+	});
+
+	// Verifier finding, older than PR #84. Once another user signed in,
+	// the flush went on with the rest of user A's queue, which the server
+	// took with user B's session: A's task created in B's account.
+	it.fails('sends no more of the user\'s queue once another user signed in', async () => {
+		seedUserA({ id: SERVER_TASK_ID, text: 'Mine', version: 1 }, {
+			type: 'task.patch',
+			taskId: SERVER_TASK_ID,
+			patch: { text: 'A edit', expectedVersion: 1 }
+		}, {
+			type: 'task.create',
+			localTaskId: 'local-a',
+			payload: { text: 'A offline task' }
+		});
+
+		await syncWhileUserChanges('user-b', jsonResponse({ task: { id: SERVER_TASK_ID, text: 'A edit', version: 2 } }));
+
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(readUserAQueue()).toEqual(['mutation-b']);
 	});
 
 	// Found while fixing the two above. A sign-out that clears local data
