@@ -284,7 +284,7 @@ describe('settling task writes before sign-out', () => {
     // a later patch of an item on top of an earlier one; the toggle in
     // flight fails after the toggle behind it was queued, so the item ends
     // up checked on the server although it was unchecked last.
-    it.fails('keeps the later toggle of a checklist item when the toggle in flight fails after the wait', async () => {
+    it('keeps the later toggle of a checklist item when the toggle in flight fails after the wait', async () => {
         replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] })]);
         const firstAnswer = createDeferred();
         vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
@@ -307,7 +307,7 @@ describe('settling task writes before sign-out', () => {
     // the item's final text. When the create lands, that create would add
     // the item a second time, and the answer puts the created text back on
     // the board over the rename.
-    it.fails('keeps a rename queued behind an item create that lands after the wait, as an edit of the created item', async () => {
+    it('keeps a rename queued behind an item create that lands after the wait, as an edit of the created item', async () => {
         const firstAnswer = createDeferred();
         vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
         addSubtask(TASK_ID, 'New');
@@ -334,11 +334,30 @@ describe('settling task writes before sign-out', () => {
         });
     });
 
+    it('queues the fields of a failed checklist edit that the later queued edit of its item does not set', async () => {
+        replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] })]);
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        renameSubtask(TASK_ID, ITEM.id, 'First');
+        await vi.advanceTimersByTimeAsync(0);
+        toggleSubtask(TASK_ID, ITEM.id);
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        firstAnswer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({ type: 'checklist.patch', itemId: ITEM.id, patch: { done: true, text: 'First' } })
+        ]);
+    });
+
     // While a task edit is out, the add of a checklist item waits behind it
     // and moves to the queue at the timeout. The edit's answer, which does
     // not have the item, then replaces the task on the board: the item is
     // gone from the board, and from the cache, until a sync sends its create.
-    it.fails('keeps an item queued behind a task edit on the board when the edit lands after the wait', async () => {
+    it('keeps an item queued behind a task edit on the board when the edit lands after the wait', async () => {
         const firstAnswer = createDeferred();
         vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
         updateTask(TASK_ID, { text: 'Edit 1' });

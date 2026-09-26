@@ -136,6 +136,58 @@ export function advanceQueuedTaskVersion(taskId, version, { ownerId = queueOwner
 	}
 }
 
+/**
+ * Turns the queued create of checklist item `localItemId` of `taskId`, in
+ * `ownerId`'s queue (the current owner's by default), into an edit of
+ * `createdItem`: the item that a create request for it, still out when the
+ * queued create was built, made on the server. Sent as it is, the queued
+ * create would add the item a second time. The edit sets the queued text
+ * and checked state where they differ from `createdItem`, in the create's
+ * place in the queue; when nothing differs, the create goes.
+ * @param {string} taskId
+ * @param {string} localItemId
+ * @param {{ id: string; text: string; done: boolean }} createdItem
+ * @param {{ ownerId?: string }} [options]
+ */
+export function resolveQueuedChecklistCreate(taskId, localItemId, createdItem, { ownerId = queueOwnerId } = {}) {
+	const owner = normalizeQueueOwner(ownerId);
+	const queue = loadOwnerQueue(owner);
+	const queuedCreate = queue.find((mutation) =>
+		mutation.type === 'checklist.create'
+		&& mutation.taskId === taskId
+		&& mutation.localItemId === localItemId
+	);
+	if (!queuedCreate || queuedCreate.type !== 'checklist.create') {
+		return;
+	}
+
+	/** @type {{ text?: string; done?: boolean }} */
+	const patch = {};
+	if (queuedCreate.text !== createdItem.text) {
+		patch.text = queuedCreate.text;
+	}
+	if (Boolean(queuedCreate.done) !== createdItem.done) {
+		patch.done = Boolean(queuedCreate.done);
+	}
+	if (Object.keys(patch).length === 0) {
+		saveOfflineQueue(queue.filter((mutation) => mutation !== queuedCreate), owner);
+		return;
+	}
+
+	/** @type {OfflineMutation} */
+	const edit = {
+		id: queuedCreate.id,
+		type: 'checklist.patch',
+		taskId,
+		itemId: createdItem.id,
+		patch,
+		ownerUserId: owner,
+		createdAt: queuedCreate.createdAt,
+		attempts: queuedCreate.attempts
+	};
+	saveOfflineQueue(queue.map((mutation) => mutation === queuedCreate ? edit : mutation), owner);
+}
+
 export function getOfflineQueueSize() {
 	return loadOfflineQueue().length;
 }

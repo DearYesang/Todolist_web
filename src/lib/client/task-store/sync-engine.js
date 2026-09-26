@@ -11,7 +11,8 @@ import {
     advanceQueuedTaskVersion,
     enqueueOfflineMutation,
     getOfflineQueueOwner,
-    loadOfflineQueue
+    loadOfflineQueue,
+    resolveQueuedChecklistCreate
 } from '../offline-write-queue.js';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
 import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
@@ -25,6 +26,9 @@ import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
  * queue owner's queue, and a success is applied only while the store
  * still holds its store owner's board.
  *
+ * - item: for a checklist write, the item it creates, edits or deletes,
+ *   by the id the board gave it when the write was made (a local id until
+ *   its create lands), and the fields an edit sets.
  * - drained: it moved to the offline queue before it started, and never
  *   runs.
  * - discarded: a sign-out cleared its user's local data. It never runs,
@@ -34,14 +38,27 @@ import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
  *   delete of the task moved to the queue. That write was built from the
  *   store after this one started, so it holds every field a snapshot
  *   patch sends, newer, and the version this request started from.
+ * - queuedItemEdits: while its request was out, later writes of the
+ *   task's checklist items moved to the queue: by item (its server id, or
+ *   its local id while its create is out), the fields they set and
+ *   whether one deleted it. The queue holds those items' newer state, so
+ *   this write queues nothing they cover when it fails, and a create that
+ *   lands hands them the item it made (see syncChecklistCreate).
+ *
+ * When either of the last two holds, the board is newer than the
+ * request's answer, and the answer moves only the task's version there.
  * @typedef {{
  *   taskId: string;
+ *   item: ChecklistWriteItem | null;
  *   queueOwnerId: string;
  *   storeOwnerId: string | null;
  *   drained: boolean;
  *   discarded: boolean;
  *   taskStateQueued: boolean;
+ *   queuedItemEdits: Map<string, { deleted: boolean; fields: Set<string> }>;
  * }} TaskSyncWrite
+ *
+ * @typedef {{ id: string; change: 'create' | 'patch' | 'delete'; fields: string[] }} ChecklistWriteItem
  */
 
 /**
@@ -192,16 +209,19 @@ export function applyServerTaskVersions(taskVersions) {
  * @param {string} taskId
  * @param {(write: TaskSyncWrite) => Promise<void>} operation
  * @param {(() => import('../offline-write-queue.js').OfflineMutationInput | null) | null} [buildDrainMutation]
+ * @param {ChecklistWriteItem | null} [item] the checklist item the write is about
  */
-function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null) {
+function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null, item = null) {
     /** @type {TaskSyncWrite} */
     const write = {
         taskId,
+        item,
         queueOwnerId: getOfflineQueueOwner(),
         storeOwnerId: getTaskStorageOwner(),
         drained: false,
         discarded: false,
-        taskStateQueued: false
+        taskStateQueued: false,
+        queuedItemEdits: new Map()
     };
     if (buildDrainMutation) {
         pendingChainOpDescriptors.set(write, buildDrainMutation);
@@ -267,19 +287,70 @@ export function drainPendingTaskSyncsToOfflineQueue() {
     for (const [write, buildDrainMutation] of descriptors) {
         write.drained = true;
         const mutation = buildDrainMutation();
-        if (!mutation) {
-            continue;
+        if (mutation) {
+            enqueueOfflineMutation(mutation, { ownerId: write.queueOwnerId });
+        }
+        markQueuedBehindRequestsInFlight(write, mutation);
+    }
+}
+
+/**
+ * Tells the requests still out for a drained write's task, made for the
+ * same user, what the queue now holds after them (TaskSyncWrite). A
+ * checklist write counts even when the drain queued nothing for it: the
+ * delete of an item whose create is out has nothing to delete yet.
+ * @param {TaskSyncWrite} drained
+ * @param {import('../offline-write-queue.js').OfflineMutationInput | null} mutation what the drain queued for it
+ */
+function markQueuedBehindRequestsInFlight(drained, mutation) {
+    const { item } = drained;
+    writesInFlight.forEach((inFlight) => {
+        if (inFlight.taskId !== drained.taskId || inFlight.queueOwnerId !== drained.queueOwnerId) {
+            return;
         }
 
-        enqueueOfflineMutation(mutation, { ownerId: write.queueOwnerId });
-        if (mutation.type === 'task.patch' || mutation.type === 'task.delete') {
-            writesInFlight.forEach((inFlight) => {
-                if (inFlight.taskId === mutation.taskId && inFlight.queueOwnerId === write.queueOwnerId) {
-                    inFlight.taskStateQueued = true;
-                }
-            });
+        if (!item) {
+            if (mutation?.type === 'task.patch' || mutation?.type === 'task.delete') {
+                inFlight.taskStateQueued = true;
+            }
+            return;
         }
+
+        const itemKey = resolveChecklistItemId(item.id);
+        const edits = inFlight.queuedItemEdits.get(itemKey) ?? { deleted: false, fields: new Set() };
+        if (item.change === 'delete') {
+            edits.deleted = true;
+        }
+        item.fields.forEach((field) => edits.fields.add(field));
+        inFlight.queuedItemEdits.set(itemKey, edits);
+    });
+}
+
+/**
+ * The later writes of a checklist write's item that moved to the queue
+ * while its request was out, if any.
+ * @param {TaskSyncWrite} write
+ */
+function getQueuedEditsOfItem(write) {
+    if (!write.item) {
+        return undefined;
     }
+
+    // A create's item has no server id until the create lands; the drain
+    // named it by its local id.
+    return write.queuedItemEdits.get(
+        write.item.change === 'create' ? write.item.id : resolveChecklistItemId(write.item.id)
+    );
+}
+
+/**
+ * A checklist item's server id: its own, or the one a create in this
+ * task's chain resolved its local id to. An item whose create has not
+ * landed keeps its local id.
+ * @param {string} itemId
+ */
+function resolveChecklistItemId(itemId) {
+    return isServerId(itemId) ? itemId : resolvedChecklistItemIds.get(itemId) ?? itemId;
 }
 
 /**
@@ -346,7 +417,9 @@ export async function waitForPendingTaskSyncs() {
  * to the queue at the timeout, a failed task edit queues nothing, since
  * that edit holds all of its fields, newer; and a request that lands
  * moves that edit to the version it landed at, and changes only the
- * version on the board.
+ * version on the board. A failed checklist write queues only what later
+ * queued writes of its item do not cover, and a checklist create that
+ * lands turns them into writes of the item it made.
  *
  * Until it settles, countPendingTaskSyncs counts the request, so the
  * "clear local data" question that follows includes it, and a confirmed
@@ -615,16 +688,24 @@ export function syncChecklistCreate(taskId, subtaskId, text) {
                 .filter((id) => isServerId(id))
         );
         const result = await createServerChecklistItem(taskId, text);
+        const queuedEdits = getQueuedEditsOfItem(write);
         if (result.ok) {
             const createdItem = findNewChecklistItem(result.task, knownItemIds, text);
             if (createdItem) {
                 resolvedChecklistItemIds.set(subtaskId, createdItem.id);
+                if (queuedEdits) {
+                    handQueuedEditsToCreatedItem(write, subtaskId, createdItem, queuedEdits);
+                }
             }
             applyWriteResult(write, result.task);
             return;
         }
 
-        reportSyncFailure(write, result, {
+        // A later write of the item moved to the queue while this request
+        // was out: a create with the item's final text and state, or, for a
+        // delete, nothing. Queued as well, this create would add the item a
+        // second time, or bring the deleted item back.
+        reportSyncFailure(write, result, queuedEdits ? null : {
             type: 'checklist.create',
             taskId,
             localItemId: subtaskId,
@@ -635,7 +716,31 @@ export function syncChecklistCreate(taskId, subtaskId, text) {
         taskId,
         localItemId: subtaskId,
         text
-    }));
+    }), { id: subtaskId, change: 'create', fields: [] });
+}
+
+/**
+ * A checklist create landed after later writes of its item moved to the
+ * offline queue. The drain built them for an item the server did not have
+ * yet (buildChecklistDrainMutation): an edit as a create with the item's
+ * final state, a delete as nothing. The item exists now, so the queued
+ * create becomes an edit of it, and a delete goes to the queue for it.
+ * @param {TaskSyncWrite} write
+ * @param {string} localItemId
+ * @param {import('../../shared/task-domain.js').Subtask} createdItem
+ * @param {{ deleted: boolean }} queuedEdits
+ */
+function handQueuedEditsToCreatedItem(write, localItemId, createdItem, queuedEdits) {
+    if (write.discarded) {
+        return;
+    }
+
+    if (queuedEdits.deleted) {
+        queueWrite(write, { type: 'checklist.delete', taskId: write.taskId, itemId: createdItem.id });
+        return;
+    }
+
+    resolveQueuedChecklistCreate(write.taskId, localItemId, createdItem, { ownerId: write.queueOwnerId });
 }
 
 /**
@@ -697,13 +802,50 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
             return;
         }
 
-        reportSyncFailure(write, result, {
+        // The queue puts a later patch of the item on top of an earlier
+        // one. Queued after a later edit that moved there while this
+        // request was out, this edit's older values would win.
+        const unqueuedPatch = withoutFieldsQueuedLater(write, patch);
+        reportSyncFailure(write, result, unqueuedPatch && {
             type: 'checklist.patch',
             taskId,
             itemId,
-            patch
+            patch: unqueuedPatch
         });
-    }, () => buildChecklistDrainMutation(taskId, subtaskId, patch));
+    }, () => buildChecklistDrainMutation(taskId, subtaskId, patch), {
+        id: subtaskId,
+        change: 'patch',
+        fields: Object.keys(patch)
+    });
+}
+
+/**
+ * The part of a checklist edit that no later write of its item, moved to
+ * the queue while its request was out, covers: null when one deleted the
+ * item, or the later edits set every field it sets.
+ * @param {TaskSyncWrite} write
+ * @param {{ text?: string; done?: boolean }} patch
+ * @returns {{ text?: string; done?: boolean } | null}
+ */
+function withoutFieldsQueuedLater(write, patch) {
+    const queuedEdits = getQueuedEditsOfItem(write);
+    if (!queuedEdits) {
+        return patch;
+    }
+
+    if (queuedEdits.deleted) {
+        return null;
+    }
+
+    /** @type {{ text?: string; done?: boolean }} */
+    const unqueued = {};
+    if (patch.text !== undefined && !queuedEdits.fields.has('text')) {
+        unqueued.text = patch.text;
+    }
+    if (patch.done !== undefined && !queuedEdits.fields.has('done')) {
+        unqueued.done = patch.done;
+    }
+    return Object.keys(unqueued).length > 0 ? unqueued : null;
 }
 
 /**
@@ -746,7 +888,7 @@ export function syncChecklistDelete(taskId, subtaskId) {
             taskId,
             itemId
         });
-    }, () => buildChecklistDrainMutation(taskId, subtaskId, null));
+    }, () => buildChecklistDrainMutation(taskId, subtaskId, null), { id: subtaskId, change: 'delete', fields: [] });
 }
 
 /**
@@ -842,7 +984,8 @@ function toServerTaskPatch(task) {
  * write, so the queued edit moves to the answer's version, in the queue
  * of the user it was made for, whoever's board the store holds; sent as
  * it was, it would meet a 409 as a conflict with itself. On the board,
- * only the version moves: the queued edit is newer than the answer.
+ * only the version moves: the queued edit is newer than the answer. The
+ * same holds for later checklist writes of the task queued meanwhile.
  * @param {TaskSyncWrite} write
  * @param {import('../../shared/task-domain.js').Task} serverTask
  */
@@ -858,7 +1001,9 @@ function applyWriteResult(write, serverTask) {
         return;
     }
 
-    applyServerTaskResult(serverTask, { newerEditQueued: write.taskStateQueued });
+    applyServerTaskResult(serverTask, {
+        newerEditQueued: write.taskStateQueued || write.queuedItemEdits.size > 0
+    });
 }
 
 /**

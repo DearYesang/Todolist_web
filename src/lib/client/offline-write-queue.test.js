@@ -6,6 +6,7 @@ import {
 	flushOfflineWriteQueue,
 	getOfflineQueueOwner,
 	loadOfflineQueue,
+	resolveQueuedChecklistCreate,
 	setOfflineQueueOwner
 } from './offline-write-queue.js';
 import { normalizeTask } from '../shared/task-domain.js';
@@ -278,6 +279,32 @@ describe('offline write queue conflict behavior', () => {
 			[deleted, 3],
 			[ahead, { text: 'C', expectedVersion: 5 }],
 			[unversioned, { text: 'D' }]
+		]);
+	});
+
+	it('turns a queued checklist create into an edit of the item made meanwhile, in its place', () => {
+		const taskId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+		const otherTaskId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+		const createdItem = { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', text: 'New', done: false };
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({ type: 'checklist.create', taskId, localItemId: 'renamed', text: 'Renamed' });
+		enqueueOfflineMutation({ type: 'checklist.create', taskId, localItemId: 'checked', text: 'New', done: true });
+		enqueueOfflineMutation({ type: 'checklist.create', taskId, localItemId: 'unchanged', text: 'New' });
+		enqueueOfflineMutation({ type: 'task.delete', taskId: otherTaskId });
+		const queuedIds = loadOfflineQueue().map((mutation) => mutation.id);
+		// The creates landed after user A signed out.
+		setOfflineQueueOwner(null);
+
+		for (const localItemId of ['renamed', 'checked', 'unchanged', 'missing']) {
+			resolveQueuedChecklistCreate(taskId, localItemId, createdItem, { ownerId: 'user-a' });
+		}
+
+		expect(loadOfflineQueue()).toEqual([]);
+		setOfflineQueueOwner('user-a');
+		expect(loadOfflineQueue()).toEqual([
+			expect.objectContaining({ id: queuedIds[0], type: 'checklist.patch', taskId, itemId: createdItem.id, patch: { text: 'Renamed' }, ownerUserId: 'user-a' }),
+			expect.objectContaining({ id: queuedIds[1], type: 'checklist.patch', taskId, itemId: createdItem.id, patch: { done: true }, ownerUserId: 'user-a' }),
+			expect.objectContaining({ id: queuedIds[3], type: 'task.delete', taskId: otherTaskId })
 		]);
 	});
 

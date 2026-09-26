@@ -552,7 +552,7 @@ describe('signing out while a task write is still in flight', () => {
 
 	// The queue merges an item's patches with the later one on top, so the
 	// older rename, queued after the newer one, wins.
-	it.fails('keeps the later rename of a checklist item when the rename in flight fails after the sign-out', async () => {
+	it('keeps the later rename of a checklist item when the rename in flight fails after the sign-out', async () => {
 		renameSubtask(TASK_ID, ITEM.id, 'First');
 		await vi.advanceTimersByTimeAsync(0);
 		// Waits in the task's chain behind the first PATCH.
@@ -569,7 +569,7 @@ describe('signing out while a task write is still in flight', () => {
 
 	// The drain queues the toggle of an item whose create is out as a create
 	// with the item's final state; the create's failure adds a second one.
-	it.fails('queues one create of an item whose create fails after the sign-out queued a later edit of it', async () => {
+	it('queues one create of an item whose create fails after the sign-out queued a later edit of it', async () => {
 		addSubtask(TASK_ID, 'New');
 		await vi.advanceTimersByTimeAsync(0);
 		const localItemId = lastItemId();
@@ -586,7 +586,7 @@ describe('signing out while a task write is still in flight', () => {
 
 	// The drain has nothing to queue for the delete of an item whose create
 	// is out; the create's failure then queues the deleted item again.
-	it.fails('queues nothing for an item deleted while its create was out, when the create fails after the sign-out', async () => {
+	it('queues nothing for an item deleted while its create was out, when the create fails after the sign-out', async () => {
 		addSubtask(TASK_ID, 'New');
 		await vi.advanceTimersByTimeAsync(0);
 		deleteSubtask(TASK_ID, lastItemId());
@@ -599,7 +599,7 @@ describe('signing out while a task write is still in flight', () => {
 
 	// Here the create lands, and the queued create would add the item a
 	// second time at the user's next sync.
-	it.fails('turns the queued create into an edit of the item when its create lands after the sign-out', async () => {
+	it('turns the queued create into an edit of the item when its create lands after the sign-out', async () => {
 		addSubtask(TASK_ID, 'New');
 		await vi.advanceTimersByTimeAsync(0);
 		toggleSubtask(TASK_ID, lastItemId());
@@ -614,7 +614,7 @@ describe('signing out while a task write is still in flight', () => {
 	});
 
 	// And the item deleted while its create was out stays on the server.
-	it.fails('queues the delete of an item deleted while its create was out, when the create lands after the sign-out', async () => {
+	it('queues the delete of an item deleted while its create was out, when the create lands after the sign-out', async () => {
 		addSubtask(TASK_ID, 'New');
 		await vi.advanceTimersByTimeAsync(0);
 		deleteSubtask(TASK_ID, lastItemId());
