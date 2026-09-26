@@ -13,7 +13,14 @@ import {
     waitForPendingTaskSyncs
 } from './sync-engine.js';
 import { replaceTasks, tasks } from './task-cache.js';
-import { clearDoneTasks, deleteTaskCascade, updateTask } from './task-mutations.js';
+import {
+    addSubtask,
+    clearDoneTasks,
+    deleteTaskCascade,
+    renameSubtask,
+    toggleSubtask,
+    updateTask
+} from './task-mutations.js';
 
 describe('task store server sync', () => {
     afterEach(() => {
@@ -151,6 +158,8 @@ describe('task versions from other endpoints', () => {
 
 describe('settling task writes before sign-out', () => {
     const TASK_ID = '33333333-3333-4333-8333-333333333333';
+    const ITEM = { id: '44444444-4444-4444-8444-444444444444', text: 'Item', done: false };
+    const NEW_ITEM_ID = '55555555-5555-4555-8555-555555555555';
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -267,6 +276,88 @@ describe('settling task writes before sign-out', () => {
                 })
             ],
             board: [['Edit 2', 2]]
+        });
+    });
+
+    // The same for checklist writes, still signed in (a cancelled "clear
+    // local data" question, or a page kept after pagehide). The queue puts
+    // a later patch of an item on top of an earlier one; the toggle in
+    // flight fails after the toggle behind it was queued, so the item ends
+    // up checked on the server although it was unchecked last.
+    it.fails('keeps the later toggle of a checklist item when the toggle in flight fails after the wait', async () => {
+        replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] })]);
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        toggleSubtask(TASK_ID, ITEM.id);
+        await vi.advanceTimersByTimeAsync(0);
+        toggleSubtask(TASK_ID, ITEM.id);
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        firstAnswer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({ type: 'checklist.patch', taskId: TASK_ID, itemId: ITEM.id, patch: { done: false } })
+        ]);
+    });
+
+    // The rename of an item whose create is out is queued as a create with
+    // the item's final text. When the create lands, that create would add
+    // the item a second time, and the answer puts the created text back on
+    // the board over the rename.
+    it.fails('keeps a rename queued behind an item create that lands after the wait, as an edit of the created item', async () => {
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        addSubtask(TASK_ID, 'New');
+        await vi.advanceTimersByTimeAsync(0);
+        const localItemId = get(tasks)[0].subtasks[0].id;
+        renameSubtask(TASK_ID, localItemId, 'Renamed');
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        firstAnswer.resolve(jsonResponse({
+            task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ id: NEW_ITEM_ID, text: 'New', done: false }] }
+        }, { status: 201 }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect({
+            queue: loadOfflineQueue(),
+            board: get(tasks)[0].subtasks
+        }).toEqual({
+            queue: [
+                expect.objectContaining({ type: 'checklist.patch', taskId: TASK_ID, itemId: NEW_ITEM_ID, patch: { text: 'Renamed' } })
+            ],
+            board: [{ id: NEW_ITEM_ID, text: 'Renamed', done: false }]
+        });
+    });
+
+    // While a task edit is out, the add of a checklist item waits behind it
+    // and moves to the queue at the timeout. The edit's answer, which does
+    // not have the item, then replaces the task on the board: the item is
+    // gone from the board, and from the cache, until a sync sends its create.
+    it.fails('keeps an item queued behind a task edit on the board when the edit lands after the wait', async () => {
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        addSubtask(TASK_ID, 'New');
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        // The answer does not have the item, whose create is in the queue.
+        firstAnswer.resolve(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2, subtasks: [] } }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect({
+            queue: loadOfflineQueue().map((mutation) => mutation.type),
+            board: get(tasks).map((task) => [task.text, task.version, task.subtasks.map((item) => item.text)])
+        }).toEqual({
+            queue: ['checklist.create'],
+            board: [['Edit 1', 2, ['New']]]
         });
     });
 });

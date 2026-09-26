@@ -5,15 +5,19 @@ import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import { DEFAULT_FILTERS } from '../shared/task-domain.js';
 import { linkOpenState, requestOpenLinks } from './link-opener.js';
 import {
+	addSubtask,
 	categories,
+	deleteSubtask,
 	filters,
 	markPendingDefaultView,
 	readPendingDefaultView,
+	renameSubtask,
 	setCategoryFilter,
 	setPriorityFilter,
 	settlePendingTaskSyncs,
 	syncServerTasks,
 	tasks,
+	toggleSubtask,
 	updateTask
 } from './task-store.js';
 import {
@@ -311,11 +315,15 @@ describe('signing out during a task edit', () => {
 
 describe('signing out while a task write is still in flight', () => {
 	const TASK_ID = '11111111-1111-4111-8111-111111111111';
+	// A checklist item the server has, and the id it gives an item the tests
+	// add.
+	const ITEM = { id: '22222222-2222-4222-8222-222222222222', text: 'Item', done: false };
+	const NEW_ITEM_ID = '33333333-3333-4333-8333-333333333333';
 	/** @type {Map<string, string>} */
 	let storage;
 	/** @type {ReturnType<typeof createDeferred>[]} */
 	let answers = [];
-	/** @type {string[]} */
+	/** @type {(string | undefined)[]} */
 	let sent = [];
 
 	beforeEach(() => {
@@ -328,20 +336,24 @@ describe('signing out while a task write is still in flight', () => {
 		// Every request stays out until the test answers it, as on a network
 		// that has stopped answering.
 		vi.stubGlobal('fetch', vi.fn((/** @type {unknown} */ _url, /** @type {RequestInit} */ init) => {
-			sent.push(JSON.parse(String(init.body)).text);
+			sent.push(init.body ? JSON.parse(String(init.body)).text : init.method);
 			const answer = createDeferred();
 			answers.push(answer);
 			return answer.promise;
 		}));
-		storage.set('kanbanTasks:user-a', JSON.stringify([{ id: TASK_ID, text: 'Saved', version: 1 }]));
+		storage.set('kanbanTasks:user-a', JSON.stringify([{ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] }]));
 		applyUserScope('user-a');
 	});
 
 	afterEach(async () => {
-		// Ends the requests a test left out, so no task's write chain stays
-		// busy for the tests after it.
-		answers.forEach((answer) => answer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 })));
-		await vi.advanceTimersByTimeAsync(0);
+		// Ends the requests a test left out, and those they let go out, so no
+		// task's write chain stays busy for the tests after it.
+		let answered = 0;
+		while (answered < answers.length) {
+			answers.slice(answered).forEach((answer) => answer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 })));
+			answered = answers.length;
+			await vi.advanceTimersByTimeAsync(0);
+		}
 		applyUserScope(null);
 		vi.useRealTimers();
 	});
@@ -412,6 +424,25 @@ describe('signing out while a task write is still in flight', () => {
 	}
 
 	const unauthorized = () => jsonResponse({ message: 'Unauthorized' }, { status: 401 });
+
+	/**
+	 * A checklist write in the signed-out user's queue.
+	 * @param {Record<string, unknown>} fields
+	 */
+	function queuedItemWrite(fields) {
+		return expect.objectContaining({ taskId: TASK_ID, ownerUserId: 'user-a', ...fields });
+	}
+
+	/** The id the board gave the checklist item added last. */
+	function lastItemId() {
+		const items = get(tasks).find((task) => task.id === TASK_ID)?.subtasks ?? [];
+		return items[items.length - 1].id;
+	}
+
+	/** The server's answer to the create of an item 'New': NEW_ITEM_ID. */
+	const itemCreated = () => jsonResponse({
+		task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [ITEM, { id: NEW_ITEM_ID, text: 'New', done: false }] }
+	}, { status: 201 });
 
 	// Codex review P1: the wait ends after 5 seconds and moves only the
 	// writes that have not started to the queue. The request already out
@@ -510,6 +541,89 @@ describe('signing out while a task write is still in flight', () => {
 				ownerUserId: 'user-a',
 				patch: expect.objectContaining({ text: 'Edit 2', expectedVersion: 2 })
 			})],
+			anonymous: []
+		});
+	});
+
+	// Checklist writes, as the task edits above. The sign-out moves an edit
+	// of an item waiting behind the item's request in flight to the queue,
+	// and the request then fails or lands. Before 79bee3c its failure went to
+	// the queue of no user; now it goes to the user's queue, after the edit.
+
+	// The queue merges an item's patches with the later one on top, so the
+	// older rename, queued after the newer one, wins.
+	it.fails('keeps the later rename of a checklist item when the rename in flight fails after the sign-out', async () => {
+		renameSubtask(TASK_ID, ITEM.id, 'First');
+		await vi.advanceTimersByTimeAsync(0);
+		// Waits in the task's chain behind the first PATCH.
+		renameSubtask(TASK_ID, ITEM.id, 'Last');
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(unauthorized());
+
+		expect(readQueues()).toEqual({
+			userA: [queuedItemWrite({ type: 'checklist.patch', itemId: ITEM.id, patch: { text: 'Last' } })],
+			anonymous: []
+		});
+	});
+
+	// The drain queues the toggle of an item whose create is out as a create
+	// with the item's final state; the create's failure adds a second one.
+	it.fails('queues one create of an item whose create fails after the sign-out queued a later edit of it', async () => {
+		addSubtask(TASK_ID, 'New');
+		await vi.advanceTimersByTimeAsync(0);
+		const localItemId = lastItemId();
+		toggleSubtask(TASK_ID, localItemId);
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(unauthorized());
+
+		expect(readQueues()).toEqual({
+			userA: [queuedItemWrite({ type: 'checklist.create', localItemId, text: 'New', done: true })],
+			anonymous: []
+		});
+	});
+
+	// The drain has nothing to queue for the delete of an item whose create
+	// is out; the create's failure then queues the deleted item again.
+	it.fails('queues nothing for an item deleted while its create was out, when the create fails after the sign-out', async () => {
+		addSubtask(TASK_ID, 'New');
+		await vi.advanceTimersByTimeAsync(0);
+		deleteSubtask(TASK_ID, lastItemId());
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(unauthorized());
+
+		expect(readQueues()).toEqual({ userA: [], anonymous: [] });
+	});
+
+	// Here the create lands, and the queued create would add the item a
+	// second time at the user's next sync.
+	it.fails('turns the queued create into an edit of the item when its create lands after the sign-out', async () => {
+		addSubtask(TASK_ID, 'New');
+		await vi.advanceTimersByTimeAsync(0);
+		toggleSubtask(TASK_ID, lastItemId());
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(itemCreated());
+
+		expect(readQueues()).toEqual({
+			userA: [queuedItemWrite({ type: 'checklist.patch', itemId: NEW_ITEM_ID, patch: { done: true } })],
+			anonymous: []
+		});
+	});
+
+	// And the item deleted while its create was out stays on the server.
+	it.fails('queues the delete of an item deleted while its create was out, when the create lands after the sign-out', async () => {
+		addSubtask(TASK_ID, 'New');
+		await vi.advanceTimersByTimeAsync(0);
+		deleteSubtask(TASK_ID, lastItemId());
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(itemCreated());
+
+		expect(readQueues()).toEqual({
+			userA: [queuedItemWrite({ type: 'checklist.delete', itemId: NEW_ITEM_ID })],
 			anonymous: []
 		});
 	});
