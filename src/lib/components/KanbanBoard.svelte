@@ -1,8 +1,8 @@
 <script>
-    import { setContext } from 'svelte';
     import { assignParent, filters, moveTask, taskIndex, tasks } from '$lib/client/task-store.js';
     import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import { buildColumnHierarchy, canAssignParent } from '$lib/shared/task-domain.js';
+    import { setBoardContext } from './board-context.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
     /** @type {{ openTask: (id: string) => void }} */
@@ -43,8 +43,12 @@
         }
     });
 
-    // Cards are drop targets (re-parenting) only on the Kanban board.
-    setContext('task-dnd', { controller, state: dndState, cardDrops: true });
+    // Cards are drop targets (re-parenting) only on the Kanban board. The
+    // closure calls whichever openTask App passes now.
+    setBoardContext({
+        dnd: { controller, state: dndState, cardDrops: true },
+        openTask: (id) => openTask(id)
+    });
 
     /**
      * @param {string} zone
@@ -87,7 +91,6 @@
                     {#each column.roots as task (task.id)}
                         <TaskTreeCard
                             childrenByParent={column.childrenByParent}
-                            openTask={openTask}
                             task={task} />
                     {/each}
                 {/if}

@@ -1,7 +1,8 @@
 <script>
-    import { getContext, onDestroy } from 'svelte';
+    import { onDestroy } from 'svelte';
     import TaskTreeCard from './TaskTreeCard.svelte';
     import OpenLinksButton from './OpenLinksButton.svelte';
+    import { getBoardContext } from './board-context.js';
     import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import {
         addSubtask,
@@ -29,24 +30,22 @@
      *   task: import('$lib/shared/task-domain.js').Task;
      *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
-     *   openTask: (id: string) => void;
      * }} */
     let {
         task,
         childrenByParent,
-        depth = 0,
-        openTask
+        depth = 0
     } = $props();
 
-    /** @type {{ controller: ReturnType<typeof import('$lib/client/pointer-dnd.js').createPointerDndController>; state: { draggedId: string | null; hoveredZone: string | null }; cardDrops: boolean } | undefined} */
-    const dnd = getContext('task-dnd');
+    // The same for every card on the board, at every depth.
+    const { dnd, openTask } = getBoardContext();
 
     /**
      * @param {HTMLElement} node
      * @param {string} id
      */
     function cardDraggable(node, id) {
-        return dnd ? dnd.controller.draggable(node, id) : undefined;
+        return dnd.controller.draggable(node, id);
     }
     let newSubtaskText = $state('');
     const subtaskComposition = createImeCompositionGuard();
@@ -166,14 +165,14 @@
 <div
     class="task-card"
     class:child-card={depth > 0}
-    class:drag-over-card={Boolean(dnd?.cardDrops)
-        && dnd?.state.hoveredZone === `card:${task.id}`
-        && dnd?.state.draggedId !== task.id}
+    class:drag-over-card={dnd.cardDrops
+        && dnd.state.hoveredZone === `card:${task.id}`
+        && dnd.state.draggedId !== task.id}
     data-priority={task.priority}
     role="listitem"
     style={depth > 0 ? `margin-left:${depth * 32}px;` : ''}
     use:cardDraggable={task.id}
-    {...(dnd?.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {})}>
+    {...(dnd.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {})}>
     <div class="card-meta">
         <span class="priority-badge {task.priority}">{PRIORITY_LABELS[task.priority]}</span>
         <span class="urgency-badge {task.urgency}">{URGENCY_LABELS[task.urgency]}</span>
@@ -325,7 +324,6 @@
         <TaskTreeCard
             childrenByParent={childrenByParent}
             depth={depth + 1}
-            openTask={openTask}
             task={child} />
     {/each}
 {/if}
