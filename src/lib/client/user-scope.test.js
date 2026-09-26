@@ -686,3 +686,120 @@ describe('signing out while a task write is still in flight', () => {
 		});
 	});
 });
+
+// Verifier finding on PR #84, older than it. A sync sends the user's
+// offline queue, and the user signs out, or another user signs in, while
+// a request of it is out. The flush saved the queue of whoever owned it
+// when the flush ended, so the user's queue kept what it had sent, to be
+// sent again at their next sign-in; and syncServerTasks applied its answers
+// to the board the store held by then.
+describe('a sync of the offline queue that outlives its user', () => {
+	const SERVER_TASK_ID = '11111111-1111-4111-8111-111111111111';
+	const USER_B_TASK = { id: '22222222-2222-4222-8222-222222222222', text: 'User B task', version: 1 };
+	/** @type {Map<string, string>} */
+	let storage;
+	/** @type {ReturnType<typeof createDeferred>} */
+	let firstAnswer;
+
+	beforeEach(() => {
+		storage = installMemoryStorage();
+		vi.stubGlobal('window', {});
+		firstAnswer = createDeferred();
+		// The queue's first request stays out until the test answers it; the
+		// session has ended for every request after it.
+		let requests = 0;
+		vi.stubGlobal('fetch', vi.fn(() => {
+			requests += 1;
+			return requests === 1
+				? firstAnswer.promise
+				: Promise.resolve(jsonResponse({ message: 'Unauthorized' }, { status: 401 }));
+		}));
+		storage.set('kanbanTasks:user-b', JSON.stringify([USER_B_TASK]));
+	});
+
+	afterEach(() => {
+		applyUserScope(null);
+	});
+
+	/**
+	 * Seeds user A's cached board and offline queue.
+	 * @param {Record<string, unknown>} localTask
+	 * @param {Record<string, unknown>} mutation
+	 */
+	function seedUserA(localTask, mutation) {
+		storage.set('kanbanTasks:user-a', JSON.stringify([localTask]));
+		storage.set('kanbanOfflineWriteQueue:user-a', JSON.stringify([
+			{ id: 'mutation-a', ownerUserId: 'user-a', createdAt: 1, attempts: 0, ...mutation }
+		]));
+		applyUserScope('user-a');
+	}
+
+	/**
+	 * Starts a sync, hands the board to `nextUserId` while its first
+	 * request is out, then answers that request.
+	 * @param {string | null} nextUserId
+	 * @param {Response} response
+	 */
+	async function syncWhileUserChanges(nextUserId, response) {
+		const syncing = syncServerTasks();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(fetch).toHaveBeenCalledTimes(1);
+		applyUserScope(nextUserId);
+		firstAnswer.resolve(response);
+		await syncing;
+	}
+
+	/** @param {string} key */
+	function readTexts(key) {
+		return JSON.parse(storage.get(key) ?? '[]').map((/** @type {{ id: string; text: string }} */ task) => [task.id, task.text]);
+	}
+
+	it.fails('settles the queue of the user who sent a create and leaves the next board alone', async () => {
+		seedUserA({ id: 'local-a', text: 'Offline task' }, {
+			type: 'task.create',
+			localTaskId: 'local-a',
+			payload: { text: 'Offline task' }
+		});
+
+		await syncWhileUserChanges(null, jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Offline task', version: 1 } }, { status: 201 }));
+
+		// Left in the queue, the create would make the task a second time at
+		// user A's next sign-in; left on the local id, the cached task would
+		// stay beside the server's copy.
+		expect({
+			userAQueue: storage.get('kanbanOfflineWriteQueue:user-a') ?? null,
+			userACache: readTexts('kanbanTasks:user-a'),
+			board: get(tasks)
+		}).toEqual({
+			userAQueue: null,
+			userACache: [[SERVER_TASK_ID, 'Offline task']],
+			board: []
+		});
+	});
+
+	it.fails('keeps the tasks of an import that lands after another user signed in off that user\'s board', async () => {
+		seedUserA({ id: 'local-import', text: 'Imported' }, {
+			type: 'import.tasks',
+			mode: 'replace',
+			payload: [{ text: 'Imported' }],
+			localTaskIds: ['local-import']
+		});
+
+		await syncWhileUserChanges('user-b', jsonResponse({
+			tasks: [{ id: SERVER_TASK_ID, text: 'Imported', version: 1 }],
+			summary: { imported: 1 }
+		}));
+
+		expect({
+			userAQueue: storage.get('kanbanOfflineWriteQueue:user-a') ?? null,
+			userACache: readTexts('kanbanTasks:user-a'),
+			board: get(tasks).map((task) => task.text),
+			userBCache: readTexts('kanbanTasks:user-b')
+		}).toEqual({
+			userAQueue: null,
+			userACache: [[SERVER_TASK_ID, 'Imported']],
+			board: ['User B task'],
+			userBCache: [[USER_B_TASK.id, 'User B task']]
+		});
+	});
+});
