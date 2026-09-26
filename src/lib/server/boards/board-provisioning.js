@@ -1,6 +1,14 @@
+/**
+ * Each user's board: the Personal workspace and its Inbox board, created on
+ * first use, and the board's default view. The tasks, categories and
+ * calendar modules and the board preferences route import this file
+ * directly, and it imports none of them.
+ */
+
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
-import { parseBoardPreferencesInput, TaskWriteError } from './validation.js';
+import { ApiError } from '$lib/server/http/api-error.js';
+import { APP_VIEWS, isOneOf } from '$lib/shared/task-rules.js';
 
 const DEFAULT_WORKSPACE_NAME = 'Personal';
 const DEFAULT_BOARD_NAME = 'Inbox';
@@ -39,10 +47,25 @@ export async function updateBoardPreferencesForUser(userId, payload) {
 		.returning();
 
 	if (!updated) {
-		throw new TaskWriteError('Board preferences could not be updated.', 500);
+		throw new ApiError('Board preferences could not be updated.', 500);
 	}
 
 	return mapBoardPreferences(updated);
+}
+
+/**
+ * @param {unknown} payload
+ */
+function parseBoardPreferencesInput(payload) {
+	const source = /** @type {Record<string, unknown> | null} */ (payload);
+	if (!source || typeof source !== 'object' || Array.isArray(source)) {
+		throw new ApiError('Board preferences payload must be an object.');
+	}
+	if (!isOneOf(APP_VIEWS, source.defaultView)) {
+		throw new ApiError('Invalid defaultView.');
+	}
+
+	return { defaultView: source.defaultView };
 }
 
 /**
@@ -88,7 +111,7 @@ export async function getOrCreatePersonalBoardForUser(db, userId) {
 
 	const board = await getOrCreateDefaultBoard(db, workspace.id);
 	if (!board) {
-		throw new TaskWriteError('A default workspace board could not be created.', 500);
+		throw new ApiError('A default workspace board could not be created.', 500);
 	}
 
 	return board;
@@ -148,7 +171,7 @@ async function getOrCreateDefaultWorkspace(db, userId) {
 
 	const workspace = createdWorkspace ?? (await getDefaultWorkspace(db, userId));
 	if (!workspace) {
-		throw new TaskWriteError('A default workspace could not be created.', 500);
+		throw new ApiError('A default workspace could not be created.', 500);
 	}
 
 	return workspace;

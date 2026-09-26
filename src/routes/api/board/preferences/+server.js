@@ -3,8 +3,8 @@ import { requireAuthUser } from '$lib/server/auth/session.js';
 import {
 	getBoardPreferencesForUser,
 	updateBoardPreferencesForUser
-} from '$lib/server/tasks/repository.js';
-import { TaskWriteError } from '$lib/server/tasks/validation.js';
+} from '$lib/server/boards/board-provisioning.js';
+import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
@@ -23,20 +23,10 @@ export async function PATCH({ request }) {
 		return authResult.response;
 	}
 
-	let payload;
 	try {
-		payload = await request.json();
-	} catch {
-		return json({ message: 'Request body must be valid JSON.' }, { status: 400 });
-	}
-
-	try {
+		const payload = await readJsonBody(request);
 		return json(await updateBoardPreferencesForUser(authResult.user.id, payload));
 	} catch (error) {
-		if (error instanceof TaskWriteError) {
-			return json({ message: error.message }, { status: error.status });
-		}
-
-		throw error;
+		return apiErrorResponse(error);
 	}
 }

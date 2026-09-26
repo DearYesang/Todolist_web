@@ -7,7 +7,7 @@ vi.mock('$lib/server/db/index.js', async () => {
 	return createFakeDbModule();
 });
 
-vi.mock('$lib/server/tasks/repository.js', () => ({
+vi.mock('$lib/server/boards/board-provisioning.js', () => ({
 	ensurePersonalBoardForUser: async () => ({ id: '22222222-2222-4222-8222-222222222222' })
 }));
 

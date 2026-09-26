@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
 import { createCategoryForUser, listCategoriesForUser } from '$lib/server/categories/repository.js';
-import { TaskWriteError } from '$lib/server/tasks/validation.js';
+import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
@@ -25,20 +25,11 @@ export async function POST({ request }) {
 		return authResult.response;
 	}
 
-	let payload;
 	try {
-		payload = await request.json();
-	} catch {
-		return json({ message: 'Request body must be valid JSON.' }, { status: 400 });
-	}
-
-	try {
+		const payload = await readJsonBody(request);
 		const category = await createCategoryForUser(authResult.user.id, payload);
 		return json({ category }, { status: 201 });
 	} catch (error) {
-		if (error instanceof TaskWriteError) {
-			return json({ message: error.message }, { status: error.status });
-		}
-		throw error;
+		return apiErrorResponse(error);
 	}
 }

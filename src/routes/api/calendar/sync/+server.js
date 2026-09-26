@@ -6,12 +6,8 @@ import {
 } from '$lib/server/calendar/provider-sync.js';
 import { CalendarProviderError } from '$lib/server/calendar/providers.js';
 import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
-import {
-	assertRateLimit,
-	createRateLimitHeaders,
-	createRateLimitKey,
-	RateLimitError
-} from '$lib/server/security/rate-limit.js';
+import { apiErrorResponse } from '$lib/server/http/api-error.js';
+import { assertRateLimit, createRateLimitKey, RateLimitError } from '$lib/server/security/rate-limit.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST(event) {
@@ -33,17 +29,6 @@ export async function POST(event) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof RateLimitError) {
-			return json({ message: error.message }, {
-				status: error.status,
-				headers: createRateLimitHeaders(error)
-			});
-		}
-
-		if (error instanceof CalendarSyncError || error instanceof CalendarProviderError || error instanceof CalendarTokenEncryptionError) {
-			return json({ message: error.message }, { status: error.status });
-		}
-
-		throw error;
+		return apiErrorResponse(error, RateLimitError, CalendarSyncError, CalendarProviderError, CalendarTokenEncryptionError);
 	}
 }

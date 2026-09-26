@@ -1,4 +1,6 @@
-export const CALENDAR_PROVIDERS = {
+import { ApiError } from '$lib/server/http/api-error.js';
+
+const CALENDAR_PROVIDERS = {
 	google: {
 		id: 'google',
 		name: 'Google Calendar',
@@ -17,19 +19,18 @@ export const CALENDAR_PROVIDERS = {
 	}
 };
 
-export class CalendarProviderError extends Error {
+export class CalendarProviderError extends ApiError {
 	/** @param {string} message */
 	constructor(message, status = 502) {
-		super(message);
+		super(message, status);
 		this.name = 'CalendarProviderError';
-		this.status = status;
 	}
 }
 
 /**
  * @param {string} provider
  */
-export function getCalendarProvider(provider) {
+function getCalendarProvider(provider) {
 	const config = /** @type {Record<string, typeof CALENDAR_PROVIDERS.google>} */ (CALENDAR_PROVIDERS)[provider];
 	if (!config) {
 		throw new CalendarProviderError('Unsupported calendar provider.', 404);

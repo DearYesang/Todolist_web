@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
-import { timingSafeEqual } from 'node:crypto';
 import {
 	CalendarSyncError,
 	syncCalendarProvidersForConnectedUsers
 } from '$lib/server/calendar/provider-sync.js';
 import { CalendarProviderError } from '$lib/server/calendar/providers.js';
 import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
+import { apiErrorResponse } from '$lib/server/http/api-error.js';
+import { readBearerToken, secretsMatch } from '$lib/server/security/bearer-secret.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request, url }) {
@@ -36,11 +37,7 @@ async function runCalendarCronSync(request, url) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof CalendarSyncError || error instanceof CalendarProviderError || error instanceof CalendarTokenEncryptionError) {
-			return json({ message: error.message }, { status: error.status });
-		}
-
-		throw error;
+		return apiErrorResponse(error, CalendarSyncError, CalendarProviderError, CalendarTokenEncryptionError);
 	}
 }
 
@@ -57,7 +54,7 @@ function checkCronSecret(request) {
 		};
 	}
 
-	const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+	const bearer = readBearerToken(request);
 	const headerSecret = request.headers.get('x-cron-secret')?.trim();
 	if (!secretsMatch(bearer, secret) && !secretsMatch(headerSecret, secret)) {
 		return {
@@ -68,15 +65,6 @@ function checkCronSecret(request) {
 	}
 
 	return { ok: true };
-}
-
-/**
- * @param {string | undefined} candidate
- * @param {string} secret
- */
-function secretsMatch(candidate, secret) {
-	if (!candidate || candidate.length !== secret.length) return false;
-	return timingSafeEqual(Buffer.from(candidate), Buffer.from(secret));
 }
 
 /**

@@ -2,7 +2,9 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { and, desc, eq, gt, isNull, lt, or } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
 import { isPlaceholderValue } from '$lib/server/config/env.js';
-import { ensurePersonalBoardForUser, listTasksForBoard } from '$lib/server/tasks/repository.js';
+import { ApiError } from '$lib/server/http/api-error.js';
+import { ensurePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
+import { listTasksForBoard } from '$lib/server/tasks/repository.js';
 
 const TOKEN_PREFIX = 'cal_';
 const TOKEN_BYTES = 32;
@@ -12,10 +14,11 @@ const DEFAULT_TOKEN_TTL_DAYS = 30;
 const MAX_ACTIVE_TOKENS_PER_USER = 5;
 const LAST_USED_UPDATE_INTERVAL_MS = 60 * 60 * 1000;
 
-export class CalendarTokenConfigurationError extends Error {
+export class CalendarTokenConfigurationError extends ApiError {
 	constructor() {
-		super('CALENDAR_TOKEN_SECRET must be configured before calendar subscription tokens can be used.');
+		super('CALENDAR_TOKEN_SECRET must be configured before calendar subscription tokens can be used.', 503);
 		this.name = 'CalendarTokenConfigurationError';
+		this.answeredByDefault = false;
 	}
 }
 
@@ -161,12 +164,11 @@ async function refreshCalendarTokenLastUsedAt(db, tokenRecord) {
 		));
 }
 
-export class CalendarTokenLimitError extends Error {
+export class CalendarTokenLimitError extends ApiError {
 	/** @param {string} message */
 	constructor(message) {
-		super(message);
+		super(message, 429);
 		this.name = 'CalendarTokenLimitError';
-		this.status = 429;
 	}
 }
 

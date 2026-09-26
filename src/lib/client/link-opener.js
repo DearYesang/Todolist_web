@@ -31,7 +31,7 @@ import { get, writable } from 'svelte/store';
  * }} LinkOpenSummary
  */
 
-export const LINK_CONFIRM_THRESHOLD = 10;
+const LINK_CONFIRM_THRESHOLD = 10;
 export const LINK_OPEN_BATCH_LIMIT = 20;
 export const LINK_RESULT_AUTO_HIDE_MS = 5000;
 

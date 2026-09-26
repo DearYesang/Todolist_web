@@ -91,7 +91,7 @@ export function getDeleteTaskConfirmMessage(childCount) {
         : '이 작업을 삭제하시겠습니까?';
 }
 
-export const CATEGORY_COLORS = [
+const CATEGORY_COLORS = [
     { bg: 'rgba(88, 166, 255, 0.15)', fg: '#58a6ff', border: '#58a6ff' },
     { bg: 'rgba(63, 185, 80, 0.15)', fg: '#3fb950', border: '#3fb950' },
     { bg: 'rgba(210, 153, 34, 0.15)', fg: '#d29922', border: '#d29922' },
@@ -127,7 +127,7 @@ export function createId() {
  * @param {unknown} value
  * @returns {value is TaskStatus}
  */
-export function isTaskStatus(value) {
+function isTaskStatus(value) {
     return isOneOf(TASK_STATUSES, value);
 }
 
@@ -705,7 +705,7 @@ export function updateTaskInList(taskList, taskId, patch) {
  * @param {Task[]} taskList
  * @param {string} taskId
  */
-export function collectDescendantIds(taskList, taskId) {
+function collectDescendantIds(taskList, taskId) {
     const ids = new Set([taskId]);
     let foundNewChild = true;
 

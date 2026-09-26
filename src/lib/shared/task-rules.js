@@ -3,6 +3,9 @@
  * server issued, and the values a task's status, priority and urgency and a
  * board's view can take. The database CHECK constraints in
  * server/db/schema.js repeat the enums; task-rules.test.js holds them equal.
+ * The module also holds the text length limits the API enforces (LIMITS);
+ * the browser does not check them and the database has no matching
+ * constraint.
  */
 
 /** A UUID, the shape of every id the server issues. */
@@ -12,6 +15,16 @@ export const TASK_STATUSES = /** @type {const} */ (['todo', 'doing', 'done']);
 export const TASK_PRIORITIES = /** @type {const} */ (['high', 'medium', 'low']);
 export const TASK_URGENCIES = /** @type {const} */ (['urgent', 'normal']);
 export const APP_VIEWS = /** @type {const} */ (['kanban', 'gantt', 'matrix']);
+
+/**
+ * The most characters the API accepts in a task title, a category name and
+ * a checklist item's text, after trimming.
+ */
+export const LIMITS = /** @type {const} */ ({
+	title: 300,
+	category: 80,
+	checklistText: 500
+});
 
 /**
  * @typedef {typeof TASK_STATUSES[number]} TaskStatus

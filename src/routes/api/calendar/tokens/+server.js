@@ -6,12 +6,8 @@ import {
 	createCalendarTokenForUser,
 	listCalendarTokensForUser
 } from '$lib/server/calendar/tokens.js';
-import {
-	assertRateLimit,
-	createRateLimitHeaders,
-	createRateLimitKey,
-	RateLimitError
-} from '$lib/server/security/rate-limit.js';
+import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
+import { assertRateLimit, createRateLimitKey, RateLimitError } from '$lib/server/security/rate-limit.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
@@ -28,11 +24,7 @@ export async function GET({ request }) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof CalendarTokenConfigurationError) {
-			return json({ message: error.message }, { status: 503 });
-		}
-
-		throw error;
+		return apiErrorResponse(error, CalendarTokenConfigurationError);
 	}
 }
 
@@ -44,12 +36,7 @@ export async function POST(event) {
 		return authResult.response;
 	}
 
-	let payload = {};
-	try {
-		payload = await request.json();
-	} catch {
-		payload = {};
-	}
+	const payload = await readJsonBody(request, { lenient: true });
 
 	try {
 		await assertRateLimit(createRateLimitKey(event, 'calendar-token-create', authResult.user.id), {
@@ -65,21 +52,6 @@ export async function POST(event) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof RateLimitError) {
-			return json({ message: error.message }, {
-				status: error.status,
-				headers: createRateLimitHeaders(error)
-			});
-		}
-
-		if (error instanceof CalendarTokenConfigurationError) {
-			return json({ message: error.message }, { status: 503 });
-		}
-
-		if (error instanceof CalendarTokenLimitError) {
-			return json({ message: error.message }, { status: error.status });
-		}
-
-		throw error;
+		return apiErrorResponse(error, RateLimitError, CalendarTokenConfigurationError, CalendarTokenLimitError);
 	}
 }

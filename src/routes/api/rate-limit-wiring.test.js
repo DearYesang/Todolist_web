@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuthUser } from '$lib/server/auth/session.js';
-import { enforceImportRateLimit, enforceTaskWriteRateLimit } from '$lib/server/tasks/rate-limit-guard.js';
+import { enforceImportRateLimit, enforceTaskWriteRateLimit } from '$lib/server/security/rate-limit-guard.js';
 import * as repository from '$lib/server/tasks/repository.js';
 import { POST as createTask } from './tasks/+server.js';
 import { PATCH as patchTask, DELETE as deleteTask } from './tasks/[taskId]/+server.js';
@@ -15,7 +15,7 @@ vi.mock('$lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/tasks/rate-limit-guard.js', () => ({
+vi.mock('$lib/server/security/rate-limit-guard.js', () => ({
 	enforceTaskWriteRateLimit: vi.fn(),
 	enforceImportRateLimit: vi.fn()
 }));

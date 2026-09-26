@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, gt } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
-import { ensurePersonalBoardForUser, listTasksForUser } from '$lib/server/tasks/repository.js';
+import { ApiError } from '$lib/server/http/api-error.js';
+import { ensurePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
+import { listTasksForUser } from '$lib/server/tasks/repository.js';
 import {
 	decryptCalendarToken,
 	encryptCalendarToken,
@@ -601,11 +603,10 @@ function readErrorMessage(error) {
 	return error instanceof Error && error.message ? error.message : null;
 }
 
-export class CalendarSyncError extends Error {
+export class CalendarSyncError extends ApiError {
 	/** @param {string} message */
 	constructor(message, status = 500) {
-		super(message);
+		super(message, status);
 		this.name = 'CalendarSyncError';
-		this.status = status;
 	}
 }

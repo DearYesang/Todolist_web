@@ -1,26 +1,22 @@
+import { ApiError } from '$lib/server/http/api-error.js';
 import { normalizeDateRange } from '$lib/shared/task-domain.js';
 import {
-	APP_VIEWS,
 	isOneOf,
+	LIMITS,
 	TASK_PRIORITIES,
 	TASK_STATUSES,
 	TASK_URGENCIES,
 	UUID_PATTERN
 } from '$lib/shared/task-rules.js';
 
-const MAX_TITLE_LENGTH = 300;
-const MAX_CATEGORY_LENGTH = 80;
-const MAX_CHECKLIST_TEXT_LENGTH = 500;
-
-export class TaskWriteError extends Error {
+export class TaskWriteError extends ApiError {
 	/**
 	 * @param {string} message
 	 * @param {number} [status]
 	 */
 	constructor(message, status = 400) {
-		super(message);
+		super(message, status);
 		this.name = 'TaskWriteError';
-		this.status = status;
 	}
 }
 
@@ -33,11 +29,11 @@ export function parseCreateTaskInput(payload) {
 		throw new TaskWriteError('Task payload must be an object.');
 	}
 
-	const title = parseRequiredString(source.text ?? source.title, 'Task title', MAX_TITLE_LENGTH);
+	const title = parseRequiredString(source.text ?? source.title, 'Task title', LIMITS.title);
 	const status = parseEnum(source.status, TASK_STATUSES, 'status', 'todo');
 	const priority = parseEnum(source.priority, TASK_PRIORITIES, 'priority', 'medium');
 	const urgency = parseEnum(source.urgency, TASK_URGENCIES, 'urgency', 'normal');
-	const category = parseOptionalString(source.category, MAX_CATEGORY_LENGTH);
+	const category = parseOptionalString(source.category, LIMITS.category);
 	const categoryId = parseOptionalUuid(source.categoryId, 'categoryId');
 	const { startDate, endDate } = parseDateRange(source.startDate, source.endDate);
 	const parentId = parseOptionalUuid(source.parentId, 'parentId');
@@ -83,7 +79,7 @@ export function parseUpdateTaskInput(payload) {
 	let hasTaskField = false;
 
 	if (hasField(source, 'text') || hasField(source, 'title')) {
-		patch.title = parseRequiredString(source.text ?? source.title, 'Task title', MAX_TITLE_LENGTH);
+		patch.title = parseRequiredString(source.text ?? source.title, 'Task title', LIMITS.title);
 		hasTaskField = true;
 	}
 
@@ -103,7 +99,7 @@ export function parseUpdateTaskInput(payload) {
 	}
 
 	if (hasField(source, 'category')) {
-		patch.category = parseOptionalString(source.category, MAX_CATEGORY_LENGTH);
+		patch.category = parseOptionalString(source.category, LIMITS.category);
 		hasTaskField = true;
 	}
 
@@ -170,20 +166,6 @@ export function parseDeleteTaskInput(payload) {
 }
 
 /**
- * @param {unknown} payload
- */
-export function parseBoardPreferencesInput(payload) {
-	const source = /** @type {Record<string, unknown> | null} */ (payload);
-	if (!source || typeof source !== 'object' || Array.isArray(source)) {
-		throw new TaskWriteError('Board preferences payload must be an object.');
-	}
-
-	return {
-		defaultView: parseRequiredEnum(source.defaultView, APP_VIEWS, 'defaultView')
-	};
-}
-
-/**
  * @param {string} startDate
  * @param {string} endDate
  */
@@ -204,7 +186,7 @@ export function parseCreateChecklistItemInput(payload) {
 	}
 
 	return {
-		text: parseRequiredString(source.text, 'Checklist text', MAX_CHECKLIST_TEXT_LENGTH)
+		text: parseRequiredString(source.text, 'Checklist text', LIMITS.checklistText)
 	};
 }
 
@@ -221,7 +203,7 @@ export function parseUpdateChecklistItemInput(payload) {
 	const patch = {};
 
 	if (hasField(source, 'text')) {
-		patch.text = parseRequiredString(source.text, 'Checklist text', MAX_CHECKLIST_TEXT_LENGTH);
+		patch.text = parseRequiredString(source.text, 'Checklist text', LIMITS.checklistText);
 	}
 
 	if (hasField(source, 'done')) {
@@ -239,10 +221,12 @@ export function parseUpdateChecklistItemInput(payload) {
 }
 
 /**
+ * Whether a payload names a field, even as undefined or null: a PATCH
+ * changes only the fields it names.
  * @param {Record<string, unknown>} source
  * @param {string} field
  */
-function hasField(source, field) {
+export function hasField(source, field) {
 	return Object.prototype.hasOwnProperty.call(source, field);
 }
 

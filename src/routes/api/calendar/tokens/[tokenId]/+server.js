@@ -4,6 +4,7 @@ import {
 	CalendarTokenConfigurationError,
 	revokeCalendarTokenForUser
 } from '$lib/server/calendar/tokens.js';
+import { apiErrorResponse } from '$lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ params, request }) {
@@ -20,10 +21,6 @@ export async function DELETE({ params, request }) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof CalendarTokenConfigurationError) {
-			return json({ message: error.message }, { status: 503 });
-		}
-
-		throw error;
+		return apiErrorResponse(error, CalendarTokenConfigurationError);
 	}
 }

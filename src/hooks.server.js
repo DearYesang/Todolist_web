@@ -1,4 +1,3 @@
-import { building } from '$app/environment';
 import { authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
 
 const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
@@ -19,10 +18,6 @@ export async function handle({ event, resolve }) {
 
 	if (authConfigurationError && isAuthRoute(event.url.pathname)) {
 		return withSecurityHeaders(Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 500 }), event);
-	}
-
-	if (building) {
-		return withSecurityHeaders(await resolve(event), event);
 	}
 
 	return withSecurityHeaders(await resolve(event), event);
