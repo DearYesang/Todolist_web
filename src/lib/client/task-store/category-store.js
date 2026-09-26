@@ -1,4 +1,4 @@
-import { derived, writable } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 import {
     deleteServerCategory,
     mergeServerCategory,
@@ -6,10 +6,10 @@ import {
     updateServerCategory
 } from '../category-api.js';
 import { normalizeTaskList } from '../../shared/task-domain.js';
-import { normalizeCategoryName } from '../../shared/category-suggestions.js';
+import { normalizeCategoryKey, normalizeCategoryName } from '../../shared/category-suggestions.js';
 import { tasks } from './task-cache.js';
 import { filters } from './filters.js';
-import { syncTaskSnapshot } from './sync-engine.js';
+import { applyServerTaskVersions, syncTaskSnapshot } from './sync-engine.js';
 
 /** @type {import('svelte/store').Writable<import('../category-api.js').ClientCategory[]>} */
 export const categoryCatalog = writable([]);
@@ -20,7 +20,7 @@ export const categories = derived([tasks, categoryCatalog], ([$tasks, $categoryC
         .map((category) => category.id));
     const hiddenCategoryNames = new Set($categoryCatalog
         .filter((category) => category.hiddenAt || category.archivedAt)
-        .map((category) => normalizeCategoryName(category.name).toLocaleLowerCase('ko'))
+        .map((category) => normalizeCategoryKey(category.name))
         .filter(Boolean));
     const names = new Set($categoryCatalog
         .filter((category) => !category.archivedAt && !category.hiddenAt)
@@ -28,7 +28,7 @@ export const categories = derived([tasks, categoryCatalog], ([$tasks, $categoryC
         .filter(Boolean));
     for (const task of $tasks) {
         const name = normalizeCategoryName(task.category);
-        const key = name.toLocaleLowerCase('ko');
+        const key = normalizeCategoryKey(name);
         if (
             task.categoryMeta?.hiddenAt
             || task.categoryMeta?.archivedAt
@@ -64,7 +64,7 @@ export const categorySummaries = derived([tasks, categoryCatalog], ([$tasks, $ca
     for (const task of $tasks) {
         const name = normalizeCategoryName(task.category);
         if (!name) continue;
-        const key = task.categoryId ? `id:${task.categoryId}` : `name:${normalizeCategoryName(name).toLocaleLowerCase('ko')}`;
+        const key = task.categoryId ? `id:${task.categoryId}` : `name:${normalizeCategoryKey(name)}`;
         const summary = summaryByKey.get(key) ?? {
             id: task.categoryId ?? null,
             name,
@@ -126,6 +126,7 @@ export async function renameCategory(sourceCategory, targetCategory) {
         if (result.ok) {
             upsertCategoryCatalog(result.category);
             const changed = rewriteLocalCategory(source, result.category, { sync: false });
+            applyServerTaskVersions(result.taskVersions);
             return { ok: true, changed, message: `${changed}개 작업의 카테고리를 수정했습니다.` };
         }
         if (!result.fallback) {
@@ -154,6 +155,7 @@ export async function mergeCategory(sourceCategory, targetCategory) {
             upsertCategoryCatalog(result.target);
             archiveCategoryInCatalog(result.source.id);
             const changed = rewriteLocalCategory(source, result.target, { sync: false });
+            applyServerTaskVersions(result.taskVersions);
             return { ok: true, changed, message: `${changed}개 작업을 "${result.target.name}" 카테고리로 병합했습니다.` };
         }
         if (!result.fallback) {
@@ -184,6 +186,7 @@ export async function clearCategory(category) {
         if (result.ok) {
             archiveCategoryInCatalog(result.category.id);
             const changed = rewriteLocalCategory(source, null, { sync: false });
+            applyServerTaskVersions(result.taskVersions);
             return { ok: true, changed, message: `${changed}개 작업을 미분류로 옮겼습니다.` };
         }
         if (!result.fallback) {
@@ -253,6 +256,47 @@ export async function reorderCategories(categoryIds) {
 }
 
 /**
+ * Puts one task in the category called `name`. category, categoryId and
+ * categoryMeta change together: normalizeTask takes the name from
+ * categoryMeta, so changing `category` alone on a task that has one is undone.
+ * A name the catalog holds (ignoring case) takes that category. Any other name
+ * goes to the server without an id, and the server finds or creates the
+ * category by name. An empty name clears the category.
+ * @param {string} taskId
+ * @param {string} name
+ */
+export function assignTaskCategory(taskId, name) {
+    const categoryName = normalizeCategoryName(name);
+    const key = normalizeCategoryKey(categoryName);
+    const target = categoryName
+        ? get(categoryCatalog).find((category) => !category.archivedAt && normalizeCategoryKey(category.name) === key) ?? null
+        : null;
+
+    /** @type {import('../../shared/task-domain.js').Task | null} */
+    let changedTask = null;
+    tasks.update((current) => {
+        const task = current.find((candidate) => candidate.id === taskId);
+        // The same name is a no-op, and keeps the task's own id when the
+        // catalog has not loaded (offline) or does not list it.
+        if (!task || (normalizeCategoryKey(task.category) === key && (!target || task.categoryId === target.id))) {
+            return current;
+        }
+
+        const next = normalizeTaskList(current.map((candidate) => candidate.id === taskId
+            ? {
+                ...candidate,
+                category: target?.name ?? categoryName,
+                categoryId: target?.id ?? null,
+                categoryMeta: target ? toCategoryMeta(target) : null
+            }
+            : candidate));
+        changedTask = next.find((candidate) => candidate.id === taskId) ?? null;
+        return next;
+    });
+    syncTaskSnapshot(changedTask);
+}
+
+/**
  * @param {{ id?: string | null; name: string }} source
  * @param {{ id?: string | null; name: string; color: string | null; sortOrder: number; hiddenAt: string | null; archivedAt: string | null } | null} target
  * @param {{ sync: boolean }} options
@@ -284,16 +328,7 @@ function rewriteLocalCategory(source, target, options) {
                 ...task,
                 category: targetName,
                 categoryId: target?.id || null,
-                categoryMeta: target?.id
-                    ? {
-                        id: target.id,
-                        name: target.name,
-                        color: target.color,
-                        sortOrder: target.sortOrder,
-                        hiddenAt: target.hiddenAt,
-                        archivedAt: target.archivedAt
-                    }
-                    : null
+                categoryMeta: target ? toCategoryMeta(target) : null
             };
             changedTasks.push(nextTask);
             return nextTask;
@@ -312,6 +347,24 @@ function rewriteLocalCategory(source, target, options) {
         changedTasks.forEach((task) => syncTaskSnapshot(task));
     }
     return changedTasks.length;
+}
+
+/**
+ * The categoryMeta a task carries for a category; null when it has no server id.
+ * @param {{ id?: string | null; name: string; color: string | null; sortOrder: number; hiddenAt: string | null; archivedAt: string | null }} category
+ * @returns {import('../../shared/task-domain.js').TaskCategoryMeta | null}
+ */
+function toCategoryMeta(category) {
+    return category.id
+        ? {
+            id: category.id,
+            name: category.name,
+            color: category.color,
+            sortOrder: category.sortOrder,
+            hiddenAt: category.hiddenAt,
+            archivedAt: category.archivedAt
+        }
+        : null;
 }
 
 /**
@@ -355,14 +408,7 @@ function updateLocalCategoryMeta(category) {
             ? {
                 ...task,
                 category: category.name,
-                categoryMeta: {
-                    id: category.id,
-                    name: category.name,
-                    color: category.color,
-                    sortOrder: category.sortOrder,
-                    hiddenAt: category.hiddenAt,
-                    archivedAt: category.archivedAt
-                }
+                categoryMeta: toCategoryMeta(category)
             }
             : task
     )));

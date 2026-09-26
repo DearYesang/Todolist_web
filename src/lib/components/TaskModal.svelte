@@ -1,5 +1,5 @@
 <script>
-    import { categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
+    import { assignTaskCategory, categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
@@ -15,7 +15,6 @@
     import OpenLinksButton from './OpenLinksButton.svelte';
 
     let { taskId, onclose } = $props();
-    let categoryDraft = $state('');
 
     const task = $derived($tasks.find((candidate) => candidate.id === taskId) || null);
     const parentTask = $derived(task?.parentId ? $tasks.find((candidate) => candidate.id === task.parentId) || null : null);
@@ -26,14 +25,10 @@
     // subtreeLinks always includes ownLinks; OpenLinksButton needs 2 or more.
     const hasLinkActions = $derived(subtreeLinks.length >= 2);
 
-    $effect(() => {
-        if (task && categoryDraft !== task.category) {
-            categoryDraft = task.category;
-        }
-    });
-
     /**
-     * @param {'text' | 'startDate' | 'endDate' | 'priority' | 'urgency' | 'category' | 'status'} field
+     * The category is not one of these fields: it goes through
+     * assignTaskCategory, which also moves categoryId and categoryMeta.
+     * @param {'text' | 'startDate' | 'endDate' | 'priority' | 'urgency' | 'status'} field
      * @param {string} value
      */
     function updateField(field, value) {
@@ -60,11 +55,23 @@
     }
 
     /**
-     * @param {string} nextCategory
+     * @param {string} name
      */
-    function updateCategory(nextCategory) {
-        categoryDraft = nextCategory;
-        updateField('category', nextCategory);
+    function commitCategory(name) {
+        assignTaskCategory(taskId, name);
+    }
+
+    /**
+     * Leaves the focused field before closing. The category saves on its
+     * native change event, which fires on blur; unmounting a focused field
+     * (Escape closes the panel with the focus still in it) fires none, and
+     * the typed name would be lost.
+     */
+    function closePanel() {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        onclose();
     }
 
     /**
@@ -73,7 +80,7 @@
     function handleDialogKeydown(event) {
         if (event.key === 'Escape') {
             event.stopPropagation();
-            onclose();
+            closePanel();
             return;
         }
 
@@ -86,8 +93,8 @@
         class="modal-backdrop"
         role="button"
         tabindex="-1"
-        onclick={onclose}
-        onkeydown={(event) => event.key === 'Escape' && onclose()}
+        onclick={closePanel}
+        onkeydown={(event) => event.key === 'Escape' && closePanel()}
         transition:fade={{ duration: 180 }}>
         <div
             class="side-panel"
@@ -102,7 +109,7 @@
                     <p class="panel-eyebrow">작업 상세 정보</p>
                     <h2>{task.text || '새 작업'}</h2>
                 </div>
-                <button class="close-btn" onclick={onclose}>✕</button>
+                <button class="close-btn" onclick={closePanel}>✕</button>
             </div>
 
             <div class="panel-body">
@@ -203,14 +210,18 @@
                 <div class="form-grid">
                     <div class="form-section">
                         <label for="modal-category">카테고리</label>
-                        <CategoryInput
-                            id="modal-category"
-                            bind:value={categoryDraft}
-                            categories={$categories}
-                            parentCategory={parentTask?.category ?? ''}
-                            taskText={task.text}
-                            placeholder="예: 개발, 기획"
-                            onchange={updateCategory} />
+                        <!-- One-way value: the field keeps what is typed and saves it on
+                             commit. The key resets it when the panel shows another task. -->
+                        {#key taskId}
+                            <CategoryInput
+                                id="modal-category"
+                                value={task.category}
+                                categories={$categories}
+                                parentCategory={parentTask?.category ?? ''}
+                                taskText={task.text}
+                                placeholder="예: 개발, 기획"
+                                oncommit={commitCategory} />
+                        {/key}
                     </div>
 
                     <div class="form-section">
@@ -234,7 +245,7 @@
                 <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
                 <div class="panel-footer-actions">
                     <button class="btn btn-calendar" onclick={downloadCalendar}>📅 일정 추가(.ics)</button>
-                    <button class="btn btn-primary" onclick={onclose}>완료</button>
+                    <button class="btn btn-primary" onclick={closePanel}>완료</button>
                 </div>
             </div>
         </div>

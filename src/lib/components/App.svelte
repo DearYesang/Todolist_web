@@ -19,6 +19,7 @@
     import { updateBoardPreferences } from '$lib/client/task-api.js';
     import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
+        applyServerCategoryCatalog,
         clearDoneTasks,
         clearPendingDefaultView,
         currentView,
@@ -131,6 +132,10 @@
         setTaskStorageOwner(userId);
         setOfflineQueueOwner(userId);
         setLinkOpenOwner(userId);
+        // The catalog belongs to the previous user's board until the next
+        // finished sync loads this one (a blocked queue skips it). Kept, it
+        // would list their categories and give the task panel their ids.
+        applyServerCategoryCatalog([]);
     }
 
     /**

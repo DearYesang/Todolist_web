@@ -108,6 +108,47 @@ export function applyServerTaskResults(serverTasks) {
 }
 
 /**
+ * Advances tasks to the versions a category rename, merge or delete left them
+ * at. Those writes rewrite every task in the category on the server and bump
+ * its version by one; the caller has made the same change locally, so only
+ * the version moves here. A copy left on the old version would send a stale
+ * expectedVersion with its next edit and get a false 409.
+ *
+ * An idle task moves only from exactly one version behind: that proves its
+ * copy was current before the category write. A copy further behind missed
+ * an edit from another device, and must keep its old version so its next
+ * edit gets the real 409 instead of overwriting that edit (every patch sends
+ * all fields). A task with a sync in flight or queued may already count its
+ * own write in the reported version, so it moves forward by any amount and
+ * also records the version for its chain, as a snapshot does; that chain
+ * reports its own conflicts. latestServerVersions is dropped when a chain
+ * drains, so an idle task needs only the store.
+ * @param {{ id: string; version: number }[]} taskVersions
+ */
+export function applyServerTaskVersions(taskVersions) {
+    const versionById = new Map(taskVersions.map((entry) => [entry.id, entry.version]));
+    if (versionById.size === 0) {
+        return;
+    }
+
+    versionById.forEach((version, id) => {
+        if (hasPendingTaskSync(id)) {
+            rememberServerVersion({ id, version });
+        }
+    });
+    tasks.update((current) => current.map((task) => {
+        const version = versionById.get(task.id);
+        if (version === undefined) {
+            return task;
+        }
+
+        const advances = typeof task.version !== 'number'
+            || (hasPendingTaskSync(task.id) ? version > task.version : version === task.version + 1);
+        return advances ? { ...task, version } : task;
+    }));
+}
+
+/**
  * @param {string} taskId
  * @param {() => Promise<void>} operation
  * @param {(() => import('../offline-write-queue.js').OfflineMutationInput | null) | null} [buildDrainMutation]
@@ -184,7 +225,7 @@ export async function waitForPendingTaskSyncs() {
 }
 
 /**
- * @param {import('../../shared/task-domain.js').Task} serverTask
+ * @param {{ id: string; version?: number }} serverTask
  */
 function rememberServerVersion(serverTask) {
     if (typeof serverTask.version !== 'number') {
@@ -629,6 +670,10 @@ function toServerTaskPatch(task) {
         urgency: task.urgency,
         category: task.category,
         categoryId: task.categoryId ?? null,
+        // A null categoryId means "find the category by name", not "clear
+        // it"; an empty name still clears it. The server clears for clients
+        // that do not send this.
+        categoryByName: true,
         parentId: isServerTaskId(task.parentId) ? task.parentId : null,
         ...(typeof task.version === 'number' ? { expectedVersion: task.version } : {})
     };

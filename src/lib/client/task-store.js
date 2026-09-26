@@ -48,6 +48,7 @@ export {
 
 export {
     applyServerCategoryCatalog,
+    assignTaskCategory,
     categories,
     categoryCatalog,
     categorySummaries,

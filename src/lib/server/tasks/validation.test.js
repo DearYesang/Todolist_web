@@ -90,6 +90,20 @@ describe('server task validation', () => {
 	        expect(parseDeleteTaskInput(undefined)).toEqual({ expectedVersion: null });
 	    });
 
+    it('reads categoryByName as how to take a null categoryId, not as a task field', () => {
+        expect(parseUpdateTaskInput({ category: '기획', categoryId: null, categoryByName: true })).toEqual({
+            category: '기획',
+            categoryId: null,
+            categoryByName: true
+        });
+        expect(parseUpdateTaskInput({ category: '기획', categoryId: null, categoryByName: false })).toEqual({
+            category: '기획',
+            categoryId: null
+        });
+        expect(() => parseUpdateTaskInput({ categoryByName: true })).toThrow('At least one task field is required.');
+        expect(() => parseUpdateTaskInput({ category: '기획', categoryByName: 'yes' })).toThrow('categoryByName must be a boolean.');
+    });
+
     it('rejects invalid update payloads and date ranges', () => {
         expect(() => parseTaskIdParam('local-id')).toThrow('taskId must be a UUID.');
 	        expect(() => parseUpdateTaskInput({})).toThrow('At least one task field is required.');

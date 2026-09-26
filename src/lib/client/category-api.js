@@ -14,6 +14,11 @@ const FALLBACK_STATUSES = new Set([401, 503]);
  * }} ClientCategory
  *
  * @typedef {{
+ *   id: string;
+ *   version: number;
+ * }} TaskVersion
+ *
+ * @typedef {{
  *   ok: true;
  *   categories: ClientCategory[];
  * } | {
@@ -28,6 +33,7 @@ const FALLBACK_STATUSES = new Set([401, 503]);
  *   category: ClientCategory;
  *   updatedTasks?: number;
  *   clearedTasks?: number;
+ *   taskVersions: TaskVersion[];
  * } | {
  *   ok: false;
  *   fallback: boolean;
@@ -40,6 +46,7 @@ const FALLBACK_STATUSES = new Set([401, 503]);
  *   source: ClientCategory;
  *   target: ClientCategory;
  *   updatedTasks: number;
+ *   taskVersions: TaskVersion[];
  * } | {
  *   ok: false;
  *   fallback: boolean;
@@ -119,7 +126,8 @@ export async function mergeServerCategory(sourceCategoryId, targetCategoryId, fe
 				ok: true,
 				source: normalizeCategory(body.source),
 				target: normalizeCategory(body.target),
-				updatedTasks: body.updatedTasks
+				updatedTasks: body.updatedTasks,
+				taskVersions: normalizeTaskVersions(body.taskVersions)
 			};
 		}
 
@@ -185,7 +193,8 @@ async function writeCategory(url, method, payload, fetcher) {
 				ok: true,
 				category: normalizeCategory(body.category),
 				...(typeof body.updatedTasks === 'number' ? { updatedTasks: body.updatedTasks } : {}),
-				...(typeof body.clearedTasks === 'number' ? { clearedTasks: body.clearedTasks } : {})
+				...(typeof body.clearedTasks === 'number' ? { clearedTasks: body.clearedTasks } : {}),
+				taskVersions: normalizeTaskVersions(body.taskVersions)
 			};
 		}
 
@@ -209,6 +218,28 @@ function normalizeCategory(raw) {
 		hiddenAt: typeof source?.hiddenAt === 'string' && source.hiddenAt ? source.hiddenAt : null,
 		archivedAt: typeof source?.archivedAt === 'string' && source.archivedAt ? source.archivedAt : null
 	};
+}
+
+/**
+ * The tasks a rename, merge or delete rewrote, with their new versions. A
+ * server from before the field existed sends none.
+ * @param {unknown} raw
+ * @returns {TaskVersion[]}
+ */
+function normalizeTaskVersions(raw) {
+	if (!Array.isArray(raw)) {
+		return [];
+	}
+
+	/** @type {TaskVersion[]} */
+	const taskVersions = [];
+	for (const entry of raw) {
+		const source = /** @type {Partial<TaskVersion> | null | undefined} */ (entry);
+		if (typeof source?.id === 'string' && source.id && Number.isInteger(source.version)) {
+			taskVersions.push({ id: source.id, version: /** @type {number} */ (source.version) });
+		}
+	}
+	return taskVersions;
 }
 
 /** @param {unknown} body */

@@ -1,7 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
-import { mapTaskRowToClientTask } from './task-mapper.js';
-import { createPositionValue, getChecklistRowsForTask, getWritableTaskForUser } from './task-rows.js';
+import { createPositionValue, getWritableTaskForUser, loadClientTask } from './task-rows.js';
 import {
 	parseChecklistItemIdParam,
 	parseCreateChecklistItemInput,
@@ -46,7 +45,7 @@ export async function createChecklistItemForUser(userId, taskId, payload) {
 		throw new TaskWriteError('Checklist item could not be created.', 500);
 	}
 
-	return mapTaskRowToClientTask(bumpedRows[0] ?? task, await getChecklistRowsForTask(db, task.id));
+	return loadClientTask(db, bumpedRows[0] ?? task);
 }
 
 /**
@@ -86,7 +85,7 @@ export async function updateChecklistItemForUser(userId, taskId, itemId, payload
 		throw new TaskWriteError('Checklist item was not found.', 404);
 	}
 
-	return mapTaskRowToClientTask(bumpedRows[0] ?? task, await getChecklistRowsForTask(db, task.id));
+	return loadClientTask(db, bumpedRows[0] ?? task);
 }
 
 /**
@@ -116,7 +115,7 @@ export async function deleteChecklistItemForUser(userId, taskId, itemId) {
 		throw new TaskWriteError('Checklist item was not found.', 404);
 	}
 
-	return mapTaskRowToClientTask(bumpedRows[0] ?? task, await getChecklistRowsForTask(db, task.id));
+	return loadClientTask(db, bumpedRows[0] ?? task);
 }
 
 /**

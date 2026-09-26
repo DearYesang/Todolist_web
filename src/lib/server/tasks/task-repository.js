@@ -10,7 +10,7 @@ import {
 	getPersonalBoardForUser
 } from './board-provisioning.js';
 import { attachCategoryMetaToTaskRow, mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
-import { createPositionValue, getChecklistRowsForTask, getWritableTaskForUser } from './task-rows.js';
+import { createPositionValue, getWritableTaskForUser, loadClientTask } from './task-rows.js';
 import {
 	assertValidTaskDateRange,
 	parseCreateTaskInput,
@@ -19,6 +19,8 @@ import {
 	parseUpdateTaskInput,
 	TaskWriteError
 } from './validation.js';
+
+const STALE_TASK_MESSAGE = 'Task changed on another device. Sync and try again.';
 
 /**
  * @param {string} userId
@@ -141,24 +143,50 @@ async function resolveCategoryForTaskCreate(db, boardId, userId, input) {
  * @param {ReturnType<typeof parseUpdateTaskInput>} input
  */
 async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
-	if (hasField(input, 'categoryId')) {
-		if (typeof input.categoryId !== 'string') {
-			return { id: null, name: '' };
-		}
-
-		const category = await getCategoryRowForBoard(db, boardId, input.categoryId);
+	if (typeof input.categoryId === 'string') {
+		// An id that is gone (deleted or merged away on another device, or
+		// from another user's catalog) comes from a client catalog that is
+		// out of date. A client that lets the name decide gets the category
+		// by its name, found, reactivated or created as if typed; the stale
+		// version check above keeps a stale copy from getting here. Older
+		// clients get the 400 they always did.
+		const category = await getCategoryRowForBoard(db, boardId, input.categoryId)
+			?? (input.categoryByName === true ? await findCategoryRowByPatchName(db, boardId, userId, input) : null);
 		if (!category) {
 			throw new TaskWriteError('Category was not found on this board.');
 		}
 		return category;
 	}
 
-	const category = await findOrCreateCategoryRow(db, {
+	// A null id clears the category unless the client asks for the name to
+	// decide. Clients cached from before categoryByName send a patch for every
+	// keystroke in the task panel, each with categoryId: null, and resolving
+	// those names would leave a category for every half-typed name.
+	if (hasField(input, 'categoryId') && input.categoryByName !== true) {
+		return { id: null, name: '' };
+	}
+
+	// The name decides. Current clients send categoryId: null with every task
+	// patch, also for a name they have no id for yet (typed in the task panel,
+	// or renamed offline), so a null id must not clear a named category. An
+	// empty or missing name still clears it.
+	return (await findCategoryRowByPatchName(db, boardId, userId, input)) ?? { id: null, name: '' };
+}
+
+/**
+ * The category a patch names, found, reactivated or created; null for an
+ * empty or missing name.
+ * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {string} boardId
+ * @param {string} userId
+ * @param {ReturnType<typeof parseUpdateTaskInput>} input
+ */
+function findCategoryRowByPatchName(db, boardId, userId, input) {
+	return findOrCreateCategoryRow(db, {
 		boardId,
 		userId,
 		name: typeof input.category === 'string' ? input.category : ''
 	});
-	return category ?? { id: null, name: '' };
 }
 
 /**
@@ -175,6 +203,12 @@ export async function updateTaskForUser(userId, taskId, payload) {
 		throw new TaskWriteError('Task was not found.', 404);
 	}
 	const expectedVersion = typeof input.expectedVersion === 'number' ? input.expectedVersion : null;
+	// A stale write must change nothing. Resolving the category below can
+	// create a category or bring an archived one back before the UPDATE's
+	// own version guard rejects the write, so the version is checked first.
+	if (expectedVersion !== null && existing.version !== expectedVersion) {
+		throw new TaskWriteError(STALE_TASK_MESSAGE, 409);
+	}
 
 	const hasParentPatch = hasField(input, 'parentId');
 	const hasCategoryIdPatch = hasField(input, 'categoryId');
@@ -225,16 +259,14 @@ export async function updateTaskForUser(userId, taskId, payload) {
 
 	if (!updated) {
 		if (expectedVersion !== null) {
-			throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
+			throw new TaskWriteError(STALE_TASK_MESSAGE, 409);
 		}
 		// The task passed the authz read moments ago, so an unversioned update
 		// matching nothing means it was deleted concurrently — a benign race.
 		throw new TaskWriteError('Task was not found.', 404);
 	}
 
-	const checklistRows = await getChecklistRowsForTask(db, updated.id);
-	const categoryRow = updated.categoryId ? await getCategoryRowForBoard(db, updated.boardId, updated.categoryId, { includeArchived: true }) : null;
-	return mapTaskRowToClientTask(attachCategoryMetaToTaskRow(updated, categoryRow), checklistRows);
+	return loadClientTask(db, updated);
 }
 
 /**
@@ -307,7 +339,7 @@ export async function deleteTaskCascadeForUser(userId, taskId, payload = undefin
 	const result = await db.execute(buildCascadeDeleteStatement(task, now, input.expectedVersion));
 	const deletedCount = result.rows.length;
 	if (input.expectedVersion !== null && deletedCount === 0) {
-		throw new TaskWriteError('Task changed on another device. Sync and try again.', 409);
+		throw new TaskWriteError(STALE_TASK_MESSAGE, 409);
 	}
 
 	return deletedCount;

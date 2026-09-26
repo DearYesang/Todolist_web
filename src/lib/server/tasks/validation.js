@@ -75,7 +75,7 @@ export function parseUpdateTaskInput(payload) {
 		throw new TaskWriteError('Task payload must be an object.');
 	}
 
-	/** @type {Record<string, string | null | number>} */
+	/** @type {Record<string, string | null | number | boolean>} */
 	const patch = {};
 	let hasTaskField = false;
 
@@ -107,6 +107,17 @@ export function parseUpdateTaskInput(payload) {
 	if (hasField(source, 'categoryId')) {
 		patch.categoryId = parseOptionalUuid(source.categoryId, 'categoryId');
 		hasTaskField = true;
+	}
+
+	// Says how to read a null categoryId: find the category by name rather
+	// than clear it. Not a task field on its own.
+	if (hasField(source, 'categoryByName')) {
+		if (typeof source.categoryByName !== 'boolean') {
+			throw new TaskWriteError('categoryByName must be a boolean.');
+		}
+		if (source.categoryByName) {
+			patch.categoryByName = true;
+		}
 	}
 
 	if (hasField(source, 'startDate')) {

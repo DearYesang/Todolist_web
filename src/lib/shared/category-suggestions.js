@@ -104,6 +104,15 @@ export function normalizeCategoryName(value) {
 }
 
 /**
+ * The key category names are unique by on a board (categories.normalized_name),
+ * so names that differ only in case or spacing are the same category.
+ * @param {string} value
+ */
+export function normalizeCategoryKey(value) {
+    return normalizeCategoryName(value).toLocaleLowerCase('ko');
+}
+
+/**
  * @param {string[]} categories
  */
 function normalizeCategoryList(categories) {
