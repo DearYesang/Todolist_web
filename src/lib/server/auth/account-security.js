@@ -55,7 +55,7 @@ export function assertAllowedAccountEmail(email) {
 	}
 }
 
-export function getAllowedAccountEmails() {
+function getAllowedAccountEmails() {
 	return parseEmailList(process.env.AUTH_ALLOWED_EMAILS);
 }
 

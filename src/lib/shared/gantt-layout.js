@@ -21,7 +21,7 @@ import { buildHierarchy } from './task-domain.js';
 
 export const GANTT_DAY_WIDTH = 48;
 /** Days kept on each side of today, so the timeline can center on it. */
-export const GANTT_TODAY_PADDING_DAYS = 18;
+const GANTT_TODAY_PADDING_DAYS = 18;
 const DAY_MS = 86400000;
 const MIN_BAR_WIDTH = 24;
 const LEADING_DAYS = 3;

@@ -62,7 +62,7 @@ export async function getCategoryRowForBoard(db, boardId, categoryId, options = 
  * @param {string} normalizedName
  * @param {{ includeArchived?: boolean }} [options]
  */
-export async function getCategoryRowByNormalizedName(db, boardId, normalizedName, options = {}) {
+async function getCategoryRowByNormalizedName(db, boardId, normalizedName, options = {}) {
 	const [category] = await db
 		.select()
 		.from(schema.categories)
