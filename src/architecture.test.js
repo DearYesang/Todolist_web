@@ -25,6 +25,7 @@ const LAYER_RULES = [
 	{ layer: 'server', forbidden: ['client', 'components'] }
 ];
 const TEST_SUPPORT = 'lib/test-support/';
+const SERVER_DIR = 'lib/server/';
 const TASK_STORE_DIR = 'lib/client/task-store/';
 const TASK_STORE_FACADE = 'lib/client/task-store.js';
 const OFFLINE_QUEUE = 'lib/client/offline-write-queue.js';
@@ -141,11 +142,11 @@ function findImports(breaksRule) {
 }
 
 /**
- * Every import cycle among the production files, as `a -> b -> a` lines. A
- * component that renders itself, like TaskTreeCard.svelte, imports itself;
- * that is recursion, not a cycle.
+ * Every cycle in a graph, as `a -> b -> a` lines.
+ * @param {string[]} nodes
+ * @param {(node: string) => string[]} next the nodes a node points to
  */
-function findCycles() {
+function findCycles(nodes, next) {
 	/** @type {string[]} */
 	const cycles = [];
 	/** @type {Map<string, 'open' | 'done'>} */
@@ -153,27 +154,61 @@ function findCycles() {
 	/** @type {string[]} */
 	const stack = [];
 
-	/** @param {string} file */
-	function visit(file) {
-		state.set(file, 'open');
-		stack.push(file);
-		for (const next of (imports.get(file) ?? []).filter((target) => target !== file && isProduction(target))) {
-			if (state.get(next) === 'open') {
-				cycles.push([...stack.slice(stack.indexOf(next)), next].join(' -> '));
-			} else if (!state.has(next)) {
-				visit(next);
+	/** @param {string} node */
+	function visit(node) {
+		state.set(node, 'open');
+		stack.push(node);
+		for (const target of next(node)) {
+			if (state.get(target) === 'open') {
+				cycles.push([...stack.slice(stack.indexOf(target)), target].join(' -> '));
+			} else if (!state.has(target)) {
+				visit(target);
 			}
 		}
 		stack.pop();
-		state.set(file, 'done');
+		state.set(node, 'done');
 	}
 
-	for (const file of files.filter(isProduction)) {
-		if (!state.has(file)) {
-			visit(file);
+	for (const node of nodes) {
+		if (!state.has(node)) {
+			visit(node);
 		}
 	}
 	return cycles;
+}
+
+/**
+ * Every import cycle among the production files. A component that renders
+ * itself, like TaskTreeCard.svelte, imports itself; that is recursion, not a
+ * cycle.
+ */
+function findFileCycles() {
+	return findCycles(
+		files.filter(isProduction),
+		(file) => (imports.get(file) ?? []).filter((target) => target !== file && isProduction(target))
+	);
+}
+
+/**
+ * Every import cycle among the server packages, the folders directly under
+ * lib/server/, counting the imports of their production files.
+ */
+function findServerPackageCycles() {
+	/** @param {string} file */
+	const packageOf = (file) => file.slice(SERVER_DIR.length).split('/')[0];
+	const isServerProduction = (/** @type {string} */ file) => isProduction(file) && file.startsWith(SERVER_DIR);
+	/** @type {Map<string, Set<string>>} */
+	const packageImports = new Map();
+	for (const file of files.filter(isServerProduction)) {
+		const targets = packageImports.get(packageOf(file)) ?? new Set();
+		for (const imported of (imports.get(file) ?? []).filter(isServerProduction)) {
+			if (packageOf(imported) !== packageOf(file)) {
+				targets.add(packageOf(imported));
+			}
+		}
+		packageImports.set(packageOf(file), targets);
+	}
+	return findCycles([...packageImports.keys()].sort(), (name) => [...(packageImports.get(name) ?? [])].sort());
 }
 
 describe('source architecture', () => {
@@ -183,7 +218,17 @@ describe('source architecture', () => {
 	});
 
 	it('has no import cycles', () => {
-		expect(findCycles()).toEqual([]);
+		expect(findFileCycles()).toEqual([]);
+	});
+
+	it('has no import cycles between the server packages', () => {
+		// A package can then be read, and its tests mocked, without the
+		// packages that use it: boards/ and http/ import no other package,
+		// and tasks/ imports categories/ but categories/ never imports tasks/.
+		expect(findServerPackageCycles()).toEqual([]);
+		expect(findImports((importer, imported) =>
+			isProduction(importer) && importer.startsWith(`${SERVER_DIR}categories/`) && imported.startsWith(`${SERVER_DIR}tasks/`)
+		)).toEqual([]);
 	});
 
 	it.each(LAYER_RULES.map((rule) => ({ ...rule, names: rule.forbidden.join(', ') })))(
@@ -262,11 +307,10 @@ describe('source architecture', () => {
 	it('reaches the server task repository modules only through repository.js', () => {
 		// A route importing a module behind repository.js would escape the
 		// vi.mock('$lib/server/tasks/repository.js') factories in its tests.
-		// Tests may also import validation.js for TaskWriteError.
-		const tasksDir = 'lib/server/tasks/';
-		const publicModules = ['repository.js', 'validation.js'].map((name) => tasksDir + name);
+		// Tests may import the others, like validation.js for TaskWriteError.
+		const tasksDir = `${SERVER_DIR}tasks/`;
 		expect(findImports((importer, imported) =>
-			isProduction(importer) && !importer.startsWith(tasksDir) && imported.startsWith(tasksDir) && !publicModules.includes(imported)
+			isProduction(importer) && !importer.startsWith(tasksDir) && imported.startsWith(tasksDir) && imported !== `${tasksDir}repository.js`
 		)).toEqual([]);
 	});
 
