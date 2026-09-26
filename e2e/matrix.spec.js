@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { seedOfflineBoard } from './fixtures/board.js';
+import { readPersistedTask, seedOfflineBoard } from './fixtures/board.js';
 import { pointerDrag } from './fixtures/page.js';
 
 test('opens the Eisenhower matrix view with all quadrants', async ({ page }) => {
@@ -56,10 +56,7 @@ test('moves a task between Eisenhower quadrants with pointer input', async ({ pa
 	// 'Interrupting task' was medium/urgent (줄이기); dropping on 즉시 실행
 	// promotes it to important while keeping urgency.
 	await expect(target.getByText('Interrupting task')).toBeVisible();
-	const persisted = await page.evaluate(() =>
-		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
-			.find((task) => task.id === 'local-interrupting-task')
-	);
+	const persisted = await readPersistedTask(page, 'local-interrupting-task');
 	expect(persisted).toMatchObject({ priority: 'high', urgency: 'urgent' });
 });
 

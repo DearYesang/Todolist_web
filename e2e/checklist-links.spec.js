@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { seedOfflineBoard } from './fixtures/board.js';
+import { cardByTitle, readPersistedTasks, seedOfflineBoard } from './fixtures/board.js';
 
 const LINK_TASKS = [
 	{
@@ -71,13 +71,6 @@ function readOpenedUrls(page) {
 	return page.evaluate(() => window.__opened.map((args) => args[0]));
 }
 
-/**
- * @param {import('@playwright/test').Page} page
- */
-function linkParentCard(page) {
-	return page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 모음' }) });
-}
-
 test('renders checklist links without trailing punctuation and opens them all', async ({ page }) => {
 	await stubWindowOpen(page);
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
@@ -97,7 +90,7 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	});
 
 	await page.goto('/');
-	const card = linkParentCard(page);
+	const card = cardByTitle(page, 'E2E 링크 모음');
 	await expect(card).toBeVisible();
 
 	const links = card.locator('a.subtask-link');
@@ -116,7 +109,7 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	await expect(ownButton).toHaveAccessibleDescription('체크리스트 링크 2개를 새 탭에서 모두 열기');
 	await expect(subtreeButton).toHaveAccessibleDescription('하위 작업 포함 링크 4개를 새 탭에서 모두 열기');
 	// The child card has 2 links of its own and no children.
-	const childCard = page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 하위' }) });
+	const childCard = cardByTitle(page, 'E2E 링크 하위');
 	await expect(childCard.getByRole('button', { name: '모두 열기 (2)', exact: true })).toBeVisible();
 
 	// A permanent live region carries only the short result message; the
@@ -160,11 +153,9 @@ test('renders checklist links without trailing punctuation and opens them all', 
 	expect(await page.evaluate(() => window.__bubbled)).toEqual([]);
 	await expect(page.locator('.side-panel')).toHaveCount(0);
 	await expect(page.locator('.dnd-ghost')).toHaveCount(0);
-	const persisted = await page.evaluate(() =>
-		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
-			.filter((task) => task.id.startsWith('local-link-'))
-			.map((task) => [task.id, task.status, task.parentId])
-	);
+	const persisted = (await readPersistedTasks(page))
+		.filter((task) => task.id.startsWith('local-link-'))
+		.map((task) => [task.id, task.status, task.parentId]);
 	expect(persisted).toEqual([
 		['local-link-parent', 'todo', null],
 		['local-link-child', 'todo', 'local-link-parent']
@@ -207,7 +198,7 @@ test('falls back to a link list when the browser blocks pop-ups', async ({ page 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await linkParentCard(page).getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
+	await cardByTitle(page, 'E2E 링크 모음').getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
 	expect(await readOpenedUrls(page)).toEqual(LINK_TASK_URLS);
 
 	const panel = page.locator('.link-open-panel');
@@ -248,7 +239,7 @@ test('lists every link when new tabs cannot be opened at all', async ({ page }) 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await linkParentCard(page).getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
+	await cardByTitle(page, 'E2E 링크 모음').getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
 
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('이 환경에서는 새 탭을 자동으로 열 수 없습니다.');
@@ -278,7 +269,7 @@ test('confirms more than 10 links and opens them in batches of 20 from the keybo
 	await seedOfflineBoard(page, { extraTasks: MANY_LINK_TASKS });
 
 	await page.goto('/');
-	const card = page.locator('.task-card', { has: page.locator('.card-text', { hasText: 'E2E 링크 21개' }) });
+	const card = cardByTitle(page, 'E2E 링크 21개');
 	const trigger = card.getByRole('button', { name: '모두 열기 (21)', exact: true });
 	await trigger.focus();
 	await page.keyboard.press('Enter');
@@ -320,7 +311,7 @@ test('drops a leftover link panel when another account signs in', async ({ page 
 	await seedOfflineBoard(page, { extraTasks: LINK_TASKS });
 
 	await page.goto('/');
-	await linkParentCard(page).getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
+	await cardByTitle(page, 'E2E 링크 모음').getByRole('button', { name: '하위 포함 모두 열기 (4)', exact: true }).click();
 	const panel = page.locator('.link-open-panel');
 	await expect(panel).toContainText('링크 4개 중 1개만 열렸습니다');
 

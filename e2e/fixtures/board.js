@@ -1,9 +1,36 @@
+/** The account the offline board is cached for. */
+const E2E_USER = { id: 'e2e-user', email: 'e2e@example.com', name: null };
+
+const TASKS_STORAGE_KEY = `kanbanTasks:${E2E_USER.id}`;
+
+/**
+ * The tasks every offline board starts with. seedOfflineBoard fills in the
+ * fields left out here, as it does for extra tasks.
+ * @type {Array<Record<string, unknown>>}
+ */
+const BASE_TASKS = [
+	{ id: 'local-urgent-important', text: 'Urgent important', priority: 'high', urgency: 'urgent' },
+	{ id: 'local-planned-important', text: 'Planned important', status: 'doing', priority: 'high' },
+	{ id: 'local-interrupting-task', text: 'Interrupting task', urgency: 'urgent' },
+	{
+		id: 'local-e2e-task',
+		text: 'E2E cached task',
+		subtasks: [
+			{ id: 'local-e2e-checklist-one', text: 'E2E checklist one', done: false },
+			{ id: 'local-e2e-checklist-done', text: 'E2E checklist done', done: true }
+		]
+	},
+	{ id: 'local-parent-task', text: 'Nested parent task' },
+	{ id: 'local-child-task', text: 'Nested child task', parentId: 'local-parent-task' },
+	{ id: 'local-completed-matrix-task', text: 'Completed matrix task', status: 'done', priority: 'high', urgency: 'urgent' }
+];
+
 /**
  * @param {import('@playwright/test').Page} page
  * @param {{ extraTasks?: Array<Record<string, unknown>> }} [options]
  */
 export async function seedOfflineBoard(page, { extraTasks = [] } = {}) {
-	await page.addInitScript((seedExtraTasks) => {
+	await page.addInitScript(({ user, tasksKey, seedTasks }) => {
 		Object.defineProperty(navigator, 'onLine', {
 			configurable: true,
 			get: () => false
@@ -17,7 +44,10 @@ export async function seedOfflineBoard(page, { extraTasks = [] } = {}) {
 		};
 		const past = new Date(today);
 		past.setDate(past.getDate() - 16);
-		const extraSeedTasks = seedExtraTasks.map((task) => ({
+		// Dates and createdAt come from the page's clock, so a test that fixes
+		// the clock or the time zone seeds tasks for that day.
+		/** @param {Record<string, unknown>} task */
+		const seedTask = (task) => ({
 			status: 'todo',
 			startDate: formatDate(past),
 			endDate: formatDate(past),
@@ -29,133 +59,35 @@ export async function seedOfflineBoard(page, { extraTasks = [] } = {}) {
 			collapsed: false,
 			createdAt: Date.now(),
 			...task
-		}));
+		});
 
 		localStorage.setItem('todokanbanAuthScope', JSON.stringify({
-			id: 'e2e-user',
-			email: 'e2e@example.com',
-			name: null,
+			...user,
 			cachedAt: Date.now()
 		}));
-		if (localStorage.getItem('kanbanTasks:e2e-user')) {
+		if (localStorage.getItem(tasksKey)) {
 			return;
 		}
 
-		localStorage.setItem('kanbanTasks:e2e-user', JSON.stringify([
-			{
-				id: 'local-urgent-important',
-				text: 'Urgent important',
-				status: 'todo',
-				startDate: formatDate(past),
-				endDate: formatDate(past),
-				priority: 'high',
-				urgency: 'urgent',
-				category: '',
-				parentId: null,
-				subtasks: [],
-				collapsed: false,
-				createdAt: Date.now()
-			},
-			{
-				id: 'local-planned-important',
-				text: 'Planned important',
-				status: 'doing',
-				startDate: formatDate(past),
-				endDate: formatDate(past),
-				priority: 'high',
-				urgency: 'normal',
-				category: '',
-				parentId: null,
-				subtasks: [],
-				collapsed: false,
-				createdAt: Date.now()
-			},
-			{
-				id: 'local-interrupting-task',
-				text: 'Interrupting task',
-				status: 'todo',
-				startDate: formatDate(past),
-				endDate: formatDate(past),
-				priority: 'medium',
-				urgency: 'urgent',
-				category: '',
-				parentId: null,
-				subtasks: [],
-				collapsed: false,
-				createdAt: Date.now()
-			},
-			{
-				id: 'local-e2e-task',
-				text: 'E2E cached task',
-				status: 'todo',
-				startDate: formatDate(past),
-				endDate: formatDate(past),
-				priority: 'medium',
-				urgency: 'normal',
-				category: '',
-				parentId: null,
-				subtasks: [
-					{ id: 'local-e2e-checklist-one', text: 'E2E checklist one', done: false },
-					{ id: 'local-e2e-checklist-done', text: 'E2E checklist done', done: true }
-				],
-				collapsed: false,
-				createdAt: Date.now()
-			},
-			{
-				id: 'local-parent-task',
-				text: 'Nested parent task',
-				status: 'todo',
-				startDate: formatDate(past),
-				endDate: formatDate(past),
-				priority: 'medium',
-				urgency: 'normal',
-				category: '',
-				parentId: null,
-				subtasks: [],
-				collapsed: false,
-				createdAt: Date.now()
-			},
-			{
-				id: 'local-child-task',
-				text: 'Nested child task',
-				status: 'todo',
-				startDate: formatDate(past),
-				endDate: formatDate(past),
-				priority: 'medium',
-				urgency: 'normal',
-				category: '',
-				parentId: 'local-parent-task',
-				subtasks: [],
-				collapsed: false,
-				createdAt: Date.now()
-			},
-			{
-				id: 'local-completed-matrix-task',
-				text: 'Completed matrix task',
-				status: 'done',
-				startDate: formatDate(past),
-				endDate: formatDate(past),
-				priority: 'high',
-				urgency: 'urgent',
-				category: '',
-				parentId: null,
-				subtasks: [],
-				collapsed: false,
-				createdAt: Date.now()
-			},
-			...extraSeedTasks
-		]));
-	}, extraTasks);
+		localStorage.setItem(tasksKey, JSON.stringify(seedTasks.map(seedTask)));
+	}, { user: E2E_USER, tasksKey: TASKS_STORAGE_KEY, seedTasks: [...BASE_TASKS, ...extraTasks] });
+}
+
+/**
+ * The task list the app has persisted for the E2E account.
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<any[]>}
+ */
+export function readPersistedTasks(page) {
+	return page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '[]'), TASKS_STORAGE_KEY);
 }
 
 /**
  * @param {import('@playwright/test').Page} page
  * @param {string} taskId
  */
-export function readPersistedTask(page, taskId) {
-	return page.evaluate((id) =>
-		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]').find((task) => task.id === id),
-	taskId);
+export async function readPersistedTask(page, taskId) {
+	return (await readPersistedTasks(page)).find((task) => task.id === taskId);
 }
 
 /**

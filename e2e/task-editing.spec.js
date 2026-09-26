@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { cardByTitle, readPersistedTask, seedOfflineBoard } from './fixtures/board.js';
+import { recordDialogs } from './fixtures/page.js';
 
 test('suggests categories and manages category names offline', async ({ page }) => {
 	await seedOfflineBoard(page);
@@ -88,7 +89,7 @@ test('does not submit the Enter that confirms an IME composition', async ({ page
 	await expect(page.locator('.card-text', { hasText: '한글 작업' })).toHaveCount(1);
 });
 
-test('narrows every view with the search box and highlights overdue work', async ({ page }) => {
+test('narrows the board with the search box and restores it when the search is cleared', async ({ page }) => {
 	await seedOfflineBoard(page);
 
 	await page.goto('/');
@@ -105,12 +106,7 @@ test('asks the same delete question on a card and in the detail panel', async ({
 	await seedOfflineBoard(page);
 	await page.goto('/');
 
-	/** @type {string[]} */
-	const questions = [];
-	page.on('dialog', (dialog) => {
-		questions.push(`${dialog.type()}:${dialog.message()}`);
-		void dialog.dismiss();
-	});
+	const questions = recordDialogs(page);
 
 	const modal = page.locator('.side-panel');
 	const parentCard = cardByTitle(page, 'Nested parent task');

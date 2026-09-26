@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readPersistedTask, seedOfflineBoard } from './fixtures/board.js';
+import { boxOf } from './fixtures/page.js';
 
 test('opens an offline cached board and centers the Gantt timeline on today', async ({ page }) => {
 	await seedOfflineBoard(page);
@@ -84,8 +85,7 @@ async function pressGanttEndHandle(page, taskText) {
 	const bar = page.getByRole('button', { name: `${taskText} 일정 막대` });
 	const handle = bar.locator('.resize-handle.end');
 	await handle.scrollIntoViewIfNeeded();
-	const box = await handle.boundingBox();
-	expect(box).toBeTruthy();
+	const box = await boxOf(handle);
 	const x = box.x + box.width / 2;
 	const y = box.y + box.height / 2;
 	await page.mouse.move(x, y);

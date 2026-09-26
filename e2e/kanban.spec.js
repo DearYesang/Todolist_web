@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { seedOfflineBoard } from './fixtures/board.js';
+import { readPersistedTask, seedOfflineBoard } from './fixtures/board.js';
 import { pointerDrag } from './fixtures/page.js';
 
 test('keeps iPad-width Kanban columns side by side', async ({ page }) => {
@@ -93,10 +93,7 @@ test('drags a Kanban card to another column with pointer input', async ({ page }
 	await expect(page.locator('#col-todo').getByText('E2E cached task')).toBeHidden();
 	// Positive control for the write path: the move is persisted, not just
 	// rendered.
-	const persistedStatus = await page.evaluate(() =>
-		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
-			.find((task) => task.id === 'local-e2e-task')?.status
-	);
+	const persistedStatus = (await readPersistedTask(page, 'local-e2e-task'))?.status;
 	expect(persistedStatus).toBe('doing');
 });
 
@@ -120,10 +117,7 @@ test('keeps a dropped child in its own column attached to its parent', async ({ 
 	// Still rendered as an indented child (child-card class survives)…
 	await expect(page.locator('.task-card.child-card', { has: page.getByText('Nested child task') })).toBeVisible();
 	// …and the persisted task graph still records the parent link.
-	const parentId = await page.evaluate(() =>
-		JSON.parse(localStorage.getItem('kanbanTasks:e2e-user') ?? '[]')
-			.find((task) => task.id === 'local-child-task')?.parentId
-	);
+	const parentId = (await readPersistedTask(page, 'local-child-task'))?.parentId;
 	expect(parentId).toBe('local-parent-task');
 	// A same-column drop must queue no sync write. Note: for cache-seeded
 	// local tasks the queue also stays empty because coalescing drops

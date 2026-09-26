@@ -1,14 +1,23 @@
 import { expect } from '@playwright/test';
 
 /**
+ * Returns the locator's bounding box after asserting that it has one.
+ * @param {import('@playwright/test').Locator} locator
+ */
+export async function boxOf(locator) {
+	const box = await locator.boundingBox();
+	expect(box).toBeTruthy();
+	return /** @type {NonNullable<typeof box>} */ (box);
+}
+
+/**
  * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').Locator} card
  * @param {{ x: number; y: number }} dropPoint
  */
 export async function pointerDrag(page, card, dropPoint) {
 	await card.scrollIntoViewIfNeeded();
-	const cardBox = await card.boundingBox();
-	expect(cardBox).toBeTruthy();
+	const cardBox = await boxOf(card);
 
 	// Pointer-based drag: press, cross the activation threshold, drop.
 	await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + 12);
