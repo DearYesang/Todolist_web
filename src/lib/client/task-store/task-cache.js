@@ -1,6 +1,6 @@
 import { get, writable } from 'svelte/store';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
-import { getStorage, PENDING_VIEW_STORAGE_KEY } from './storage.js';
+import { getStorage, PENDING_VIEW_STORAGE_KEY } from '../browser-storage.js';
 
 const STORAGE_KEY = 'kanbanTasks';
 const DEFAULT_STORAGE_OWNER = 'anonymous';
