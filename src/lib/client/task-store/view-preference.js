@@ -1,8 +1,9 @@
 import { writable } from 'svelte/store';
 import { isAppView } from '../../shared/task-rules.js';
-import { getStorage, PENDING_VIEW_STORAGE_KEY } from '../browser-storage.js';
+import { getStorage } from '../browser-storage.js';
 
 const VIEW_STORAGE_KEY = 'todokanbanCurrentView';
+const PENDING_VIEW_STORAGE_KEY = 'todokanbanPendingDefaultView';
 
 /** @typedef {import('../../shared/task-rules.js').AppView} AppView */
 
