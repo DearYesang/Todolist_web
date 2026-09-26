@@ -545,6 +545,32 @@ describe('signing out while a task write is still in flight', () => {
 		});
 	});
 
+	// Verifier finding on bfcec00. The board goes to no user and back while
+	// a request is out: the user signed out in another tab, or the server
+	// ended the session, and the user signed in again. The edit waiting
+	// behind the request moved to the user's queue. Back on the board, the
+	// user edits the task again; that edit waits behind the same request,
+	// goes out after it and lands. The queued older edit then goes out at
+	// the next sync into a 409 that reports it as a conflict, and applied
+	// from there it would undo the newer edit.
+	it.fails('retires the queued edit once the edit made after the user came back lands', async () => {
+		await editInFlight();
+		updateTask(TASK_ID, { text: 'Edit 2' });
+		applyUserScope(null);
+		applyUserScope('user-a');
+		updateTask(TASK_ID, { text: 'Edit 3' });
+
+		await answerFirstRequest(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+		expect(sent).toEqual(['Edit 1', 'Edit 3']);
+		answers[1].resolve(jsonResponse({ task: { id: TASK_ID, text: 'Edit 3', version: 3 } }));
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect({
+			queues: readQueues(),
+			board: get(tasks).map((task) => [task.text, task.version])
+		}).toEqual({ queues: { userA: [], anonymous: [] }, board: [['Edit 3', 3]] });
+	});
+
 	// Checklist writes, as the task edits above. The sign-out moves an edit
 	// of an item waiting behind the item's request in flight to the queue,
 	// and the request then fails or lands. Before 79bee3c its failure went to

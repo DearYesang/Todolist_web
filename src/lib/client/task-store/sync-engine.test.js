@@ -463,3 +463,135 @@ describe('task writes when sign-out clears local data', () => {
         expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['Edit 2', 1]]);
     });
 });
+
+// Verifier findings on PR #84. An edit of a task waits in the offline
+// queue (it failed, or moved there from the task's chain at sign-out's
+// timeout), and the user edits the task again while still signed in. That
+// edit goes out through the chain, from the board, which holds the queued
+// edit, and lands first. The queued edit then goes out at the next sync,
+// behind the newer one.
+describe('an edit that lands after an older edit of its task was queued', () => {
+    const TASK_ID = '66666666-6666-4666-8666-666666666666';
+    const ITEM = { id: '77777777-7777-4777-8777-777777777777', text: 'Item', done: false };
+    /** @type {ReturnType<typeof createDeferred>[]} */
+    let answers;
+    /** @type {Record<string, unknown>[]} */
+    let bodies;
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        installMemoryStorage();
+        vi.stubGlobal('window', {});
+        setOfflineQueueOwner('user-a');
+        replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] })]);
+        answers = [];
+        bodies = [];
+        // Every request stays out until the test answers it.
+        vi.stubGlobal('fetch', vi.fn((/** @type {unknown} */ _url, /** @type {RequestInit} */ init) => {
+            bodies.push(JSON.parse(String(init.body)));
+            const answer = createDeferred();
+            answers.push(answer);
+            return answer.promise;
+        }));
+    });
+
+    afterEach(async () => {
+        let answered = 0;
+        while (answered < answers.length) {
+            answers.slice(answered).forEach((answer) => answer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 })));
+            answered = answers.length;
+            await vi.advanceTimersByTimeAsync(0);
+        }
+        vi.useRealTimers();
+        resetTaskSyncStateForTests();
+        replaceTasks([]);
+        setOfflineQueueOwner(null);
+    });
+
+    /**
+     * Answers request `index` (0 for the first).
+     * @param {number} index
+     * @param {Response} response
+     */
+    async function answer(index, response) {
+        answers[index].resolve(response);
+        await vi.advanceTimersByTimeAsync(0);
+    }
+
+    const unavailable = () => jsonResponse({ message: 'Unavailable' }, { status: 503 });
+
+    // Sent at the next sync, the queued edit expects the version before the
+    // newer one landed and meets a 409, which reports the user's own older
+    // edit as a conflict; applied from there, it would undo the newer one.
+    it.fails('retires a queued task edit once a later edit of the task lands', async () => {
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        await answer(0, unavailable());
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({ type: 'task.patch', patch: expect.objectContaining({ text: 'Edit 1', expectedVersion: 1 }) })
+        ]);
+
+        updateTask(TASK_ID, { priority: 'high' });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bodies[1]).toMatchObject({ text: 'Edit 1', priority: 'high', expectedVersion: 1 });
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', priority: 'high', version: 2 } }));
+
+        expect(loadOfflineQueue()).toEqual([]);
+    });
+
+    it.fails('retires the edit queued at sign-out\'s timeout once the next edit, made after a cancelled sign-out, lands', async () => {
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        updateTask(TASK_ID, { text: 'Edit 2' });
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        // The "clear local data" question is cancelled, and the first
+        // request lands.
+        await answer(0, jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+
+        updateTask(TASK_ID, { text: 'Edit 3' });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bodies[1]).toMatchObject({ text: 'Edit 3', expectedVersion: 2 });
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Edit 3', version: 3 } }));
+
+        expect({
+            queue: loadOfflineQueue(),
+            board: get(tasks).map((task) => [task.text, task.version])
+        }).toEqual({ queue: [], board: [['Edit 3', 3]] });
+    });
+
+    // A checklist patch carries no version, so the queued older rename
+    // lands at the next sync over the newer one, with no conflict to show.
+    it.fails('retires the fields of a queued checklist edit that a later edit of the item set once it lands', async () => {
+        renameSubtask(TASK_ID, ITEM.id, 'First');
+        await vi.advanceTimersByTimeAsync(0);
+        renameSubtask(TASK_ID, ITEM.id, 'Last');
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        await answer(0, jsonResponse({ task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ ...ITEM, text: 'First' }] } }));
+
+        renameSubtask(TASK_ID, ITEM.id, 'Newest');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bodies[1]).toEqual({ text: 'Newest' });
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Saved', version: 3, subtasks: [{ ...ITEM, text: 'Newest' }] } }));
+
+        expect(loadOfflineQueue()).toEqual([]);
+    });
+
+    // The toggle's answer has the server's task, without the queued edit,
+    // and replaced the task on the board with it. The next edit of the task
+    // is sent from the board, so the queued edit would be undone there too.
+    it.fails('keeps a queued task edit on the board when a checklist write of the task lands', async () => {
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        await answer(0, unavailable());
+
+        toggleSubtask(TASK_ID, ITEM.id);
+        await vi.advanceTimersByTimeAsync(0);
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ ...ITEM, done: true }] } }));
+
+        expect(get(tasks).map((task) => [task.text, task.version, task.subtasks[0].done])).toEqual([['Edit 1', 2, true]]);
+    });
+});
