@@ -79,7 +79,7 @@ Format on save is an editor setting, and `.vscode/settings.json` is not tracked.
 }
 ```
 
-Without it, run `npm run format` before committing.
+Without it, run `npm run format` before committing; CI runs `npm run format:check`.
 
 Run the production readiness check:
 
