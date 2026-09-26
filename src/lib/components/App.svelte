@@ -6,7 +6,7 @@
         cacheAuthScope,
         clearCachedAuthScope,
         readCachedAuthScope
-    } from '$lib/client/auth-session-scope.js';
+    } from '$lib/client/user-scope.js';
     import {
         createOfflineConflictReport,
         describeServerSyncResult,

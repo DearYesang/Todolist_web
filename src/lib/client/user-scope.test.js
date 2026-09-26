@@ -4,7 +4,7 @@ import {
 	cacheAuthScope,
 	clearCachedAuthScope,
 	readCachedAuthScope
-} from './auth-session-scope.js';
+} from './user-scope.js';
 
 describe('auth session scope cache', () => {
 	/** @type {Map<string, string>} */
