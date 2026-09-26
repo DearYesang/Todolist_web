@@ -158,10 +158,9 @@ describe('user scope', () => {
 		expect(get(categories)).toEqual(['서버 카테고리']);
 	});
 
-	// Probes P2 and P3: the category catalog was already emptied, but the
-	// filters and a pending default view outlived the user. App.svelte sends
-	// a pending view to whoever is signed in next.
-	it.fails.each([
+	// Probes P2 and P3. Left behind, a pending view is sent by App.svelte's
+	// next sync as the default view of whoever signs in next.
+	it.each([
 		{ change: 'another user signs in', nextUserId: 'user-b' },
 		{ change: 'the user signs out', nextUserId: null }
 	])('drops the previous user\'s catalog, filters and pending default view when $change', async ({ nextUserId }) => {
