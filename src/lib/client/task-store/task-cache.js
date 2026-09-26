@@ -66,6 +66,15 @@ export function setTaskStorageOwner(ownerId) {
     tasks.set(loadInitialTasks());
 }
 
+/**
+ * The user whose tasks the store holds, or null for the signed-out
+ * (anonymous) cache.
+ * @returns {string | null}
+ */
+export function getTaskStorageOwner() {
+    return taskStorageOwner === DEFAULT_STORAGE_OWNER ? null : taskStorageOwner;
+}
+
 export function clearLocalTaskCache() {
     try {
         const storage = getStorage();

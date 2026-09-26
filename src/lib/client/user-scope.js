@@ -1,18 +1,13 @@
 import { getStorage } from './browser-storage.js';
 import { setLinkOpenOwner } from './link-opener.js';
 import { clearOfflineWriteQueue, getOfflineQueueSize, setOfflineQueueOwner } from './offline-write-queue.js';
-import {
-	clearCategoryCatalog,
-	clearLocalTaskCache,
-	clearPendingDefaultView,
-	setTaskStorageOwner
-} from './task-store.js';
+import { clearLocalTaskCache, clearPendingDefaultView, setTaskStoreOwner } from './task-store.js';
 
 /**
  * What this device keeps for one user: the user last seen signed in, so the
  * app can open offline, and the per-user state that applyUserScope switches
- * when the signed-in user changes (the task cache, the offline queue, the
- * link-open state and the category catalog).
+ * when the signed-in user changes (the task board, the offline queue and
+ * the link-open state).
  */
 
 const AUTH_SCOPE_KEY = 'todokanbanAuthScope';
@@ -104,13 +99,12 @@ export function applyUserScope(userId) {
 	}
 
 	scopedUserId = userId;
-	setTaskStorageOwner(userId);
+	// Also resets what the previous user left on the board: the category
+	// catalog, the filters and, when a signed-in user leaves, a pending
+	// default view.
+	setTaskStoreOwner(userId);
 	setOfflineQueueOwner(userId);
 	setLinkOpenOwner(userId);
-	// The catalog belongs to the previous user's board until the next
-	// finished sync loads this one (a blocked queue skips it). Kept, it
-	// would list their categories and give the task panel their ids.
-	clearCategoryCatalog();
 }
 
 /**
