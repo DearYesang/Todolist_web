@@ -56,7 +56,7 @@ describe('/api/calendar/sync/cron route', () => {
 		expect(syncCalendarProvidersForConnectedUsers).not.toHaveBeenCalled();
 	});
 
-	it.fails('answers 401 to a secret as long as CRON_SECRET in characters but not in bytes', async () => {
+	it('answers 401 to a secret as long as CRON_SECRET in characters but not in bytes', async () => {
 		// A Latin-1 byte in a header arrives as one character that is two
 		// bytes in UTF-8.
 		const secret = 'cron-secret-with-enough-lengtä';

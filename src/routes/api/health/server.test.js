@@ -61,7 +61,7 @@ describe('/api/health', () => {
 		expect(body.checks).toEqual(expect.any(Array));
 	});
 
-	it.fails('answers without production details to a bearer token as long as the token in characters but not in bytes', async () => {
+	it('answers without production details to a bearer token as long as the token in characters but not in bytes', async () => {
 		process.env.NODE_ENV = 'production';
 		process.env.HEALTH_DETAILS_TOKEN = 'health-token-with-more-than-32-characters';
 		delete process.env.DATABASE_URL;

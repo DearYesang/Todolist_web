@@ -28,7 +28,7 @@ describe('secretsMatch', () => {
 		expect(secretsMatch('', SECRET)).toBe(false);
 	});
 
-	it.fails('does not match a candidate as long as the secret in characters but not in bytes', () => {
+	it('does not match a candidate as long as the secret in characters but not in bytes', () => {
 		// 'é' is one UTF-16 unit but two UTF-8 bytes, so the lengths agree
 		// and the buffers do not.
 		const candidate = `${SECRET.slice(0, -1)}é`;
