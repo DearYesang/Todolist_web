@@ -5,7 +5,8 @@
  *
  * - task-cache.js: the tasks store, its per-user localStorage cache and the
  *   whole-list writes (replace, insert, merge, remove, re-key a local task).
- * - view-preference.js: the current view and a pending server default view.
+ * - view-preference.js: the current view, saving it as the server default
+ *   view, and a default view chosen offline that the next sync sends.
  * - filters.js: the board filters.
  * - category-store.js: the category catalog, its summaries and category edits.
  * - owner.js: handing the board to the signed-in user.
@@ -38,9 +39,8 @@ export { clearLocalTaskCache } from './task-store/task-cache.js';
 
 export {
     clearPendingDefaultView,
-    markPendingDefaultView,
-    readPendingDefaultView,
-    setCurrentView
+    flushPendingViewPreference,
+    selectView
 } from './task-store/view-preference.js';
 
 export {

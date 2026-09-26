@@ -7,8 +7,6 @@ import { linkOpenState, requestOpenLinks } from './link-opener.js';
 import {
 	categories,
 	filters,
-	markPendingDefaultView,
-	readPendingDefaultView,
 	setCategoryFilter,
 	setPriorityFilter,
 	syncServerTasks,
@@ -24,6 +22,8 @@ import {
 } from './user-scope.js';
 
 const CATEGORY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+// Where a default view chosen offline waits for the next sync.
+const PENDING_VIEW_KEY = 'todokanbanPendingDefaultView';
 
 describe('auth session scope cache', () => {
 	/** @type {Map<string, string>} */
@@ -165,14 +165,14 @@ describe('user scope', () => {
 		await syncCategoryCatalog();
 		setCategoryFilter(CATEGORY_ID, '서버 카테고리');
 		setPriorityFilter('high');
-		markPendingDefaultView('gantt');
+		storage.set(PENDING_VIEW_KEY, 'gantt');
 	}
 
 	function readBoardState() {
 		return {
 			categories: get(categories),
 			filters: get(filters),
-			pendingView: readPendingDefaultView()
+			pendingView: storage.get(PENDING_VIEW_KEY) ?? null
 		};
 	}
 
@@ -200,27 +200,26 @@ describe('user scope', () => {
 	it('keeps a pending default view when the app opens as the cached user', () => {
 		// Set offline in an earlier visit; the first sync once the session
 		// is confirmed sends it.
-		storage.set('todokanbanPendingDefaultView', 'gantt');
+		storage.set(PENDING_VIEW_KEY, 'gantt');
 
 		applyUserScope('user-a');
 		applyUserScope('user-a');
 
-		expect(readPendingDefaultView()).toBe('gantt');
+		expect(storage.get(PENDING_VIEW_KEY)).toBe('gantt');
 	});
 
 	it('clears only the signed-in user\'s queue, cached tasks and pending default view on sign-out', () => {
 		seedUserData('user-a', { taskText: 'User A task', queued: 1 });
 		seedUserData('user-b', { taskText: 'User B task', queued: 1 });
 		applyUserScope('user-a');
-		markPendingDefaultView('gantt');
-		expect(storage.get('todokanbanPendingDefaultView')).toBe('gantt');
+		storage.set(PENDING_VIEW_KEY, 'gantt');
 		expect(countPendingLocalChanges()).toBe(1);
 
 		clearUserLocalData();
 
 		expect(countPendingLocalChanges()).toBe(0);
 		expect(get(tasks)).toEqual([]);
-		expect(readPendingDefaultView()).toBeNull();
+		expect(storage.has(PENDING_VIEW_KEY)).toBe(false);
 		// The emptied list is written back under the same key; user B's data
 		// stays on the device.
 		expect(Object.fromEntries(storage)).toEqual({

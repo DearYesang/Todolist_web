@@ -15,16 +15,12 @@
     } from '$lib/client/offline-conflicts.js';
     import { createDatedFilename, downloadJson } from '$lib/client/download.js';
     import { setupPageLifecycle } from '$lib/client/page-lifecycle.js';
-    import { updateBoardPreferences } from '$lib/client/task-api.js';
     import {
         clearDoneTasks,
-        clearPendingDefaultView,
         currentView,
         deleteTaskCascade,
-        markPendingDefaultView,
-        readPendingDefaultView,
         drainPendingTaskSyncsToOfflineQueue,
-        setCurrentView,
+        flushPendingViewPreference,
         setupCrossTabTaskSync,
         syncServerTasks,
         tasks,
@@ -123,21 +119,9 @@
     }
 
     async function runServerSync({ showSuccess = false } = {}) {
-        await flushPendingViewPreference();
+        await flushPendingViewPreference({ signedIn: Boolean($session.data?.user?.id) });
         const result = await syncServerTasks();
         handleServerSyncResult(result, { showSuccess });
-    }
-
-    async function flushPendingViewPreference() {
-        const pendingView = readPendingDefaultView();
-        if (!pendingView || !$session.data?.user?.id || !navigator.onLine) {
-            return;
-        }
-
-        const result = await updateBoardPreferences({ defaultView: pendingView });
-        if (result.ok) {
-            clearPendingDefaultView();
-        }
     }
 
     /**
@@ -242,40 +226,15 @@
             }
         }
     }
-
-    /**
-     * @param {import('$lib/shared/task-rules.js').AppView} view
-     */
-    async function selectView(view) {
-        setCurrentView(view);
-
-        if (!$session.data?.user?.id) {
-            return;
-        }
-
-        if (!navigator.onLine) {
-            markPendingDefaultView(view);
-            return;
-        }
-
-        const result = await updateBoardPreferences({ defaultView: view });
-        if (result.ok) {
-            clearPendingDefaultView();
-        } else if (result.fallback) {
-            markPendingDefaultView(view);
-        } else {
-            syncNotice = result.message;
-        }
-    }
 </script>
 
 <AppHeader
     appUnlocked={appUnlocked}
     showOfflineStatus={!$session.data?.user && !isOnline}
     isRefreshing={isRefreshing}
-    onselectview={selectView}
     onrefresh={refreshAppData}
-    oncleardone={handleClearDone} />
+    oncleardone={handleClearDone}
+    onnotice={(message) => syncNotice = message} />
 
 {#if appUnlocked}
     <SyncNoticeBanner

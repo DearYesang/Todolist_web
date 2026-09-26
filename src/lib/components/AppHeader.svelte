@@ -1,6 +1,7 @@
 <script>
+    import { authClient } from '$lib/client/auth-client.js';
     import { exportTaskBackup, importTaskBackup } from '$lib/client/backup-transfer.js';
-    import { currentView } from '$lib/client/task-store.js';
+    import { currentView, selectView } from '$lib/client/task-store.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
 
@@ -8,18 +9,30 @@
      *   appUnlocked: boolean;
      *   showOfflineStatus: boolean;
      *   isRefreshing: boolean;
-     *   onselectview: (view: import('$lib/shared/task-rules.js').AppView) => void;
      *   onrefresh: () => void;
      *   oncleardone: () => void;
+     *   onnotice: (message: string) => void;
      * }} */
     let {
         appUnlocked,
         showOfflineStatus,
         isRefreshing,
-        onselectview,
         onrefresh,
-        oncleardone
+        oncleardone,
+        onnotice
     } = $props();
+
+    const session = authClient.useSession();
+
+    /**
+     * @param {import('$lib/shared/task-rules.js').AppView} view
+     */
+    async function chooseView(view) {
+        const message = await selectView(view, { signedIn: Boolean($session.data?.user?.id) });
+        if (message !== null) {
+            onnotice(message);
+        }
+    }
 
     /**
      * @param {Event} event
@@ -53,15 +66,15 @@
 
     {#if appUnlocked}
         <div class="view-toggle">
-            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => onselectview('kanban')} aria-label="칸반 뷰">
+            <button class="view-btn" class:active={$currentView === 'kanban'} onclick={() => chooseView('kanban')} aria-label="칸반 뷰">
                 <span class="view-icon" aria-hidden="true">📋</span>
                 <span class="view-label">칸반</span>
             </button>
-            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => onselectview('gantt')} aria-label="간트 뷰">
+            <button class="view-btn" class:active={$currentView === 'gantt'} onclick={() => chooseView('gantt')} aria-label="간트 뷰">
                 <span class="view-icon" aria-hidden="true">📊</span>
                 <span class="view-label">간트</span>
             </button>
-            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => onselectview('matrix')} aria-label="매트릭스 뷰">
+            <button class="view-btn" class:active={$currentView === 'matrix'} onclick={() => chooseView('matrix')} aria-label="매트릭스 뷰">
                 <span class="view-icon" aria-hidden="true">🧭</span>
                 <span class="view-label">매트릭스</span>
             </button>

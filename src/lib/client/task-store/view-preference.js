@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { isAppView } from '../../shared/task-rules.js';
 import { getStorage } from '../browser-storage.js';
+import { updateBoardPreferences } from '../task-api.js';
 
 const VIEW_STORAGE_KEY = 'todokanbanCurrentView';
 const PENDING_VIEW_STORAGE_KEY = 'todokanbanPendingDefaultView';
@@ -20,10 +21,53 @@ export function setCurrentView(value) {
 }
 
 /**
- * @param {unknown} value
+ * Shows `view`, and for a signed-in user saves it as the default view on
+ * the server. Offline, or when the server cannot be reached, the view is
+ * kept as pending and the next sync sends it (flushPendingViewPreference).
+ * Resolves to the server's message when it refuses the view for any other
+ * reason, for the caller to show, and to null otherwise.
+ * @param {AppView} view
+ * @param {{ signedIn: boolean; fetcher?: typeof fetch }} options
+ * @returns {Promise<string | null>}
  */
-export function applyServerDefaultView(value) {
-    setCurrentView(value);
+export async function selectView(view, { signedIn, fetcher }) {
+    setCurrentView(view);
+
+    if (!signedIn) {
+        return null;
+    }
+
+    if (!navigator.onLine) {
+        markPendingDefaultView(view);
+        return null;
+    }
+
+    const result = await updateBoardPreferences({ defaultView: view }, fetcher);
+    if (result.ok) {
+        clearPendingDefaultView();
+    } else if (result.fallback) {
+        markPendingDefaultView(view);
+    } else {
+        return result.message;
+    }
+    return null;
+}
+
+/**
+ * Sends a default view that selectView kept as pending, for a signed-in
+ * user who is online. It stays pending if the server does not take it.
+ * @param {{ signedIn: boolean; fetcher?: typeof fetch }} options
+ */
+export async function flushPendingViewPreference({ signedIn, fetcher }) {
+    const pendingView = readPendingDefaultView();
+    if (!pendingView || !signedIn || !navigator.onLine) {
+        return;
+    }
+
+    const result = await updateBoardPreferences({ defaultView: pendingView }, fetcher);
+    if (result.ok) {
+        clearPendingDefaultView();
+    }
 }
 
 /**
