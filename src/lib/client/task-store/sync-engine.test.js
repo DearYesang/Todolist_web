@@ -207,4 +207,31 @@ describe('settling task writes before sign-out', () => {
         await vi.advanceTimersByTimeAsync(0);
         expect(sent).toEqual(['Edit 1']);
     });
+
+    // The queue merges a task's patches with the later one's fields on top.
+    // The request in flight fails after the edit behind it was queued, so
+    // its older fields would land on top of the newer edit's.
+    it.fails('keeps the queued later edit when the request in flight fails after the wait', async () => {
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        updateTask(TASK_ID, { text: 'Edit 2' });
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        firstAnswer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        // The later edit carries every field of the first; its patch alone is
+        // what the next sync must send.
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({
+                type: 'task.patch',
+                taskId: TASK_ID,
+                patch: expect.objectContaining({ text: 'Edit 2', expectedVersion: 1 })
+            })
+        ]);
+    });
 });

@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
-import { jsonResponse } from '$lib/test-support/http.js';
+import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import { DEFAULT_FILTERS } from '../shared/task-domain.js';
 import { linkOpenState, requestOpenLinks } from './link-opener.js';
 import {
@@ -306,5 +306,189 @@ describe('signing out during a task edit', () => {
 			anonymousQueue: [],
 			userATasks: [{ text: 'Edit 2', version: 3 }]
 		});
+	});
+});
+
+describe('signing out while a task write is still in flight', () => {
+	const TASK_ID = '11111111-1111-4111-8111-111111111111';
+	/** @type {Map<string, string>} */
+	let storage;
+	/** @type {ReturnType<typeof createDeferred>[]} */
+	let answers = [];
+	/** @type {string[]} */
+	let sent = [];
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		storage = installMemoryStorage();
+		// The sync engine sends task writes only in a browser.
+		vi.stubGlobal('window', {});
+		answers = [];
+		sent = [];
+		// Every request stays out until the test answers it, as on a network
+		// that has stopped answering.
+		vi.stubGlobal('fetch', vi.fn((/** @type {unknown} */ _url, /** @type {RequestInit} */ init) => {
+			sent.push(JSON.parse(String(init.body)).text);
+			const answer = createDeferred();
+			answers.push(answer);
+			return answer.promise;
+		}));
+		storage.set('kanbanTasks:user-a', JSON.stringify([{ id: TASK_ID, text: 'Saved', version: 1 }]));
+		applyUserScope('user-a');
+	});
+
+	afterEach(async () => {
+		// Ends the requests a test left out, so no task's write chain stays
+		// busy for the tests after it.
+		answers.forEach((answer) => answer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 })));
+		await vi.advanceTimersByTimeAsync(0);
+		applyUserScope(null);
+		vi.useRealTimers();
+	});
+
+	/**
+	 * Sign-out as AuthAccountControls.svelte runs it: the 5 second wait, the
+	 * "clear local data" question, authClient.signOut() (which succeeds
+	 * here), the clear, and then the session refetch that hands the board to
+	 * no user.
+	 * @param {{ clearLocalData: boolean; confirm?: boolean; duringSignOut?: () => void }} options
+	 *   confirm: the answer to the question. duringSignOut: what the user
+	 *   does while the sign-out request is out.
+	 * @returns {Promise<{ asked: number | null; signedOut: boolean }>} the count
+	 *   the question named (null when it was not asked) and whether the
+	 *   sign-out went ahead
+	 */
+	async function signOut({ clearLocalData, confirm = true, duringSignOut = () => {} }) {
+		const signingOut = (async () => {
+			await settlePendingTaskSyncs({ timeoutMs: 5000 });
+			const pendingChanges = countPendingLocalChanges();
+			const asked = clearLocalData && pendingChanges > 0 ? pendingChanges : null;
+			if (asked !== null && !confirm) {
+				return { asked, signedOut: false };
+			}
+			duringSignOut();
+			if (clearLocalData) {
+				clearUserLocalData();
+			}
+			applyUserScope(null);
+			return { asked, signedOut: true };
+		})();
+		await vi.advanceTimersByTimeAsync(5000);
+		return signingOut;
+	}
+
+	/** Edits the task and lets its PATCH go out. */
+	async function editInFlight() {
+		updateTask(TASK_ID, { text: 'Edit 1' });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(sent).toEqual(['Edit 1']);
+	}
+
+	/**
+	 * Answers the first request.
+	 * @param {Response} response
+	 */
+	async function answerFirstRequest(response) {
+		answers[0].resolve(response);
+		await vi.advanceTimersByTimeAsync(0);
+	}
+
+	/** The signed-out user's and the anonymous offline queue. */
+	function readQueues() {
+		return {
+			userA: JSON.parse(storage.get('kanbanOfflineWriteQueue:user-a') ?? '[]'),
+			anonymous: JSON.parse(storage.get('kanbanOfflineWriteQueue:anonymous') ?? '[]')
+		};
+	}
+
+	/** @param {string} text */
+	function queuedPatch(text) {
+		return expect.objectContaining({
+			type: 'task.patch',
+			taskId: TASK_ID,
+			ownerUserId: 'user-a',
+			patch: expect.objectContaining({ text, expectedVersion: 1 })
+		});
+	}
+
+	const unauthorized = () => jsonResponse({ message: 'Unauthorized' }, { status: 401 });
+
+	// Codex review P1: the wait ends after 5 seconds and moves only the
+	// writes that have not started to the queue. The request already out
+	// stays unprotected: when it fails after the sign-out, the queue belongs
+	// to no user.
+	it.fails('queues a write that fails after the sign-out under the user who made it', async () => {
+		await editInFlight();
+		await expect(signOut({ clearLocalData: false })).resolves.toEqual({ asked: null, signedOut: true });
+
+		// The session is gone, so the server answers 401, which task-api
+		// treats as worth retrying.
+		await answerFirstRequest(unauthorized());
+
+		expect(readQueues()).toEqual({ userA: [queuedPatch('Edit 1')], anonymous: [] });
+	});
+
+	it.fails('counts a write still in flight when the wait ends, and keeps it when the question is cancelled', async () => {
+		await editInFlight();
+		await expect(signOut({ clearLocalData: true, confirm: false })).resolves.toEqual({ asked: 1, signedOut: false });
+
+		// Still signed in: a failure worth retrying queues the edit as always.
+		await answerFirstRequest(jsonResponse({ message: 'Unavailable' }, { status: 503 }));
+
+		expect(readQueues()).toEqual({ userA: [queuedPatch('Edit 1')], anonymous: [] });
+		expect(countPendingLocalChanges()).toBe(1);
+	});
+
+	it.fails('drops the late failure of a write that a confirmed clear counted', async () => {
+		await editInFlight();
+		await expect(signOut({ clearLocalData: true })).resolves.toEqual({ asked: 1, signedOut: true });
+
+		await answerFirstRequest(unauthorized());
+
+		expect(readQueues()).toEqual({ userA: [], anonymous: [] });
+		expect(storage.get('kanbanTasks:user-a')).toBe('[]');
+	});
+
+	it('leaves no copy of a write that lands after the sign-out in any queue', async () => {
+		await editInFlight();
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+
+		// Queued as well, it would be sent again at the user's next sync and
+		// meet a 409 on the version this answer moved past.
+		expect(readQueues()).toEqual({ userA: [], anonymous: [] });
+		expect(get(tasks)).toEqual([]);
+	});
+
+	it.fails('keeps a write that lands after the sign-out off the next board, even one holding the same task', async () => {
+		// Server ids are per user, so another board holds the task only in a
+		// case like this one: a device that ran the app before caches were
+		// kept per user still shows that shared cache when signed out.
+		storage.set('kanbanTasks', JSON.stringify([{ id: TASK_ID, text: 'Old copy', version: 1 }]));
+		await editInFlight();
+		await signOut({ clearLocalData: false });
+		expect(get(tasks).map((task) => task.text)).toEqual(['Old copy']);
+
+		await answerFirstRequest(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+
+		expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['Old copy', 1]]);
+		expect(storage.get('kanbanTasks:anonymous') ?? storage.get('kanbanTasks')).not.toContain('Edit 1');
+	});
+
+	it.fails('queues an edit made during the sign-out behind the write in flight under the same user', async () => {
+		await editInFlight();
+		await signOut({
+			clearLocalData: false,
+			// Waits in the task's chain behind the first PATCH.
+			duringSignOut: () => updateTask(TASK_ID, { text: 'Edit 2' })
+		});
+
+		await answerFirstRequest(unauthorized());
+
+		// The second edit holds every field of the first, which the queue
+		// must not put back over it.
+		expect(readQueues()).toEqual({ userA: [queuedPatch('Edit 2')], anonymous: [] });
+		expect(sent).toEqual(['Edit 1']);
 	});
 });
