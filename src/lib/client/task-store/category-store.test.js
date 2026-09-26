@@ -11,7 +11,7 @@ import {
     renameCategory
 } from './category-store.js';
 import { replaceTasks, tasks } from './task-cache.js';
-import { resetFilters } from './filters.js';
+import { filters, resetFilters, setCategoryFilter } from './filters.js';
 import { resetTaskSyncStateForTests, waitForPendingTaskSyncs } from './sync-engine.js';
 import { updateTask } from './task-mutations.js';
 
@@ -98,6 +98,57 @@ describe('category entity client state', () => {
 
         expect(result.changed).toBe(1);
         expect(get(tasks).map((task) => task.category)).toEqual(['Beta', 'Beta']);
+    });
+});
+
+describe('the category filter during category edits on this device', () => {
+    const ALPHA_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const BETA_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+    beforeEach(() => {
+        replaceTasks([
+            { id: 'task-a', text: 'A', category: 'Alpha', categoryId: ALPHA_ID },
+            { id: 'task-b', text: 'B', category: 'Beta', categoryId: BETA_ID },
+            { id: 'task-c', text: 'C', category: 'Legacy' }
+        ]);
+        resetFilters();
+    });
+
+    afterEach(() => {
+        replaceTasks([]);
+        resetFilters();
+    });
+
+    it('follows a renamed category filtered by name', async () => {
+        setCategoryFilter('Legacy');
+
+        await renameCategory('Legacy', 'Archive');
+
+        expect(get(filters)).toMatchObject({ category: 'Archive', categoryId: 'all' });
+    });
+
+    it('follows a merged category filtered by id to the target category', async () => {
+        setCategoryFilter(ALPHA_ID, 'Alpha');
+
+        await mergeCategory({ id: ALPHA_ID, name: 'Alpha' }, { id: BETA_ID, name: 'Beta' });
+
+        expect(get(filters)).toMatchObject({ category: 'Beta', categoryId: BETA_ID });
+    });
+
+    it('goes back to all categories when the filtered category is cleared', async () => {
+        setCategoryFilter(ALPHA_ID, 'Alpha');
+
+        await clearCategory({ id: ALPHA_ID, name: 'Alpha' });
+
+        expect(get(filters)).toMatchObject({ category: 'all', categoryId: 'all' });
+    });
+
+    it('keeps a filter on another category', async () => {
+        setCategoryFilter(BETA_ID, 'Beta');
+
+        await renameCategory('Legacy', 'Archive');
+
+        expect(get(filters)).toMatchObject({ category: 'Beta', categoryId: BETA_ID });
     });
 });
 

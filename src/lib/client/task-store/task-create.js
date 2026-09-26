@@ -1,30 +1,29 @@
-import { createId, normalizeTask } from '../shared/task-domain.js';
-
-const SERVER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { createId, normalizeTask } from '../../shared/task-domain.js';
+import { isServerId } from '../../shared/task-rules.js';
 
 /**
  * @typedef {{
  *   text: string;
- *   priority: import('../shared/task-domain.js').TaskPriority;
- *   urgency: import('../shared/task-domain.js').TaskUrgency;
+ *   priority: import('../../shared/task-domain.js').TaskPriority;
+ *   urgency: import('../../shared/task-domain.js').TaskUrgency;
  *   category: string;
  *   startDate: string;
  *   endDate: string;
- *   parent: import('../shared/task-domain.js').Task | null;
+ *   parent: import('../../shared/task-domain.js').Task | null;
  * }} BuildTaskCreatePayloadInput
  *
  * @typedef {{
  *   payload: {
  *     text: string;
- *     status: import('../shared/task-domain.js').TaskStatus;
+ *     status: import('../../shared/task-domain.js').TaskStatus;
  *     startDate: string;
  *     endDate: string;
- *     priority: import('../shared/task-domain.js').TaskPriority;
- *     urgency: import('../shared/task-domain.js').TaskUrgency;
+ *     priority: import('../../shared/task-domain.js').TaskPriority;
+ *     urgency: import('../../shared/task-domain.js').TaskUrgency;
  *     category: string;
  *     parentId: string | null;
  *   };
- *   parent: import('../shared/task-domain.js').Task | null;
+ *   parent: import('../../shared/task-domain.js').Task | null;
  *   hasLocalParent: boolean;
  * }} TaskCreateDraft
  */
@@ -40,7 +39,7 @@ export function buildTaskCreateDraft(input) {
 	}
 
 	const parent = input.parent;
-	const hasLocalParent = Boolean(parent && !isServerTaskId(parent.id));
+	const hasLocalParent = Boolean(parent && !isServerId(parent.id));
 
 	return {
 		payload: {
@@ -60,7 +59,7 @@ export function buildTaskCreateDraft(input) {
 
 /**
  * @param {TaskCreateDraft['payload']} payload
- * @param {import('../shared/task-domain.js').Task | null} parent
+ * @param {import('../../shared/task-domain.js').Task | null} parent
  */
 export function createLocalTaskFromDraft(payload, parent) {
 	return normalizeTask({
@@ -77,11 +76,4 @@ export function createLocalTaskFromDraft(payload, parent) {
 		collapsed: false,
 		createdAt: Date.now()
 	});
-}
-
-/**
- * @param {unknown} value
- */
-export function isServerTaskId(value) {
-	return typeof value === 'string' && SERVER_UUID_PATTERN.test(value);
 }

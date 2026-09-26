@@ -1,4 +1,4 @@
-import { isServerTaskId } from '../task-create.js';
+import { isServerId } from '../../shared/task-rules.js';
 import { normalizeTaskList } from '../../shared/task-domain.js';
 import { getTaskStorageKey, runWithoutPersisting, tasks } from './task-cache.js';
 import { hasPendingTaskSync } from './sync-engine.js';
@@ -43,7 +43,7 @@ export function handleExternalTaskStorageEvent(event) {
                 });
                 const keptFromCurrent = current.filter((task) =>
                     !externalIds.has(task.id)
-                    && (!isServerTaskId(task.id) || hasPendingTaskSync(task.id))
+                    && (!isServerId(task.id) || hasPendingTaskSync(task.id))
                 );
 
                 return normalizeTaskList([...merged, ...keptFromCurrent]);

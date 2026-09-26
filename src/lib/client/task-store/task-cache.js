@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
 import { getStorage, PENDING_VIEW_STORAGE_KEY } from './storage.js';
 
@@ -120,6 +120,32 @@ function normalizeStorageOwner(ownerId) {
  */
 export function replaceTasks(nextTasks) {
     tasks.set(normalizeTaskList(nextTasks));
+}
+
+/**
+ * Adds a newly created task at the end of the list. When the list already
+ * holds its id, a server sync that ran while the create was in flight added
+ * it. Appended, the task would be a second one with the same id, which
+ * normalizeTaskList later gives a new local id. The listed copy stays
+ * instead: it was read after the create committed, so it is never older
+ * than the create's answer, and it may carry edits made on it since, which
+ * do not bump its version. Only a strictly newer answer is merged in.
+ * @param {import('../../shared/task-domain.js').Task} task
+ */
+export function insertTask(task) {
+    const existing = get(tasks).find((current) => current.id === task.id);
+    if (existing) {
+        if (
+            typeof existing.version === 'number'
+            && typeof task.version === 'number'
+            && task.version > existing.version
+        ) {
+            mergeTasks([task]);
+        }
+        return;
+    }
+
+    tasks.update((current) => normalizeTaskList([...current, task]));
 }
 
 /**

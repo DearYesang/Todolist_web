@@ -155,7 +155,7 @@ export function resolveLocalConflict(conflict, currentTasks) {
  * What the sync banner shows after a server sync. A key that is present
  * replaces that part of the banner; a missing key leaves it as it was.
  * `conflicts` with entries means the conflict details start closed.
- * @param {Awaited<ReturnType<typeof import('./task-sync.js').syncServerTasks>>} result
+ * @param {Awaited<ReturnType<typeof import('./task-store.js').syncServerTasks>>} result
  * @param {import('../shared/task-domain.js').Task[]} currentTasks the list after the sync, for conflict targets
  * @param {{ showSuccess?: boolean }} [options] true for a manual 새로고침
  * @returns {{ conflicts?: OfflineConflictSummary[]; notice?: string | null }}

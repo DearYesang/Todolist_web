@@ -1,9 +1,10 @@
 import { addDays, formatLocalDate, todayString } from './local-date.js';
+import { isOneOf, TASK_PRIORITIES, TASK_STATUSES, TASK_URGENCIES } from './task-rules.js';
 
 /**
- * @typedef {'todo' | 'doing' | 'done'} TaskStatus
- * @typedef {'high' | 'medium' | 'low'} TaskPriority
- * @typedef {'urgent' | 'normal'} TaskUrgency
+ * @typedef {import('./task-rules.js').TaskStatus} TaskStatus
+ * @typedef {import('./task-rules.js').TaskPriority} TaskPriority
+ * @typedef {import('./task-rules.js').TaskUrgency} TaskUrgency
  * @typedef {'all' | TaskPriority} PriorityFilter
  * @typedef {'all' | TaskUrgency} UrgencyFilter
  *
@@ -127,7 +128,7 @@ export function createId() {
  * @returns {value is TaskStatus}
  */
 export function isTaskStatus(value) {
-    return value === 'todo' || value === 'doing' || value === 'done';
+    return isOneOf(TASK_STATUSES, value);
 }
 
 /**
@@ -135,7 +136,7 @@ export function isTaskStatus(value) {
  * @returns {value is TaskPriority}
  */
 function isTaskPriority(value) {
-    return value === 'high' || value === 'medium' || value === 'low';
+    return isOneOf(TASK_PRIORITIES, value);
 }
 
 /**
@@ -143,7 +144,7 @@ function isTaskPriority(value) {
  * @returns {value is TaskUrgency}
  */
 function isTaskUrgency(value) {
-    return value === 'urgent' || value === 'normal';
+    return isOneOf(TASK_URGENCIES, value);
 }
 
 /**

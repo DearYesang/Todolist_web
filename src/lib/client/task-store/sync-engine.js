@@ -6,7 +6,7 @@ import {
     updateServerChecklistItem,
     updateServerTask
 } from '../task-api.js';
-import { isServerTaskId } from '../task-create.js';
+import { isServerId } from '../../shared/task-rules.js';
 import { enqueueOfflineMutation, loadOfflineQueue } from '../offline-write-queue.js';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
 import { mergeTasks, tasks } from './task-cache.js';
@@ -69,10 +69,10 @@ export function hasPendingTaskSync(taskId) {
  * @param {unknown[]} serverTasks
  */
 export function applyServerTaskSnapshot(serverTasks) {
-    const incoming = normalizeTaskList(serverTasks).filter((task) => isServerTaskId(task.id));
+    const incoming = normalizeTaskList(serverTasks).filter((task) => isServerId(task.id));
     tasks.update((current) => {
         const currentById = new Map(current.map((task) => [task.id, task]));
-        const pendingLocalTasks = current.filter((task) => !isServerTaskId(task.id));
+        const pendingLocalTasks = current.filter((task) => !isServerId(task.id));
         const incomingIds = new Set(incoming.map((task) => task.id));
         const authoritativeTasks = incoming.map((task) => {
             const existing = currentById.get(task.id);
@@ -91,7 +91,7 @@ export function applyServerTaskSnapshot(serverTasks) {
             return { ...task, collapsed: existing.collapsed };
         });
         const busyTasksMissingFromSnapshot = current.filter((task) =>
-            isServerTaskId(task.id) && !incomingIds.has(task.id) && hasPendingTaskSync(task.id)
+            isServerId(task.id) && !incomingIds.has(task.id) && hasPendingTaskSync(task.id)
         );
 
         return normalizeTaskList([...pendingLocalTasks, ...authoritativeTasks, ...busyTasksMissingFromSnapshot]);
@@ -279,7 +279,7 @@ export function syncTaskSnapshot(task) {
         return;
     }
 
-    if (!isServerTaskId(task.id)) {
+    if (!isServerId(task.id)) {
         enqueueOfflineMutation({
             type: 'task.patch',
             taskId: task.id,
@@ -363,7 +363,7 @@ export function syncTaskDelete(taskId, task = null) {
     }
 
     const capturedVersion = typeof task?.version === 'number' ? task.version : undefined;
-    if (!isServerTaskId(taskId)) {
+    if (!isServerId(taskId)) {
         enqueueOfflineMutation({
             type: 'task.delete',
             taskId,
@@ -443,7 +443,7 @@ export function syncChecklistCreate(taskId, subtaskId, text) {
         return;
     }
 
-    if (!isServerTaskId(taskId)) {
+    if (!isServerId(taskId)) {
         enqueueOfflineMutation({
             type: 'checklist.create',
             taskId,
@@ -460,7 +460,7 @@ export function syncChecklistCreate(taskId, subtaskId, text) {
         const knownItemIds = new Set(
             (get(tasks).find((task) => task.id === taskId)?.subtasks ?? [])
                 .map((subtask) => subtask.id)
-                .filter((id) => isServerTaskId(id))
+                .filter((id) => isServerId(id))
         );
         const result = await createServerChecklistItem(taskId, text);
         if (result.ok) {
@@ -492,7 +492,7 @@ export function syncChecklistCreate(taskId, subtaskId, text) {
  * @param {string} text
  */
 function findNewChecklistItem(serverTask, knownItemIds, text) {
-    const freshItems = serverTask.subtasks.filter((item) => isServerTaskId(item.id) && !knownItemIds.has(item.id));
+    const freshItems = serverTask.subtasks.filter((item) => isServerId(item.id) && !knownItemIds.has(item.id));
     return [...freshItems].reverse().find((item) => item.text === text) ?? freshItems[freshItems.length - 1] ?? null;
 }
 
@@ -503,7 +503,7 @@ function findNewChecklistItem(serverTask, knownItemIds, text) {
  * @param {string} subtaskId
  */
 function shouldChainLocalChecklistEdit(taskId, subtaskId) {
-    return !isServerTaskId(subtaskId)
+    return !isServerId(subtaskId)
         && (resolvedChecklistItemIds.has(subtaskId) || taskSyncChains.has(taskId));
 }
 
@@ -517,7 +517,7 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
         return;
     }
 
-    if (!isServerTaskId(taskId) || (!isServerTaskId(subtaskId) && !shouldChainLocalChecklistEdit(taskId, subtaskId))) {
+    if (!isServerId(taskId) || (!isServerId(subtaskId) && !shouldChainLocalChecklistEdit(taskId, subtaskId))) {
         enqueueOfflineMutation({
             type: 'checklist.patch',
             taskId,
@@ -528,7 +528,7 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
     }
 
     enqueueTaskSyncOperation(taskId, async () => {
-        const itemId = isServerTaskId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
+        const itemId = isServerId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
         if (!itemId) {
             enqueueOfflineMutation({
                 type: 'checklist.patch',
@@ -563,7 +563,7 @@ export function syncChecklistDelete(taskId, subtaskId) {
         return;
     }
 
-    if (!isServerTaskId(taskId) || (!isServerTaskId(subtaskId) && !shouldChainLocalChecklistEdit(taskId, subtaskId))) {
+    if (!isServerId(taskId) || (!isServerId(subtaskId) && !shouldChainLocalChecklistEdit(taskId, subtaskId))) {
         enqueueOfflineMutation({
             type: 'checklist.delete',
             taskId,
@@ -573,7 +573,7 @@ export function syncChecklistDelete(taskId, subtaskId) {
     }
 
     enqueueTaskSyncOperation(taskId, async () => {
-        const itemId = isServerTaskId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
+        const itemId = isServerId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
         if (!itemId) {
             enqueueOfflineMutation({
                 type: 'checklist.delete',
@@ -609,7 +609,7 @@ export function syncChecklistDelete(taskId, subtaskId) {
  * @returns {import('../offline-write-queue.js').OfflineMutationInput | null}
  */
 function buildChecklistDrainMutation(taskId, subtaskId, patch) {
-    const itemId = isServerTaskId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
+    const itemId = isServerId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
     if (itemId) {
         return patch
             ? { type: 'checklist.patch', taskId, itemId, patch }
@@ -654,7 +654,7 @@ function buildChecklistDrainMutation(taskId, subtaskId, patch) {
  * @param {import('../../shared/task-domain.js').Task} task
  */
 function getLocalParentId(task) {
-    return task.parentId && !isServerTaskId(task.parentId) ? task.parentId : null;
+    return task.parentId && !isServerId(task.parentId) ? task.parentId : null;
 }
 
 /**
@@ -674,7 +674,7 @@ function toServerTaskPatch(task) {
         // it"; an empty name still clears it. The server clears for clients
         // that do not send this.
         categoryByName: true,
-        parentId: isServerTaskId(task.parentId) ? task.parentId : null,
+        parentId: isServerId(task.parentId) ? task.parentId : null,
         ...(typeof task.version === 'number' ? { expectedVersion: task.version } : {})
     };
 }

@@ -1,10 +1,10 @@
 import { writable } from 'svelte/store';
+import { isAppView } from '../../shared/task-rules.js';
 import { getStorage, PENDING_VIEW_STORAGE_KEY } from './storage.js';
 
 const VIEW_STORAGE_KEY = 'todokanbanCurrentView';
-const VALID_VIEWS = new Set(['kanban', 'gantt', 'matrix']);
 
-/** @typedef {'kanban' | 'gantt' | 'matrix'} AppView */
+/** @typedef {import('../../shared/task-rules.js').AppView} AppView */
 
 /** @type {import('svelte/store').Writable<AppView>} */
 export const currentView = writable(readInitialView());
@@ -78,12 +78,4 @@ function readInitialView() {
     } catch {
         return 'kanban';
     }
-}
-
-/**
- * @param {unknown} value
- * @returns {value is AppView}
- */
-export function isAppView(value) {
-    return typeof value === 'string' && VALID_VIEWS.has(value);
 }

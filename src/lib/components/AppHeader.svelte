@@ -8,7 +8,7 @@
      *   appUnlocked: boolean;
      *   showOfflineStatus: boolean;
      *   isRefreshing: boolean;
-     *   onselectview: (view: 'kanban' | 'gantt' | 'matrix') => void;
+     *   onselectview: (view: import('$lib/shared/task-rules.js').AppView) => void;
      *   onrefresh: () => void;
      *   oncleardone: () => void;
      * }} */

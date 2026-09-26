@@ -8,7 +8,7 @@ import {
 import { normalizeTaskList } from '../../shared/task-domain.js';
 import { normalizeCategoryKey, normalizeCategoryName } from '../../shared/category-suggestions.js';
 import { tasks } from './task-cache.js';
-import { filters } from './filters.js';
+import { renameCategoryFilter } from './filters.js';
 import { applyServerTaskVersions, syncTaskSnapshot } from './sync-engine.js';
 
 /** @type {import('svelte/store').Writable<import('../category-api.js').ClientCategory[]>} */
@@ -99,6 +99,14 @@ export const visibleCategorySummaries = derived(categorySummaries, ($categorySum
  */
 export function applyServerCategoryCatalog(nextCategories) {
     categoryCatalog.set(normalizeCategoryCatalog(nextCategories));
+}
+
+/**
+ * Empties the catalog, which holds the categories of the board it was
+ * loaded for, until the next finished sync loads the current one.
+ */
+export function clearCategoryCatalog() {
+    categoryCatalog.set([]);
 }
 
 /**
@@ -337,12 +345,7 @@ function rewriteLocalCategory(source, target, options) {
         return normalizeTaskList(next);
     });
 
-    filters.update((current) => {
-        const categoryMatches = current.category === sourceName || (source.id && current.categoryId === source.id);
-        return categoryMatches
-            ? { ...current, category: targetName || 'all', categoryId: target?.id ?? 'all' }
-            : current;
-    });
+    renameCategoryFilter({ id: source.id ?? null, name: sourceName }, target && { id: target.id, name: targetName });
     if (options.sync) {
         changedTasks.forEach((task) => syncTaskSnapshot(task));
     }

@@ -1,10 +1,6 @@
 <script>
     import { onDestroy } from 'svelte';
-    import { get } from 'svelte/store';
-    import { createServerTask } from '$lib/client/task-api.js';
-    import { buildTaskCreateDraft, createLocalTaskFromDraft } from '$lib/client/task-create.js';
-    import { enqueueOfflineMutation } from '$lib/client/offline-write-queue.js';
-    import { categories, tasks } from '$lib/client/task-store.js';
+    import { categories, createTask, tasks } from '$lib/client/task-store.js';
     import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
     import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
     import CategoryInput from './CategoryInput.svelte';
@@ -49,57 +45,28 @@
         taskTextComposition.reset();
     }
 
-    /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
-     */
-    function appendTask(task) {
-        tasks.update((current) => [...current, task]);
-    }
-
     async function addTask() {
-        if (isSubmitting) return;
-
-        const currentTasks = get(tasks);
-        const parent = parentId ? currentTasks.find((task) => task.id === parentId) ?? null : null;
-        const draft = buildTaskCreateDraft({
-            text: newTaskText,
-            priority: selectedPriority,
-            urgency: selectedUrgency,
-            category,
-            startDate,
-            endDate,
-            parent
-        });
-
-        if (!draft) return;
+        // A blank title leaves the form as it is, without an error.
+        if (isSubmitting || !newTaskText.trim()) return;
 
         formError = '';
         isSubmitting = true;
 
         try {
-            if (!draft.hasLocalParent) {
-                const result = await createServerTask(draft.payload);
-                if (result.ok) {
-                    appendTask(result.task);
-                    resetForm();
-                    return;
-                }
-
-                if (!result.fallback) {
-                    formError = '작업을 추가하지 못했습니다. 입력값을 확인해 주세요.';
-                    return;
-                }
-            }
-
-            const localTask = createLocalTaskFromDraft(draft.payload, draft.parent);
-            appendTask(localTask);
-            enqueueOfflineMutation({
-                type: 'task.create',
-                localTaskId: localTask.id,
-                localParentId: draft.hasLocalParent ? draft.parent?.id ?? null : null,
-                payload: draft.payload
+            const result = await createTask({
+                text: newTaskText,
+                priority: selectedPriority,
+                urgency: selectedUrgency,
+                category,
+                startDate,
+                endDate,
+                parentId: parentId || null
             });
-            resetForm();
+            if (result.ok) {
+                resetForm();
+            } else {
+                formError = result.message;
+            }
         } finally {
             isSubmitting = false;
         }

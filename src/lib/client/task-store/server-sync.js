@@ -1,17 +1,19 @@
-import { getBoardPreferences, listServerTasks } from './task-api.js';
-import { listServerCategories } from './category-api.js';
-import { flushOfflineWriteQueue } from './offline-write-queue.js';
+import { getBoardPreferences, listServerTasks } from '../task-api.js';
+import { listServerCategories } from '../category-api.js';
+import { flushOfflineWriteQueue } from '../offline-write-queue.js';
 import {
-	applyServerCategoryCatalog,
-	applyServerDefaultView,
-	applyServerTaskResults,
-	applyServerTaskSnapshot,
 	mergeTasks,
 	removeTasksByIds,
 	replaceLocalTaskWithServerTask,
-	replaceTasks,
+	replaceTasks
+} from './task-cache.js';
+import { applyServerDefaultView } from './view-preference.js';
+import { applyServerCategoryCatalog } from './category-store.js';
+import {
+	applyServerTaskResults,
+	applyServerTaskSnapshot,
 	waitForPendingTaskSyncs
-} from './task-store.js';
+} from './sync-engine.js';
 
 /**
  * @param {typeof fetch} [fetcher]

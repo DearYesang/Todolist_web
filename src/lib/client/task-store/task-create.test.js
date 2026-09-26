@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { normalizeTask } from '../shared/task-domain.js';
+import { normalizeTask } from '../../shared/task-domain.js';
 import { buildTaskCreateDraft, createLocalTaskFromDraft } from './task-create.js';
 
 describe('client task creation', () => {

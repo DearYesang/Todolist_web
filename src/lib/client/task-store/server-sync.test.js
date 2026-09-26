@@ -1,25 +1,22 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
-import { normalizeTask } from '../shared/task-domain.js';
+import { normalizeTask } from '../../shared/task-domain.js';
+import { mergeTasks, replaceTasks, tasks } from './task-cache.js';
+import { currentView, setCurrentView } from './view-preference.js';
 import {
 	addSubtask,
-	currentView,
 	deleteSubtask,
-	mergeTasks,
-	replaceTasks,
 	renameSubtask,
-	setCurrentView,
-	tasks,
 	toggleSubtask,
 	updateTask
-} from './task-store.js';
+} from './task-mutations.js';
 import {
 	enqueueOfflineMutation,
 	loadOfflineQueue,
 	setOfflineQueueOwner
-} from './offline-write-queue.js';
-import { syncServerTasks } from './task-sync.js';
+} from '../offline-write-queue.js';
+import { syncServerTasks } from './server-sync.js';
 
 describe('client task sync', () => {
 	beforeEach(() => {

@@ -17,9 +17,8 @@
     import { setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { setupPageLifecycle } from '$lib/client/page-lifecycle.js';
     import { updateBoardPreferences } from '$lib/client/task-api.js';
-    import { syncServerTasks } from '$lib/client/task-sync.js';
     import {
-        applyServerCategoryCatalog,
+        clearCategoryCatalog,
         clearDoneTasks,
         clearPendingDefaultView,
         currentView,
@@ -30,6 +29,7 @@
         setCurrentView,
         setTaskStorageOwner,
         setupCrossTabTaskSync,
+        syncServerTasks,
         tasks,
         updateTask
     } from '$lib/client/task-store.js';
@@ -135,7 +135,7 @@
         // The catalog belongs to the previous user's board until the next
         // finished sync loads this one (a blocked queue skips it). Kept, it
         // would list their categories and give the task panel their ids.
-        applyServerCategoryCatalog([]);
+        clearCategoryCatalog();
     }
 
     /**
@@ -267,7 +267,7 @@
     }
 
     /**
-     * @param {'kanban' | 'gantt' | 'matrix'} view
+     * @param {import('$lib/shared/task-rules.js').AppView} view
      */
     async function selectView(view) {
         setCurrentView(view);

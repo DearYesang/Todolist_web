@@ -1,3 +1,4 @@
+import { get } from 'svelte/store';
 import {
     addSubtaskToList,
     assignParentInList,
@@ -5,11 +6,16 @@ import {
     deleteSubtaskFromList,
     deleteTaskCascadeFromList,
     moveTaskInList,
+    normalizeTaskList,
     renameSubtaskInList,
     toggleSubtaskInList,
     updateTaskInList
 } from '../../shared/task-domain.js';
-import { tasks } from './task-cache.js';
+import { createServerTask, importServerTasks } from '../task-api.js';
+import { enqueueOfflineMutation } from '../offline-write-queue.js';
+import { insertTask, replaceTasks, tasks } from './task-cache.js';
+import { resetFilters } from './filters.js';
+import { buildTaskCreateDraft, createLocalTaskFromDraft } from './task-create.js';
 import {
     syncChecklistCreate,
     syncChecklistDelete,
@@ -156,4 +162,109 @@ export function renameSubtask(taskId, subtaskId, text) {
 export function deleteSubtask(taskId, subtaskId) {
     tasks.update((current) => deleteSubtaskFromList(current, taskId, subtaskId));
     syncChecklistDelete(taskId, subtaskId);
+}
+
+const CREATE_FAILED_MESSAGE = '작업을 추가하지 못했습니다. 입력값을 확인해 주세요.';
+
+/**
+ * The fields of the add-task form. parentId is null for a top-level task.
+ * @typedef {{
+ *   text: string;
+ *   priority: import('../../shared/task-domain.js').TaskPriority;
+ *   urgency: import('../../shared/task-domain.js').TaskUrgency;
+ *   category: string;
+ *   startDate: string;
+ *   endDate: string;
+ *   parentId: string | null;
+ * }} TaskFormValues
+ *
+ * @typedef {{ ok: true; task: import('../../shared/task-domain.js').Task } | { ok: false; message: string }} CreateTaskResult
+ *
+ * @typedef {{ ok: true; queued: false; summary: import('../task-api.js').TaskImportSummary }
+ *   | { ok: true; queued: true }
+ *   | { ok: false; message: string }} ImportTasksResult
+ */
+
+/**
+ * Adds a task from the add-task form. Unless its parent exists only on this
+ * device, the server creates the task first and the board adds the task the
+ * server returns. When the server cannot be reached (no answer, or a status
+ * task-api treats as a fallback), or the parent is local, the task is made on
+ * this device and its create is queued for the next sync. Any other refusal
+ * adds nothing. A blank title adds nothing either.
+ * @param {TaskFormValues} values
+ * @returns {Promise<CreateTaskResult>}
+ */
+export async function createTask(values) {
+    const parent = values.parentId ? get(tasks).find((task) => task.id === values.parentId) ?? null : null;
+    const draft = buildTaskCreateDraft({
+        text: values.text,
+        priority: values.priority,
+        urgency: values.urgency,
+        category: values.category,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        parent
+    });
+
+    if (!draft) {
+        return { ok: false, message: CREATE_FAILED_MESSAGE };
+    }
+
+    if (!draft.hasLocalParent) {
+        const result = await createServerTask(draft.payload);
+        if (result.ok) {
+            insertTask(result.task);
+            return { ok: true, task: result.task };
+        }
+
+        if (!result.fallback) {
+            return { ok: false, message: CREATE_FAILED_MESSAGE };
+        }
+    }
+
+    const localTask = createLocalTaskFromDraft(draft.payload, draft.parent);
+    insertTask(localTask);
+    enqueueOfflineMutation({
+        type: 'task.create',
+        localTaskId: localTask.id,
+        localParentId: draft.hasLocalParent ? draft.parent?.id ?? null : null,
+        payload: draft.payload
+    });
+    return { ok: true, task: localTask };
+}
+
+/**
+ * Imports the task list of a backup file. `replace` swaps the board for the
+ * imported tasks and `append` adds them after the tasks already there. The
+ * server imports first and the board takes the tasks it returns. When the
+ * server cannot be reached, the file's tasks land on this device and the
+ * import is queued for the next sync. Both reset the filters, so every
+ * imported task shows. Any other refusal leaves the board alone.
+ * @param {unknown[]} parsedTasks
+ * @param {'append' | 'replace'} mode
+ * @returns {Promise<ImportTasksResult>}
+ */
+export async function importTasks(parsedTasks, mode) {
+    const result = await importServerTasks(parsedTasks, { mode });
+    if (result.ok) {
+        replaceTasks(mode === 'replace' ? result.tasks : [...get(tasks), ...result.tasks]);
+        resetFilters();
+        return { ok: true, queued: false, summary: result.summary };
+    }
+
+    if (result.fallback) {
+        const fallbackTasks = normalizeTaskList(parsedTasks);
+        enqueueOfflineMutation({
+            type: 'import.tasks',
+            mode,
+            payload: parsedTasks,
+            localTaskIds: fallbackTasks.map((task) => task.id)
+        });
+        replaceTasks(mode === 'replace' ? fallbackTasks : [...get(tasks), ...fallbackTasks]);
+        resetFilters();
+        return { ok: true, queued: true };
+    }
+
+    return { ok: false, message: result.message };
 }
