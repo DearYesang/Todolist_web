@@ -9,8 +9,11 @@ import {
 import { isServerId } from '../../shared/task-rules.js';
 import {
     advanceQueuedTaskVersion,
+    dropQueuedChecklistFields,
+    dropQueuedTaskPatch,
     enqueueOfflineMutation,
     getOfflineQueueOwner,
+    hasQueuedTaskMutation,
     loadOfflineQueue,
     resolveQueuedChecklistCreate
 } from '../offline-write-queue.js';
@@ -533,6 +536,16 @@ function scheduleTaskSnapshotSync(taskId) {
         const patch = toChainedServerTaskPatch(taskId, current);
         const result = await updateServerTask(taskId, patch);
         if (result.ok) {
+            // The patch was built from the board, which holds every edit of
+            // the task queued before this request started (applyWriteResult
+            // keeps them there). Such an edit is in this one, older: sent at
+            // the next sync, it would meet a 409 on the version this one
+            // moved past, or put its older values back. An edit queued
+            // while this request was out (taskStateQueued) is newer, and
+            // moves to this one's version instead.
+            if (!write.discarded && !write.taskStateQueued) {
+                dropQueuedTaskPatch(taskId, { ownerId: write.queueOwnerId });
+            }
             applyWriteResult(write, result.task);
             return;
         }
@@ -798,6 +811,7 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
 
         const result = await updateServerChecklistItem(taskId, itemId, patch);
         if (result.ok) {
+            dropQueuedFieldsThisEditSet(write, itemId, patch);
             applyWriteResult(write, result.task);
             return;
         }
@@ -817,6 +831,28 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
         change: 'patch',
         fields: Object.keys(patch)
     });
+}
+
+/**
+ * A checklist edit landed. A queued edit of its item from before this
+ * request started is older in the fields this one set: a checklist patch
+ * carries no version, so sent at the next sync, it would put them back
+ * without a conflict. Those fields leave the queued edit, except any that
+ * a later edit, queued while this request was out, set.
+ * @param {TaskSyncWrite} write
+ * @param {string} itemId the item's server id
+ * @param {{ text?: string; done?: boolean }} patch
+ */
+function dropQueuedFieldsThisEditSet(write, itemId, patch) {
+    if (write.discarded) {
+        return;
+    }
+
+    const queuedEdits = getQueuedEditsOfItem(write);
+    const fields = Object.keys(patch).filter((field) => !queuedEdits?.fields.has(field));
+    if (fields.length > 0) {
+        dropQueuedChecklistFields(write.taskId, itemId, fields, { ownerId: write.queueOwnerId });
+    }
 }
 
 /**
@@ -985,7 +1021,10 @@ function toServerTaskPatch(task) {
  * of the user it was made for, whoever's board the store holds; sent as
  * it was, it would meet a 409 as a conflict with itself. On the board,
  * only the version moves: the queued edit is newer than the answer. The
- * same holds for later checklist writes of the task queued meanwhile.
+ * same holds for later checklist writes of the task queued meanwhile, and
+ * for any change of the task the user's queue held from before: the board
+ * holds it and the answer does not, and the task's next snapshot sync,
+ * built from the board, must not undo it.
  * @param {TaskSyncWrite} write
  * @param {import('../../shared/task-domain.js').Task} serverTask
  */
@@ -1002,7 +1041,9 @@ function applyWriteResult(write, serverTask) {
     }
 
     applyServerTaskResult(serverTask, {
-        newerEditQueued: write.taskStateQueued || write.queuedItemEdits.size > 0
+        newerEditQueued: write.taskStateQueued
+            || write.queuedItemEdits.size > 0
+            || hasQueuedTaskMutation(serverTask.id, { ownerId: write.queueOwnerId })
     });
 }
 

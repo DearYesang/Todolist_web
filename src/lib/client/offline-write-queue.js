@@ -188,6 +188,73 @@ export function resolveQueuedChecklistCreate(taskId, localItemId, createdItem, {
 	saveOfflineQueue(queue.map((mutation) => mutation === queuedCreate ? edit : mutation), owner);
 }
 
+/**
+ * Whether `ownerId`'s queue (the current owner's by default) holds a
+ * mutation of task `taskId` or its checklist: a change the server does not
+ * have yet.
+ * @param {string} taskId
+ * @param {{ ownerId?: string }} [options]
+ */
+export function hasQueuedTaskMutation(taskId, { ownerId = queueOwnerId } = {}) {
+	return loadOwnerQueue(normalizeQueueOwner(ownerId)).some((mutation) => 'taskId' in mutation && mutation.taskId === taskId);
+}
+
+/**
+ * Drops the queued edit of task `taskId` from `ownerId`'s queue (the
+ * current owner's by default), for a newer edit of the task that landed
+ * and holds all of its fields. An edit that also sets a parent the server
+ * does not have yet (localParentId) stays: the landed edit could not send
+ * that parent.
+ * @param {string} taskId
+ * @param {{ ownerId?: string }} [options]
+ */
+export function dropQueuedTaskPatch(taskId, { ownerId = queueOwnerId } = {}) {
+	const owner = normalizeQueueOwner(ownerId);
+	const queue = loadOwnerQueue(owner);
+	const nextQueue = queue.filter((mutation) =>
+		!(mutation.type === 'task.patch' && mutation.taskId === taskId && !mutation.localParentId)
+	);
+	if (nextQueue.length !== queue.length) {
+		saveOfflineQueue(nextQueue, owner);
+	}
+}
+
+/**
+ * Drops `fields` from the queued edit of checklist item `itemId` of
+ * `taskId` in `ownerId`'s queue (the current owner's by default), and the
+ * edit once none are left: for a newer edit of the item that landed and
+ * set those fields.
+ * @param {string} taskId
+ * @param {string} itemId
+ * @param {string[]} fields
+ * @param {{ ownerId?: string }} [options]
+ */
+export function dropQueuedChecklistFields(taskId, itemId, fields, { ownerId = queueOwnerId } = {}) {
+	const owner = normalizeQueueOwner(ownerId);
+	const queue = loadOwnerQueue(owner);
+	const queuedEdit = queue.find((mutation) =>
+		mutation.type === 'checklist.patch' && mutation.taskId === taskId && mutation.itemId === itemId
+	);
+	if (!queuedEdit || queuedEdit.type !== 'checklist.patch' || !fields.some((field) => field in queuedEdit.patch)) {
+		return;
+	}
+
+	/** @type {{ text?: string; done?: boolean }} */
+	const patch = { ...queuedEdit.patch };
+	if (fields.includes('text')) {
+		delete patch.text;
+	}
+	if (fields.includes('done')) {
+		delete patch.done;
+	}
+	saveOfflineQueue(
+		Object.keys(patch).length === 0
+			? queue.filter((mutation) => mutation !== queuedEdit)
+			: queue.map((mutation) => mutation === queuedEdit ? { ...queuedEdit, patch } : mutation),
+		owner
+	);
+}
+
 export function getOfflineQueueSize() {
 	return loadOfflineQueue().length;
 }

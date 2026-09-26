@@ -523,7 +523,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
     // Sent at the next sync, the queued edit expects the version before the
     // newer one landed and meets a 409, which reports the user's own older
     // edit as a conflict; applied from there, it would undo the newer one.
-    it.fails('retires a queued task edit once a later edit of the task lands', async () => {
+    it('retires a queued task edit once a later edit of the task lands', async () => {
         updateTask(TASK_ID, { text: 'Edit 1' });
         await vi.advanceTimersByTimeAsync(0);
         await answer(0, unavailable());
@@ -539,7 +539,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
         expect(loadOfflineQueue()).toEqual([]);
     });
 
-    it.fails('retires the edit queued at sign-out\'s timeout once the next edit, made after a cancelled sign-out, lands', async () => {
+    it('retires the edit queued at sign-out\'s timeout once the next edit, made after a cancelled sign-out, lands', async () => {
         updateTask(TASK_ID, { text: 'Edit 1' });
         await vi.advanceTimersByTimeAsync(0);
         updateTask(TASK_ID, { text: 'Edit 2' });
@@ -563,7 +563,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
 
     // A checklist patch carries no version, so the queued older rename
     // lands at the next sync over the newer one, with no conflict to show.
-    it.fails('retires the fields of a queued checklist edit that a later edit of the item set once it lands', async () => {
+    it('retires the fields of a queued checklist edit that a later edit of the item set once it lands', async () => {
         renameSubtask(TASK_ID, ITEM.id, 'First');
         await vi.advanceTimersByTimeAsync(0);
         renameSubtask(TASK_ID, ITEM.id, 'Last');
@@ -583,7 +583,7 @@ describe('an edit that lands after an older edit of its task was queued', () => 
     // The toggle's answer has the server's task, without the queued edit,
     // and replaced the task on the board with it. The next edit of the task
     // is sent from the board, so the queued edit would be undone there too.
-    it.fails('keeps a queued task edit on the board when a checklist write of the task lands', async () => {
+    it('keeps a queued task edit on the board when a checklist write of the task lands', async () => {
         updateTask(TASK_ID, { text: 'Edit 1' });
         await vi.advanceTimersByTimeAsync(0);
         await answer(0, unavailable());

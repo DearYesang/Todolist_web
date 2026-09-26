@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import {
 	advanceQueuedTaskVersion,
+	dropQueuedChecklistFields,
+	dropQueuedTaskPatch,
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,
 	getOfflineQueueOwner,
+	hasQueuedTaskMutation,
 	loadOfflineQueue,
 	resolveQueuedChecklistCreate,
 	setOfflineQueueOwner
@@ -280,6 +283,35 @@ describe('offline write queue conflict behavior', () => {
 			[ahead, { text: 'C', expectedVersion: 5 }],
 			[unversioned, { text: 'D' }]
 		]);
+	});
+
+	it('drops what a landed newer edit covers from the queue of a given owner', () => {
+		const taskId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+		const childId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+		const renamedItem = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+		const checkedItem = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({ type: 'task.patch', taskId, patch: { text: 'A', expectedVersion: 1 } });
+		// Also sets a parent the server does not have yet.
+		enqueueOfflineMutation({ type: 'task.patch', taskId: childId, localParentId: 'local-parent', patch: { text: 'B' } });
+		enqueueOfflineMutation({ type: 'checklist.patch', taskId, itemId: renamedItem, patch: { text: 'Old', done: true } });
+		enqueueOfflineMutation({ type: 'checklist.patch', taskId, itemId: checkedItem, patch: { done: true } });
+		setOfflineQueueOwner('user-b');
+		expect(hasQueuedTaskMutation(taskId)).toBe(false);
+		expect(hasQueuedTaskMutation(taskId, { ownerId: 'user-a' })).toBe(true);
+
+		dropQueuedTaskPatch(taskId, { ownerId: 'user-a' });
+		dropQueuedTaskPatch(childId, { ownerId: 'user-a' });
+		dropQueuedChecklistFields(taskId, renamedItem, ['text'], { ownerId: 'user-a' });
+		dropQueuedChecklistFields(taskId, checkedItem, ['done'], { ownerId: 'user-a' });
+
+		setOfflineQueueOwner('user-a');
+		expect(loadOfflineQueue()).toEqual([
+			expect.objectContaining({ type: 'task.patch', taskId: childId, patch: { text: 'B' } }),
+			expect.objectContaining({ type: 'checklist.patch', itemId: renamedItem, patch: { done: true } })
+		]);
+		expect(hasQueuedTaskMutation(taskId)).toBe(true);
+		expect(hasQueuedTaskMutation('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBe(false);
 	});
 
 	it('turns a queued checklist create into an edit of the item made meanwhile, in its place', () => {

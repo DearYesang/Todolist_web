@@ -553,7 +553,7 @@ describe('signing out while a task write is still in flight', () => {
 	// goes out after it and lands. The queued older edit then goes out at
 	// the next sync into a 409 that reports it as a conflict, and applied
 	// from there it would undo the newer edit.
-	it.fails('retires the queued edit once the edit made after the user came back lands', async () => {
+	it('retires the queued edit once the edit made after the user came back lands', async () => {
 		await editInFlight();
 		updateTask(TASK_ID, { text: 'Edit 2' });
 		applyUserScope(null);
