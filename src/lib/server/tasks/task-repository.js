@@ -144,7 +144,14 @@ async function resolveCategoryForTaskCreate(db, boardId, userId, input) {
  */
 async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
 	if (typeof input.categoryId === 'string') {
-		const category = await getCategoryRowForBoard(db, boardId, input.categoryId);
+		// An id that is gone (deleted or merged away on another device, or
+		// from another user's catalog) comes from a client catalog that is
+		// out of date. A client that lets the name decide gets the category
+		// by its name, found, reactivated or created as if typed; the stale
+		// version check above keeps a stale copy from getting here. Older
+		// clients get the 400 they always did.
+		const category = await getCategoryRowForBoard(db, boardId, input.categoryId)
+			?? (input.categoryByName === true ? await findCategoryRowByPatchName(db, boardId, userId, input) : null);
 		if (!category) {
 			throw new TaskWriteError('Category was not found on this board.');
 		}
@@ -163,12 +170,23 @@ async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
 	// patch, also for a name they have no id for yet (typed in the task panel,
 	// or renamed offline), so a null id must not clear a named category. An
 	// empty or missing name still clears it.
-	const category = await findOrCreateCategoryRow(db, {
+	return (await findCategoryRowByPatchName(db, boardId, userId, input)) ?? { id: null, name: '' };
+}
+
+/**
+ * The category a patch names, found, reactivated or created; null for an
+ * empty or missing name.
+ * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {string} boardId
+ * @param {string} userId
+ * @param {ReturnType<typeof parseUpdateTaskInput>} input
+ */
+function findCategoryRowByPatchName(db, boardId, userId, input) {
+	return findOrCreateCategoryRow(db, {
 		boardId,
 		userId,
 		name: typeof input.category === 'string' ? input.category : ''
 	});
-	return category ?? { id: null, name: '' };
 }
 
 /**

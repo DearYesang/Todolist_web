@@ -350,6 +350,68 @@ describe('task updates', () => {
 		expect(task).toMatchObject({ category: '신규 기획', categoryId: NEW_CATEGORY_ID, categoryMeta: { id: NEW_CATEGORY_ID, name: '신규 기획' } });
 	});
 
+	it('takes the category by name when the patched id is gone and the client lets the name decide', async () => {
+		// The client's catalog still lists 개발, which another device deleted.
+		const archived = {
+			id: CATEGORY_ID,
+			boardId: BOARD_ID,
+			userId: USER_ID,
+			name: '개발',
+			normalizedName: '개발',
+			color: '#ff0000',
+			sortOrder: 0,
+			hiddenAt: NOW,
+			archivedAt: NOW,
+			createdAt: NOW,
+			updatedAt: NOW
+		};
+		const reactivated = { ...archived, hiddenAt: null, archivedAt: null };
+		const statements = recordStatements(db, [
+			...AUTHORIZATION,
+			[createTaskRow()],
+			[],
+			[archived],
+			[reactivated],
+			[createTaskRow({ category: '개발', categoryId: CATEGORY_ID, version: 4 })],
+			[],
+			[reactivated]
+		]);
+
+		const task = await updateTaskForUser(USER_ID, TASK_ID, {
+			category: '개발',
+			categoryId: CATEGORY_ID,
+			categoryByName: true,
+			expectedVersion: 3
+		});
+
+		expect(describeStatements(statements)).toEqual([
+			...AUTHORIZATION_STATEMENTS,
+			'select categories',
+			'select categories',
+			'update categories',
+			'update tasks',
+			'select checklist_items',
+			'select categories'
+		]);
+		expect(statements[4].where.params).toEqual([BOARD_ID, '개발']);
+		expect(statements[5].set).toMatchObject({ hiddenAt: null, archivedAt: null });
+		expect(statements[6].set).toMatchObject({ category: '개발', categoryId: CATEGORY_ID });
+		expect(task).toMatchObject({ category: '개발', categoryId: CATEGORY_ID, categoryMeta: { id: CATEGORY_ID, name: '개발' } });
+	});
+
+	it('answers 400 for a patched id that is gone when the client does not let the name decide', async () => {
+		for (const patch of [
+			{ category: '개발', categoryId: CATEGORY_ID },
+			{ category: '', categoryId: CATEGORY_ID, categoryByName: true }
+		]) {
+			const statements = recordStatements(db, [...AUTHORIZATION, [createTaskRow()], [], []]);
+
+			await expect(updateTaskForUser(USER_ID, TASK_ID, { ...patch, expectedVersion: 3 }))
+				.rejects.toMatchObject({ status: 400, message: 'Category was not found on this board.' });
+			expect(describeStatements(statements)).not.toContain('update tasks');
+		}
+	});
+
 	it('answers a stale version with 409 before finding, creating or reactivating a category', async () => {
 		// The copy is on version 2; the server's task is on 3. Resolving the
 		// name first would write a category row for a write that then fails.
