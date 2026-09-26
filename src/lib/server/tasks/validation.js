@@ -1,3 +1,4 @@
+import { ApiError } from '$lib/server/http/api-error.js';
 import { normalizeDateRange } from '$lib/shared/task-domain.js';
 import {
 	APP_VIEWS,
@@ -12,15 +13,14 @@ const MAX_TITLE_LENGTH = 300;
 const MAX_CATEGORY_LENGTH = 80;
 const MAX_CHECKLIST_TEXT_LENGTH = 500;
 
-export class TaskWriteError extends Error {
+export class TaskWriteError extends ApiError {
 	/**
 	 * @param {string} message
 	 * @param {number} [status]
 	 */
 	constructor(message, status = 400) {
-		super(message);
+		super(message, status);
 		this.name = 'TaskWriteError';
-		this.status = status;
 	}
 }
 

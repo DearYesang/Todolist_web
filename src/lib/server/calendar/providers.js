@@ -1,3 +1,5 @@
+import { ApiError } from '$lib/server/http/api-error.js';
+
 export const CALENDAR_PROVIDERS = {
 	google: {
 		id: 'google',
@@ -17,12 +19,11 @@ export const CALENDAR_PROVIDERS = {
 	}
 };
 
-export class CalendarProviderError extends Error {
+export class CalendarProviderError extends ApiError {
 	/** @param {string} message */
 	constructor(message, status = 502) {
-		super(message);
+		super(message, status);
 		this.name = 'CalendarProviderError';
-		this.status = status;
 	}
 }
 

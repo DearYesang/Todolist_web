@@ -1,20 +1,20 @@
 import { sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
+import { ApiError } from '$lib/server/http/api-error.js';
 
 const MAX_MEMORY_BUCKETS = 2000;
 
 /** @type {Map<string, { count: number; resetAt: number }>} */
 const buckets = new Map();
 
-export class RateLimitError extends Error {
+export class RateLimitError extends ApiError {
 	/**
 	 * @param {string} message
-	 * @param {number} retryAfter
+	 * @param {number} retryAfter seconds until the budget refills
 	 */
 	constructor(message, retryAfter) {
-		super(message);
+		super(message, 429, createRateLimitHeaders({ retryAfter }));
 		this.name = 'RateLimitError';
-		this.status = 429;
 		this.retryAfter = retryAfter;
 	}
 }
@@ -122,7 +122,7 @@ export function createRateLimitKey(event, scope, subject = '') {
 }
 
 /**
- * @param {RateLimitError} error
+ * @param {{ retryAfter: number }} error
  */
 export function createRateLimitHeaders(error) {
 	return {

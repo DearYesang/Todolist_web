@@ -1,13 +1,13 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { ApiError } from '$lib/server/http/api-error.js';
 
 const VERSION = 'v1';
 
-export class CalendarTokenEncryptionError extends Error {
+export class CalendarTokenEncryptionError extends ApiError {
 	/** @param {string} message */
 	constructor(message) {
-		super(message);
+		super(message, 503);
 		this.name = 'CalendarTokenEncryptionError';
-		this.status = 503;
 	}
 }
 

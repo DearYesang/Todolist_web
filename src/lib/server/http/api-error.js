@@ -1,0 +1,101 @@
+import { json } from '@sveltejs/kit';
+
+const INVALID_JSON_MESSAGE = 'Request body must be valid JSON.';
+
+/**
+ * An error the API answers with its own status and message, as
+ * `{ message }`. The server's domain errors (TaskWriteError, RateLimitError,
+ * the calendar and account security errors) extend it and keep their names,
+ * so code that tells them apart still can.
+ */
+export class ApiError extends Error {
+	/**
+	 * @param {string} message sent to the client as is
+	 * @param {number} [status]
+	 * @param {Record<string, string>} [headers] sent with the answer, like Retry-After on a 429
+	 */
+	constructor(message, status = 400, headers = undefined) {
+		super(message);
+		this.name = 'ApiError';
+		this.status = status;
+		this.headers = headers;
+	}
+}
+
+/**
+ * The answer to an error a route caught. An ApiError becomes `{ message }`
+ * with its status and headers; anything else is thrown again, so SvelteKit
+ * logs it and answers 500.
+ *
+ * A route that answers only some ApiErrors names their classes, and the
+ * others are thrown again too. The account and calendar routes do this so
+ * they answer exactly the errors they answered before: a missing recovery
+ * secret, for one, stays a logged 500 instead of being described to the
+ * client.
+ *
+ * @param {unknown} error
+ * @param {...(new (...args: any[]) => ApiError)} types the ApiError classes to answer; all of them when none is named
+ * @returns {Response}
+ */
+export function apiErrorResponse(error, ...types) {
+	if (!(error instanceof ApiError) || (types.length > 0 && !types.some((type) => error instanceof type))) {
+		throw error;
+	}
+
+	return json({ message: error.message }, { status: error.status, headers: error.headers });
+}
+
+/**
+ * A request's JSON body. A body that is not JSON, or cannot be read, is a
+ * 400 ApiError unless `lenient` is set.
+ *
+ * @param {Request} request
+ * @param {{
+ *   optional?: boolean;
+ *   lenient?: boolean;
+ *   maxBytes?: number;
+ *   tooLargeMessage?: string;
+ * }} [options]
+ *   - optional: an empty or blank body is no payload (undefined).
+ *   - lenient: a body that is not JSON, or none, is `{}`.
+ *   - maxBytes: a longer body is a 413 ApiError with `tooLargeMessage`,
+ *     checked on its declared content-length before reading it and on the
+ *     length of its text after.
+ * @returns {Promise<unknown>}
+ */
+export async function readJsonBody(request, options = {}) {
+	const { optional = false, lenient = false, maxBytes, tooLargeMessage = 'Request body is too large.' } = options;
+	if (maxBytes !== undefined && Number(request.headers.get('content-length') ?? '0') > maxBytes) {
+		throw new ApiError(tooLargeMessage, 413);
+	}
+
+	let text;
+	try {
+		text = await request.text();
+	} catch {
+		return invalidBody(lenient);
+	}
+
+	if (maxBytes !== undefined && text.length > maxBytes) {
+		throw new ApiError(tooLargeMessage, 413);
+	}
+	if (optional && !text.trim()) {
+		return undefined;
+	}
+
+	try {
+		return JSON.parse(text);
+	} catch {
+		return invalidBody(lenient);
+	}
+}
+
+/**
+ * @param {boolean} lenient
+ */
+function invalidBody(lenient) {
+	if (lenient) {
+		return {};
+	}
+	throw new ApiError(INVALID_JSON_MESSAGE, 400);
+}

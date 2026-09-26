@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, gt } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
+import { ApiError } from '$lib/server/http/api-error.js';
 import { ensurePersonalBoardForUser, listTasksForUser } from '$lib/server/tasks/repository.js';
 import {
 	decryptCalendarToken,
@@ -601,11 +602,10 @@ function readErrorMessage(error) {
 	return error instanceof Error && error.message ? error.message : null;
 }
 
-export class CalendarSyncError extends Error {
+export class CalendarSyncError extends ApiError {
 	/** @param {string} message */
 	constructor(message, status = 500) {
-		super(message);
+		super(message, status);
 		this.name = 'CalendarSyncError';
-		this.status = status;
 	}
 }
