@@ -82,7 +82,7 @@ vi.mock('$lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/tasks/rate-limit-guard.js', () => ({
+vi.mock('$lib/server/security/rate-limit-guard.js', () => ({
 	enforceTaskWriteRateLimit: vi.fn(),
 	enforceImportRateLimit: vi.fn()
 }));

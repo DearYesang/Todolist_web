@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
 import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
-import { enforceImportRateLimit } from '$lib/server/tasks/rate-limit-guard.js';
+import { enforceImportRateLimit } from '$lib/server/security/rate-limit-guard.js';
 import { importTasksForUser, replaceTasksForUser } from '$lib/server/tasks/repository.js';
 
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;

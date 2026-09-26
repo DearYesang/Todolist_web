@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
 import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
-import { enforceTaskWriteRateLimit } from '$lib/server/tasks/rate-limit-guard.js';
+import { enforceTaskWriteRateLimit } from '$lib/server/security/rate-limit-guard.js';
 import { createChecklistItemForUser } from '$lib/server/tasks/repository.js';
 
 /** @type {import('./$types').RequestHandler} */

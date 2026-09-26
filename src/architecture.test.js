@@ -262,10 +262,9 @@ describe('source architecture', () => {
 	it('reaches the server task repository modules only through repository.js', () => {
 		// A route importing a module behind repository.js would escape the
 		// vi.mock('$lib/server/tasks/repository.js') factories in its tests.
-		// Routes and the categories package also import validation.js
-		// (TaskWriteError and the request parsers) and rate-limit-guard.js.
+		// Tests may also import validation.js for TaskWriteError.
 		const tasksDir = 'lib/server/tasks/';
-		const publicModules = ['repository.js', 'validation.js', 'rate-limit-guard.js'].map((name) => tasksDir + name);
+		const publicModules = ['repository.js', 'validation.js'].map((name) => tasksDir + name);
 		expect(findImports((importer, imported) =>
 			isProduction(importer) && !importer.startsWith(tasksDir) && imported.startsWith(tasksDir) && !publicModules.includes(imported)
 		)).toEqual([]);
