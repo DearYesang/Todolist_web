@@ -51,7 +51,7 @@ export async function GET(event) {
 		});
 	} catch (error) {
 		if (error instanceof CalendarTokenConfigurationError) {
-			return new Response('Calendar token configuration is unavailable.', { status: 503 });
+			return new Response('Calendar token configuration is unavailable.', { status: error.status });
 		}
 		if (error instanceof RateLimitError) {
 			return new Response(error.message, {

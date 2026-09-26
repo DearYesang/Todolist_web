@@ -6,6 +6,7 @@ import {
 } from '$lib/server/calendar/provider-sync.js';
 import { CalendarProviderError } from '$lib/server/calendar/providers.js';
 import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
+import { apiErrorResponse } from '$lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request, url }) {
@@ -36,11 +37,7 @@ async function runCalendarCronSync(request, url) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof CalendarSyncError || error instanceof CalendarProviderError || error instanceof CalendarTokenEncryptionError) {
-			return json({ message: error.message }, { status: error.status });
-		}
-
-		throw error;
+		return apiErrorResponse(error, CalendarSyncError, CalendarProviderError, CalendarTokenEncryptionError);
 	}
 }
 

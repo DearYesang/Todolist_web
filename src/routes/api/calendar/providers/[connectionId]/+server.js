@@ -4,6 +4,7 @@ import {
 	CalendarSyncError,
 	deleteCalendarProviderConnection
 } from '$lib/server/calendar/provider-sync.js';
+import { apiErrorResponse } from '$lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ params, request }) {
@@ -20,10 +21,6 @@ export async function DELETE({ params, request }) {
 			}
 		});
 	} catch (error) {
-		if (error instanceof CalendarSyncError) {
-			return json({ message: error.message }, { status: error.status });
-		}
-
-		throw error;
+		return apiErrorResponse(error, CalendarSyncError);
 	}
 }
