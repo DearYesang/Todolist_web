@@ -1,11 +1,17 @@
 import { getBoardPreferences, listServerTasks } from '../task-api.js';
 import { listServerCategories } from '../category-api.js';
 import { flushOfflineWriteQueue } from '../offline-write-queue.js';
+import { normalizeTaskList } from '../../shared/task-domain.js';
 import {
+	getTaskStorageOwner,
+	mergeIntoTaskList,
 	mergeTasks,
+	removeFromTaskList,
 	removeTasksByIds,
+	replaceLocalTaskInList,
 	replaceLocalTaskWithServerTask,
-	replaceTasks
+	replaceTasks,
+	updateCachedBoardOf
 } from './task-cache.js';
 import { applyServerDefaultView } from './view-preference.js';
 import { applyServerCategoryCatalog } from './category-store.js';
@@ -20,7 +26,26 @@ import {
  */
 export async function syncServerTasks(fetcher = globalThis.fetch) {
 	await waitForPendingTaskSyncs();
+	// The flush sends the queue of the user whose board the store holds
+	// now, and stays that user's if the board goes to another user (a
+	// sign-out, or another user signing in) while a request is out.
+	const owner = getTaskStorageOwner();
 	const flushed = await flushOfflineWriteQueue(fetcher);
+	if (getTaskStorageOwner() !== owner) {
+		// Its answers are about that user's board: they go to the cache the
+		// board opens from at that user's next sign-in here, and stay off
+		// the board the store holds now, as does the server snapshot. Its
+		// conflicts are that user's too, and are not reported to the next.
+		updateCachedBoardOf(owner, (taskList) => applyFlushToTaskList(taskList, flushed));
+		return {
+			ok: /** @type {false} */ (false),
+			fallback: true,
+			status: 0,
+			message: 'The signed-in user changed while offline mutations were being sent, so the sync stopped.',
+			offlineConflicts: /** @type {import('../offline-write-queue.js').OfflineMutation[]} */ ([])
+		};
+	}
+
 	if (flushed.createdTasks.length > 0) {
 		flushed.createdTasks.forEach((created) => {
 			replaceLocalTaskWithServerTask(created.localTaskId, created.task);
@@ -70,4 +95,28 @@ export async function syncServerTasks(fetcher = globalThis.fetch) {
 	}
 
 	return { ...result, offlineConflicts: flushed.conflicts };
+}
+
+/**
+ * A flush's answers applied to a task list that is not the store's: the
+ * cached board of the user whose queue the flush sent, after the store
+ * moved on to another board. These are the changes syncServerTasks makes
+ * to the store, with answers to edits merged as mergeTasks does.
+ * @param {import('../../shared/task-domain.js').Task[]} taskList
+ * @param {import('../offline-write-queue.js').OfflineFlushResult} flushed
+ */
+function applyFlushToTaskList(taskList, flushed) {
+	let next = taskList;
+	flushed.createdTasks.forEach((created) => {
+		next = replaceLocalTaskInList(next, created.localTaskId, created.task);
+	});
+	if (flushed.syncedTasks.length > 0) {
+		next = mergeIntoTaskList(next, flushed.syncedTasks, { insertMissing: false });
+	}
+	flushed.completedImports.forEach((importResult) => {
+		next = importResult.mode === 'replace'
+			? normalizeTaskList(importResult.tasks)
+			: mergeIntoTaskList(removeFromTaskList(next, importResult.localTaskIds), importResult.tasks);
+	});
+	return next;
 }

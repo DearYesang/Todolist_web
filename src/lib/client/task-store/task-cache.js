@@ -95,16 +95,14 @@ export function getTaskStorageKey() {
 }
 
 /**
- * Rewrites task `taskId` in the cached board of `ownerId` (null for the
- * signed-out board) while the store holds another board: for a write made
- * on that board that lands after the board moved on. The store's own board
- * changes through the store. Nothing happens when that board or the task
- * is not cached.
+ * Rewrites the cached board of `ownerId` (null for the signed-out board)
+ * while the store holds another board: for a write made on that board
+ * that lands after the board moved on. The store's own board changes
+ * through the store. Nothing happens when that board is not cached.
  * @param {string | null} ownerId
- * @param {string} taskId
- * @param {(task: import('../../shared/task-domain.js').Task) => import('../../shared/task-domain.js').Task} update
+ * @param {(taskList: import('../../shared/task-domain.js').Task[]) => import('../../shared/task-domain.js').Task[]} update
  */
-export function updateCachedTaskOf(ownerId, taskId, update) {
+export function updateCachedBoardOf(ownerId, update) {
     const owner = normalizeStorageOwner(ownerId);
     if (owner === taskStorageOwner) {
         return;
@@ -120,16 +118,30 @@ export function updateCachedTaskOf(ownerId, taskId, update) {
         if (!Array.isArray(parsed)) return;
 
         const cached = normalizeTaskList(parsed);
-        const task = cached.find((current) => current.id === taskId);
-        if (!task) return;
-
-        const next = update(task);
-        if (next !== task) {
-            storage.setItem(key, JSON.stringify(cached.map((current) => current === task ? next : current)));
+        const next = update(cached);
+        if (next !== cached) {
+            storage.setItem(key, JSON.stringify(next));
         }
     } catch (error) {
-        console.error('Failed to update a cached task', error);
+        console.error('Failed to update a cached task list', error);
     }
+}
+
+/**
+ * Rewrites task `taskId` in the cached board of `ownerId`, as
+ * updateCachedBoardOf does; nothing happens when the task is not cached.
+ * @param {string | null} ownerId
+ * @param {string} taskId
+ * @param {(task: import('../../shared/task-domain.js').Task) => import('../../shared/task-domain.js').Task} update
+ */
+export function updateCachedTaskOf(ownerId, taskId, update) {
+    updateCachedBoardOf(ownerId, (cached) => {
+        const task = cached.find((current) => current.id === taskId);
+        if (!task) return cached;
+
+        const next = update(task);
+        return next === task ? cached : cached.map((current) => current === task ? next : current);
+    });
 }
 
 /**
@@ -200,42 +212,60 @@ export function insertTask(task) {
  *   insertMissing: false keeps responses for locally deleted tasks from resurrecting them.
  */
 export function mergeTasks(nextTasks, options = {}) {
+    tasks.update((current) => mergeIntoTaskList(current, nextTasks, options));
+}
+
+/**
+ * mergeTasks for a task list that is not the store's, such as another
+ * user's cached board.
+ * @param {import('../../shared/task-domain.js').Task[]} current
+ * @param {unknown[]} nextTasks
+ * @param {{ insertMissing?: boolean }} [options]
+ */
+export function mergeIntoTaskList(current, nextTasks, options = {}) {
     const { insertMissing = true } = options;
     const incoming = nextTasks.map((task) => normalizeTask(task));
-    tasks.update((current) => {
-        const merged = new Map(current.map((task) => [task.id, task]));
-        incoming.forEach((task) => {
-            const existing = merged.get(task.id);
-            if (!existing) {
-                if (insertMissing) {
-                    merged.set(task.id, task);
-                }
-                return;
+    const merged = new Map(current.map((task) => [task.id, task]));
+    incoming.forEach((task) => {
+        const existing = merged.get(task.id);
+        if (!existing) {
+            if (insertMissing) {
+                merged.set(task.id, task);
             }
+            return;
+        }
 
-            if (
-                typeof existing.version === 'number'
-                && typeof task.version === 'number'
-                && task.version < existing.version
-            ) {
-                return;
-            }
+        if (
+            typeof existing.version === 'number'
+            && typeof task.version === 'number'
+            && task.version < existing.version
+        ) {
+            return;
+        }
 
-            merged.set(task.id, { ...task, collapsed: existing.collapsed });
-        });
-
-        return normalizeTaskList([...merged.values()]);
+        merged.set(task.id, { ...task, collapsed: existing.collapsed });
     });
+
+    return normalizeTaskList([...merged.values()]);
 }
 
 /**
  * @param {string[]} taskIds
  */
 export function removeTasksByIds(taskIds) {
-    const ids = new Set(taskIds);
-    if (ids.size === 0) return;
+    if (taskIds.length === 0) return;
 
-    tasks.update((current) => normalizeTaskList(current.filter((task) => !ids.has(task.id))));
+    tasks.update((current) => removeFromTaskList(current, taskIds));
+}
+
+/**
+ * removeTasksByIds for a task list that is not the store's.
+ * @param {import('../../shared/task-domain.js').Task[]} current
+ * @param {string[]} taskIds
+ */
+export function removeFromTaskList(current, taskIds) {
+    const ids = new Set(taskIds);
+    return ids.size === 0 ? current : normalizeTaskList(current.filter((task) => !ids.has(task.id)));
 }
 
 /**
@@ -243,16 +273,24 @@ export function removeTasksByIds(taskIds) {
  * @param {import('../../shared/task-domain.js').Task} serverTask
  */
 export function replaceLocalTaskWithServerTask(localTaskId, serverTask) {
-    tasks.update((current) =>
-        normalizeTaskList(current.map((task) => {
-            if (task.id === localTaskId) {
-                return {
-                    ...serverTask,
-                    collapsed: task.collapsed
-                };
-            }
+    tasks.update((current) => replaceLocalTaskInList(current, localTaskId, serverTask));
+}
 
-            return task.parentId === localTaskId ? { ...task, parentId: serverTask.id } : task;
-        }))
-    );
+/**
+ * replaceLocalTaskWithServerTask for a task list that is not the store's.
+ * @param {import('../../shared/task-domain.js').Task[]} current
+ * @param {string} localTaskId
+ * @param {import('../../shared/task-domain.js').Task} serverTask
+ */
+export function replaceLocalTaskInList(current, localTaskId, serverTask) {
+    return normalizeTaskList(current.map((task) => {
+        if (task.id === localTaskId) {
+            return {
+                ...serverTask,
+                collapsed: task.collapsed
+            };
+        }
+
+        return task.parentId === localTaskId ? { ...task, parentId: serverTask.id } : task;
+    }));
 }

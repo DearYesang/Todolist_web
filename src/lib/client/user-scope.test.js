@@ -754,7 +754,7 @@ describe('a sync of the offline queue that outlives its user', () => {
 		return JSON.parse(storage.get(key) ?? '[]').map((/** @type {{ id: string; text: string }} */ task) => [task.id, task.text]);
 	}
 
-	it.fails('settles the queue of the user who sent a create and leaves the next board alone', async () => {
+	it('settles the queue of the user who sent a create and leaves the next board alone', async () => {
 		seedUserA({ id: 'local-a', text: 'Offline task' }, {
 			type: 'task.create',
 			localTaskId: 'local-a',
@@ -777,7 +777,7 @@ describe('a sync of the offline queue that outlives its user', () => {
 		});
 	});
 
-	it.fails('keeps the tasks of an import that lands after another user signed in off that user\'s board', async () => {
+	it('keeps the tasks of an import that lands after another user signed in off that user\'s board', async () => {
 		seedUserA({ id: 'local-import', text: 'Imported' }, {
 			type: 'import.tasks',
 			mode: 'replace',

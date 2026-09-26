@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
+import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import {
 	advanceQueuedTaskVersion,
 	dropQueuedChecklistFields,
@@ -618,6 +619,42 @@ describe('offline write queue conflict behavior', () => {
 			itemId: serverItemId,
 			patch: { done: true }
 		});
+	});
+
+	it('settles the queue it sent, and queues a follow-up there, when another owner takes the queue meanwhile', async () => {
+		const taskId = '55555555-5555-4555-8555-555555555555';
+		const serverItemId = '66666666-6666-4666-8666-666666666666';
+		const createdTask = normalizeTask({
+			id: taskId,
+			text: 'Task',
+			subtasks: [{ id: serverItemId, text: 'Checked offline', done: false }]
+		});
+		setOfflineQueueOwner('user-b');
+		enqueueOfflineMutation({ type: 'task.delete', taskId: '77777777-7777-4777-8777-777777777777' });
+		setOfflineQueueOwner('user-a');
+		enqueueOfflineMutation({
+			type: 'checklist.create',
+			taskId,
+			localItemId: 'local-checklist',
+			text: 'Checked offline',
+			done: true
+		});
+		const createAnswer = createDeferred();
+		const fetcher = vi.fn()
+			.mockReturnValueOnce(createAnswer.promise)
+			.mockResolvedValueOnce(jsonResponse({ message: 'Too many task changes.' }, { status: 429 }));
+
+		const flushing = flushOfflineWriteQueue(fetcher);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		// User A signs out and user B signs in while the create is out.
+		setOfflineQueueOwner('user-b');
+		createAnswer.resolve(jsonResponse({ task: createdTask }, { status: 201 }));
+		await flushing;
+
+		expect(JSON.parse(storage.get('kanbanOfflineWriteQueue:user-a') ?? '[]')).toEqual([
+			expect.objectContaining({ type: 'checklist.patch', taskId, itemId: serverItemId, patch: { done: true }, ownerUserId: 'user-a' })
+		]);
+		expect(loadOfflineQueue()).toEqual([expect.objectContaining({ type: 'task.delete', ownerUserId: 'user-b' })]);
 	});
 
 	it('drops a pending checklist create when the local item is deleted before sync', () => {

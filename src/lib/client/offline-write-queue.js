@@ -279,6 +279,10 @@ export function getOfflineQueueOwner() {
 }
 
 /**
+ * Sends the current owner's queue. The flush stays that owner's to the
+ * end: when another owner takes the queue while a request is out (a
+ * sign-out, or another user signing in), what it sent still leaves that
+ * owner's queue, and what it keeps stays there.
  * @param {typeof fetch} [fetcher]
  * @returns {Promise<OfflineFlushResult>}
  */
@@ -287,7 +291,8 @@ export async function flushOfflineWriteQueue(fetcher = globalThis.fetch) {
 		return createFlushResult(loadOfflineQueue(), true);
 	}
 
-	return withFlushLock(() => executeFlush(fetcher));
+	const owner = queueOwnerId;
+	return withFlushLock(() => executeFlush(fetcher, owner));
 }
 
 /**
@@ -322,10 +327,11 @@ function withFlushLock(operation) {
 
 /**
  * @param {typeof fetch} fetcher
+ * @param {string} owner the owner whose queue this flush sends
  * @returns {Promise<OfflineFlushResult>}
  */
-async function executeFlush(fetcher) {
-	const queue = loadOfflineQueue();
+async function executeFlush(fetcher, owner) {
+	const queue = loadOwnerQueue(owner);
 	if (queue.length === 0) {
 		return createFlushResult([], false);
 	}
@@ -393,7 +399,7 @@ async function executeFlush(fetcher) {
 					taskId: executableMutation.taskId,
 					itemId: result.pendingDoneItemId,
 					patch: { done: true }
-				});
+				}, { ownerId: owner });
 			}
 			if ('task' in result) {
 				if (typeof result.task.version === 'number') {
@@ -431,8 +437,8 @@ async function executeFlush(fetcher) {
 		processedIds.add(mutation.id);
 	}
 
-	const finalQueue = reconcileQueueAfterFlush(remaining, processedIds, originalById, localTaskIds);
-	saveOfflineQueue(finalQueue);
+	const finalQueue = reconcileQueueAfterFlush(remaining, processedIds, originalById, localTaskIds, owner);
+	saveOfflineQueue(finalQueue, owner);
 	return {
 		flushed,
 		remaining: finalQueue.length,
@@ -454,10 +460,11 @@ async function executeFlush(fetcher) {
  * @param {Set<string>} processedIds
  * @param {Map<string, string>} originalById
  * @param {Map<string, string>} localTaskIds
+ * @param {string} owner the owner whose queue the flush sent
  * @returns {OfflineMutation[]}
  */
-function reconcileQueueAfterFlush(remaining, processedIds, originalById, localTaskIds) {
-	const storageNow = loadOfflineQueue();
+function reconcileQueueAfterFlush(remaining, processedIds, originalById, localTaskIds, owner) {
+	const storageNow = loadOwnerQueue(owner);
 	const remainingById = new Map(remaining.map((mutation) => [mutation.id, mutation]));
 	/** @type {OfflineMutation[]} */
 	const finalQueue = [];
