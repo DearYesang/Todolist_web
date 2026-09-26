@@ -29,6 +29,7 @@ import {
 	listCalendarTokensForUser,
 	revokeCalendarTokenForUser
 } from '$lib/server/calendar/tokens.js';
+import * as boardProvisioning from '$lib/server/boards/board-provisioning.js';
 import * as categoryRepository from '$lib/server/categories/repository.js';
 import { assertRateLimit, assertVolatileRateLimit, RateLimitError } from '$lib/server/security/rate-limit.js';
 import * as taskRepository from '$lib/server/tasks/repository.js';
@@ -96,7 +97,10 @@ vi.mock('$lib/server/tasks/repository.js', () => ({
 	deleteChecklistItemForUser: vi.fn(),
 	updateChecklistItemForUser: vi.fn(),
 	importTasksForUser: vi.fn(),
-	replaceTasksForUser: vi.fn(),
+	replaceTasksForUser: vi.fn()
+}));
+
+vi.mock('$lib/server/boards/board-provisioning.js', () => ({
 	ensurePersonalBoardForUser: vi.fn(),
 	getBoardPreferencesForUser: vi.fn(),
 	updateBoardPreferencesForUser: vi.fn()
@@ -309,12 +313,13 @@ const TASK_WRITES = [
 	['DELETE /api/categories/[categoryId]', vi.mocked(categoryRepository.deleteCategoryForUser)],
 	['POST /api/categories/[categoryId]/merge', vi.mocked(categoryRepository.mergeCategoryForUser)],
 	['POST /api/categories/reorder', vi.mocked(categoryRepository.reorderCategoriesForUser)],
-	['PATCH /api/board/preferences', vi.mocked(taskRepository.updateBoardPreferencesForUser)]
+	['PATCH /api/board/preferences', vi.mocked(boardProvisioning.updateBoardPreferencesForUser)]
 ];
 
 /** Every mocked data function, to check a refused request reached none. */
 const DATA_FUNCTIONS = [
 	...Object.values(taskRepository),
+	...Object.values(boardProvisioning),
 	...Object.values(categoryRepository),
 	assertAllowedAccountEmail,
 	createPasskeyEmailVerification,
@@ -466,7 +471,7 @@ describe('the task write API', () => {
 		['GET /api/tasks', vi.mocked(taskRepository.listTasksForUser)],
 		['GET /api/export', vi.mocked(taskRepository.listTasksForUser)],
 		['GET /api/categories', vi.mocked(categoryRepository.listCategoriesForUser)],
-		['GET /api/board/preferences', vi.mocked(taskRepository.getBoardPreferencesForUser)],
+		['GET /api/board/preferences', vi.mocked(boardProvisioning.getBoardPreferencesForUser)],
 		['GET /api/calendar.ics', vi.mocked(taskRepository.listTasksForUser)]
 	])('%s lets even a TaskWriteError through', async (name, dataFunction) => {
 		const failure = new TaskWriteError('A default workspace board could not be created.', 500);
@@ -490,8 +495,8 @@ describe('the task write API', () => {
 		['DELETE /api/categories/[categoryId]', () => vi.mocked(categoryRepository.deleteCategoryForUser).mockResolvedValue(/** @type {any} */ ({ deleted: true })), 200, { deleted: true }, {}],
 		['POST /api/categories/[categoryId]/merge', () => vi.mocked(categoryRepository.mergeCategoryForUser).mockResolvedValue(/** @type {any} */ ({ merged: 1 })), 200, { merged: 1 }, {}],
 		['POST /api/categories/reorder', () => vi.mocked(categoryRepository.reorderCategoriesForUser).mockResolvedValue([]), 200, { categories: [] }, {}],
-		['GET /api/board/preferences', () => vi.mocked(taskRepository.getBoardPreferencesForUser).mockResolvedValue({ defaultView: 'matrix' }), 200, { defaultView: 'matrix' }, {}],
-		['PATCH /api/board/preferences', () => vi.mocked(taskRepository.updateBoardPreferencesForUser).mockResolvedValue({ defaultView: 'gantt' }), 200, { defaultView: 'gantt' }, {}]
+		['GET /api/board/preferences', () => vi.mocked(boardProvisioning.getBoardPreferencesForUser).mockResolvedValue({ defaultView: 'matrix' }), 200, { defaultView: 'matrix' }, {}],
+		['PATCH /api/board/preferences', () => vi.mocked(boardProvisioning.updateBoardPreferencesForUser).mockResolvedValue({ defaultView: 'gantt' }), 200, { defaultView: 'gantt' }, {}]
 	])('%s answers %i on success', async (name, arrange, status, body, headers) => {
 		arrange();
 		await expectJson(await call[name](), status, body, headers);

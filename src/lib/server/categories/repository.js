@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb, schema } from '$lib/server/db/index.js';
-import { ensurePersonalBoardForUser } from '$lib/server/tasks/repository.js';
+import { ensurePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 import {
 	findOrCreateCategoryRow,

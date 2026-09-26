@@ -1,10 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { requireAuthUser } from '$lib/server/auth/session.js';
-import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
 import {
 	getBoardPreferencesForUser,
 	updateBoardPreferencesForUser
-} from '$lib/server/tasks/repository.js';
+} from '$lib/server/boards/board-provisioning.js';
+import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {

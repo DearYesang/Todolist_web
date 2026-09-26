@@ -3,7 +3,7 @@ import { requireAuthUser } from '$lib/server/auth/session.js';
 import {
 	getBoardPreferencesForUser,
 	updateBoardPreferencesForUser
-} from '$lib/server/tasks/repository.js';
+} from '$lib/server/boards/board-provisioning.js';
 import { TaskWriteError } from '$lib/server/tasks/validation.js';
 import { GET, PATCH } from './+server.js';
 
@@ -11,7 +11,7 @@ vi.mock('$lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/tasks/repository.js', () => ({
+vi.mock('$lib/server/boards/board-provisioning.js', () => ({
 	getBoardPreferencesForUser: vi.fn(),
 	updateBoardPreferencesForUser: vi.fn()
 }));

@@ -1,7 +1,6 @@
 import { ApiError } from '$lib/server/http/api-error.js';
 import { normalizeDateRange } from '$lib/shared/task-domain.js';
 import {
-	APP_VIEWS,
 	isOneOf,
 	TASK_PRIORITIES,
 	TASK_STATUSES,
@@ -166,20 +165,6 @@ export function parseDeleteTaskInput(payload) {
 		expectedVersion: hasField(source, 'expectedVersion') || hasField(source, 'version')
 			? parseExpectedVersion(source.expectedVersion ?? source.version)
 			: null
-	};
-}
-
-/**
- * @param {unknown} payload
- */
-export function parseBoardPreferencesInput(payload) {
-	const source = /** @type {Record<string, unknown> | null} */ (payload);
-	if (!source || typeof source !== 'object' || Array.isArray(source)) {
-		throw new TaskWriteError('Board preferences payload must be an object.');
-	}
-
-	return {
-		defaultView: parseRequiredEnum(source.defaultView, APP_VIEWS, 'defaultView')
 	};
 }
 

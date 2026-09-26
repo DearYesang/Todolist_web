@@ -8,7 +8,7 @@ import {
 	getFirstBoardForUser,
 	getOrCreatePersonalBoardForUser,
 	getPersonalBoardForUser
-} from './board-provisioning.js';
+} from '$lib/server/boards/board-provisioning.js';
 import { attachCategoryMetaToTaskRow, mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
 import { createPositionValue, getWritableTaskForUser, loadClientTask } from './task-rows.js';
 import {
