@@ -12,11 +12,12 @@
  *   first use, and the board's default view.
  * - task-rows.js: the authorization read, the checklist read, the position
  *   values and the client task a write answers with, which the writers share.
+ *
+ * Tests import the module they test directly, so this file exports only what
+ * code outside src/lib/server/tasks uses.
  */
 
 export {
-	buildCascadeDeleteStatement,
-	buildTaskPatchSet,
 	createTaskForUser,
 	deleteTaskCascadeForUser,
 	listTasksForBoard,
@@ -24,7 +25,6 @@ export {
 	updateTaskForUser
 } from './task-repository.js';
 export {
-	buildTaskVersionBump,
 	createChecklistItemForUser,
 	deleteChecklistItemForUser,
 	updateChecklistItemForUser
@@ -35,4 +35,3 @@ export {
 	getBoardPreferencesForUser,
 	updateBoardPreferencesForUser
 } from './board-provisioning.js';
-export { createPositionValue } from './task-rows.js';

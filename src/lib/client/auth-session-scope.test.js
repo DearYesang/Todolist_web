@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import {
 	cacheAuthScope,
 	clearCachedAuthScope,
@@ -10,23 +11,7 @@ describe('auth session scope cache', () => {
 	let storage;
 
 	beforeEach(() => {
-		storage = new Map();
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			value: {
-				getItem: vi.fn((key) => storage.get(key) ?? null),
-				setItem: vi.fn((key, value) => {
-					storage.set(key, String(value));
-				}),
-				removeItem: vi.fn((key) => {
-					storage.delete(key);
-				})
-			}
-		});
-	});
-
-	afterEach(() => {
-		Reflect.deleteProperty(globalThis, 'localStorage');
+		storage = installMemoryStorage();
 	});
 
 	it('stores the last authenticated user for offline unlock', () => {

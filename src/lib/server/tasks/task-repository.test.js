@@ -1,117 +1,28 @@
-import { getTableName } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '$lib/server/db/index.js';
-import { createTaskForUser, updateTaskForUser } from './repository.js';
+import { BOARD_ID, NOW, TASK_ID, USER_ID, createTaskRow, recordStatements } from '$lib/test-support/fake-db.js';
+import {
+	buildCascadeDeleteStatement,
+	buildTaskPatchSet,
+	createTaskForUser,
+	deleteTaskCascadeForUser,
+	updateTaskForUser
+} from './task-repository.js';
 
 vi.mock('$lib/server/db/index.js', async () => {
-	const { drizzle } = await import('drizzle-orm/neon-http');
-	const { neon } = await import('@neondatabase/serverless');
-	const schema = await import('./../db/schema.js');
-	// neon-http performs no I/O until a query executes, so statements can be
-	// built against a fake URL.
-	const db = drizzle(neon('postgresql://user:pass@tasks-test.invalid/db'), { schema });
-	return { getDb: () => db, schema };
+	const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+	return createFakeDbModule();
 });
 
-const USER_ID = 'user-id';
-const NOW = new Date('2026-07-06T12:00:00.000Z');
-const TASK_ID = '11111111-1111-4111-8111-111111111111';
-const BOARD_ID = '22222222-2222-4222-8222-222222222222';
+const ITEM_ID = '33333333-3333-4333-8333-333333333333';
 const PARENT_ID = '44444444-4444-4444-8444-444444444444';
 const OTHER_PARENT_ID = '55555555-5555-4555-8555-555555555555';
 const CATEGORY_ID = '66666666-6666-4666-8666-666666666666';
 const NEW_CATEGORY_ID = '77777777-7777-4777-8777-777777777777';
 const WORKSPACE = { id: 'workspace-id', name: 'Personal', ownerUserId: USER_ID };
 const BOARD = { id: BOARD_ID, workspaceId: WORKSPACE.id, name: 'Inbox', defaultView: 'kanban' };
-
-/**
- * @param {Record<string, unknown>} [overrides]
- */
-function createTaskRow(overrides = {}) {
-	return {
-		id: TASK_ID,
-		boardId: BOARD_ID,
-		parentTaskId: null,
-		title: 'Task',
-		status: 'todo',
-		priority: 'medium',
-		urgency: 'normal',
-		category: '',
-		categoryId: null,
-		startDate: '2026-07-01',
-		endDate: '2026-07-02',
-		position: '1.000',
-		version: 3,
-		createdBy: USER_ID,
-		createdAt: NOW,
-		updatedAt: NOW,
-		completedAt: null,
-		deletedAt: null,
-		...overrides
-	};
-}
-
-/**
- * Replaces db.select/insert/update with builder chains that record the table,
- * the rendered where clause, the inserted or set values and the other builder
- * steps of each statement. Each statement resolves to the next queued rows.
- * @param {any} db
- * @param {unknown[][]} results
- */
-function recordStatements(db, results) {
-	const queue = [...results];
-	/** @type {Record<string, any>[]} */
-	const statements = [];
-
-	/**
-	 * @param {string} kind
-	 * @param {any} table
-	 */
-	function createChain(kind, table) {
-		/** @type {Record<string, any> & { steps: string[] }} */
-		const statement = { kind, table: table ? getTableName(table) : null, steps: [] };
-		statements.push(statement);
-		const rows = queue.shift() ?? [];
-		/** @param {string} name */
-		const step = (name) => () => {
-			statement.steps.push(name);
-			return chain;
-		};
-		/** @type {any} */
-		const chain = {
-			from: (/** @type {any} */ source) => {
-				statement.table = getTableName(source);
-				return chain;
-			},
-			where: (/** @type {import('drizzle-orm').SQL} */ condition) => {
-				const { sql: text, params } = new PgDialect().sqlToQuery(condition);
-				statement.where = { text, params };
-				return chain;
-			},
-			values: (/** @type {unknown} */ values) => {
-				statement.values = values;
-				return chain;
-			},
-			set: (/** @type {unknown} */ values) => {
-				statement.set = values;
-				return chain;
-			},
-			leftJoin: step('leftJoin'),
-			orderBy: step('orderBy'),
-			limit: step('limit'),
-			onConflictDoNothing: step('onConflictDoNothing'),
-			returning: step('returning'),
-			then: (/** @type {(rows: unknown[]) => unknown} */ resolve) => resolve(rows)
-		};
-		return chain;
-	}
-
-	vi.spyOn(db, 'select').mockImplementation(() => createChain('select', null));
-	vi.spyOn(db, 'insert').mockImplementation((table) => createChain('insert', table));
-	vi.spyOn(db, 'update').mockImplementation((table) => createChain('update', table));
-	return statements;
-}
+const TASK = { id: TASK_ID, boardId: BOARD_ID };
 
 /**
  * @param {Record<string, any>[]} statements
@@ -483,5 +394,195 @@ describe('task updates', () => {
 		await expect(updateTaskForUser(USER_ID, TASK_ID, { text: 'Renamed' }))
 			.rejects.toMatchObject({ status: 404, message: 'Task was not found.' });
 		expect(describeStatements(statements)).toEqual(AUTHORIZATION_STATEMENTS);
+	});
+});
+
+/**
+ * @param {Partial<Record<string, unknown>>} overrides
+ */
+function createExisting(overrides = {}) {
+	return /** @type {any} */ ({
+		id: 'task-id',
+		boardId: 'board-id',
+		title: 'Existing title',
+		status: 'todo',
+		priority: 'medium',
+		urgency: 'normal',
+		category: 'Old category',
+		categoryId: 'old-category-id',
+		startDate: '2026-07-01',
+		endDate: '2026-07-02',
+		parentTaskId: null,
+		completedAt: null,
+		version: 3,
+		...overrides
+	});
+}
+
+/**
+ * @param {Partial<Record<string, unknown>>} overrides
+ */
+function createComputed(existing = createExisting(), overrides = {}) {
+	return {
+		nextStatus: existing.status,
+		nextParentTaskId: existing.parentTaskId,
+		nextCategory: { id: existing.categoryId, name: existing.category },
+		nextStartDate: existing.startDate,
+		nextEndDate: existing.endDate,
+		now: NOW,
+		...overrides
+	};
+}
+
+describe('buildTaskPatchSet', () => {
+	it('writes only the patched columns plus bookkeeping, never the full row', () => {
+		const existing = createExisting();
+		const set = buildTaskPatchSet({ title: 'New title' }, existing, createComputed(existing));
+
+		expect(Object.keys(set).sort()).toEqual(['title', 'updatedAt', 'version']);
+		expect(set.title).toBe('New title');
+		expect(set.updatedAt).toBe(NOW);
+	});
+
+	it('keeps concurrent single-field patches from clobbering each other', () => {
+		const existing = createExisting();
+		const titleSet = buildTaskPatchSet({ title: 'From device A' }, existing, createComputed(existing));
+		const prioritySet = buildTaskPatchSet({ priority: 'high' }, existing, createComputed(existing));
+
+		// Device B's priority-only patch must not carry device A's stale title.
+		expect(prioritySet).not.toHaveProperty('title');
+		expect(titleSet).not.toHaveProperty('priority');
+	});
+
+	it('writes status and completedAt together when status is patched', () => {
+		const existing = createExisting();
+		const set = buildTaskPatchSet(
+			{ status: 'done' },
+			existing,
+			createComputed(existing, { nextStatus: 'done' })
+		);
+
+		expect(set.status).toBe('done');
+		expect(set.completedAt).toBe(NOW);
+		expect(set).not.toHaveProperty('title');
+	});
+
+	it('writes a parent-inherited status even when the patch only names parentId', () => {
+		const existing = createExisting();
+		const set = buildTaskPatchSet(
+			{ parentId: 'parent-id' },
+			existing,
+			createComputed(existing, { nextParentTaskId: 'parent-id', nextStatus: 'doing' })
+		);
+
+		expect(set.parentTaskId).toBe('parent-id');
+		expect(set.status).toBe('doing');
+	});
+
+	it('persists an implicit detach when a status change leaves the parent lane', () => {
+		const existing = createExisting({ parentTaskId: 'parent-id' });
+		const set = buildTaskPatchSet(
+			{ status: 'done' },
+			existing,
+			createComputed(existing, { nextStatus: 'done', nextParentTaskId: null })
+		);
+
+		expect(set.parentTaskId).toBeNull();
+		expect(set.status).toBe('done');
+	});
+
+	it('writes both category columns for either category-shaped patch', () => {
+		const existing = createExisting();
+		const byName = buildTaskPatchSet(
+			{ category: 'Fresh' },
+			existing,
+			createComputed(existing, { nextCategory: { id: 'fresh-id', name: 'Fresh' } })
+		);
+		const byId = buildTaskPatchSet(
+			{ categoryId: 'fresh-id' },
+			existing,
+			createComputed(existing, { nextCategory: { id: 'fresh-id', name: 'Fresh' } })
+		);
+
+		for (const set of [byName, byId]) {
+			expect(set.category).toBe('Fresh');
+			expect(set.categoryId).toBe('fresh-id');
+			expect(set).not.toHaveProperty('status');
+		}
+	});
+});
+
+/**
+ * @param {import('drizzle-orm').SQL} statement
+ */
+function renderSql(statement) {
+	return new PgDialect().sqlToQuery(statement);
+}
+
+describe('cascade delete statement', () => {
+	it('renders a cycle-safe recursive soft-delete scoped to the board', () => {
+		const { sql: text, params } = renderSql(buildCascadeDeleteStatement(TASK, NOW, null));
+
+		expect(text).toMatch(/with recursive descendants \(id, path\)/);
+		// Recursive member must walk children by parent link, board-scoped.
+		expect(text).toMatch(/inner join descendants on child\.parent_task_id = descendants\.id/);
+		expect(text).toMatch(/child\.board_id = \$/);
+		// The path array guards against parent cycles in corrupt data.
+		expect(text).toMatch(/not child\.id = any\(descendants\.path\)/);
+		// Both members and the outer update must skip already-deleted rows.
+		expect((text.match(/deleted_at.{0,4} is null/g) ?? []).length).toBeGreaterThanOrEqual(3);
+		expect(text).toMatch(/update "tasks"/);
+		expect(text).toMatch(/returning "tasks"\."id"/);
+		// Unversioned delete carries no version predicate.
+		expect(text).toMatch(/and true/);
+		expect(text).not.toMatch(/root\.version/);
+		expect(params).toEqual([TASK.id, TASK.boardId, TASK.boardId, NOW, NOW]);
+	});
+
+	it('renders the optimistic-concurrency guard when a version is expected', () => {
+		const { sql: text, params } = renderSql(buildCascadeDeleteStatement(TASK, NOW, 7));
+
+		expect(text).toMatch(/exists \(\s*select 1 from "tasks" as root/);
+		expect(text).toMatch(/root\.version = \$/);
+		expect(text).toMatch(/root\.deleted_at is null/);
+		expect(params).toContain(7);
+	});
+});
+
+describe('deleteTaskCascadeForUser result handling', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('throws 409 on a stale expectedVersion and returns the deleted count otherwise', async () => {
+		const db = getDb();
+		const selectResults = [
+			[{ workspaceId: 'ws' }],
+			[{ id: TASK.boardId }],
+			[{ ...TASK, deletedAt: null }]
+		];
+		vi.spyOn(db, 'select').mockImplementation(() => {
+			const rows = selectResults.shift() ?? [];
+			/** @type {any} */
+			const chain = {
+				from: () => chain,
+				where: () => chain,
+				orderBy: () => chain,
+				leftJoin: () => chain,
+				limit: () => chain,
+				then: (/** @type {(rows: unknown[]) => unknown} */ resolve) => resolve(rows)
+			};
+			return chain;
+		});
+		const execute = vi.spyOn(db, 'execute').mockResolvedValue(/** @type {any} */ ({ rows: [] }));
+
+		await expect(deleteTaskCascadeForUser('user-id', TASK.id, { expectedVersion: 7 }))
+			.rejects.toMatchObject({ status: 409 });
+		expect(execute).toHaveBeenCalledTimes(1);
+
+		selectResults.push([{ workspaceId: 'ws' }], [{ id: TASK.boardId }], [{ ...TASK, deletedAt: null }]);
+		execute.mockResolvedValue(/** @type {any} */ ({ rows: [{ id: TASK.id }, { id: ITEM_ID }] }));
+
+		await expect(deleteTaskCascadeForUser('user-id', TASK.id)).resolves.toBe(2);
 	});
 });

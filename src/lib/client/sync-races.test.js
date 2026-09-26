@@ -1,5 +1,7 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
+import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import { normalizeTask } from '../shared/task-domain.js';
 import {
 	addSubtask,
@@ -7,16 +9,16 @@ import {
 	deleteSubtask,
 	deleteTaskCascade,
 	drainPendingTaskSyncsToOfflineQueue,
-	handleExternalTaskStorageEvent,
 	mergeTasks,
 	renameSubtask,
 	replaceTasks,
-	resetTaskSyncStateForTests,
 	setTaskStorageOwner,
 	tasks,
 	updateTask,
 	waitForPendingTaskSyncs
 } from './task-store.js';
+import { handleExternalTaskStorageEvent } from './task-store/cross-tab-sync.js';
+import { resetTaskSyncStateForTests } from './task-store/sync-engine.js';
 import {
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,
@@ -27,53 +29,14 @@ import { syncServerTasks } from './task-sync.js';
 
 const SERVER_TASK_ID = '11111111-1111-4111-8111-111111111111';
 
-/**
- * @param {unknown} body
- * @param {number} [status]
- */
-function jsonResponse(body, status = 200) {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	});
-}
-
-function createDeferred() {
-	/** @type {(value: Response) => void} */
-	let resolve = () => {};
-	/** @type {Promise<Response>} */
-	const promise = new Promise((res) => {
-		resolve = res;
-	});
-	return { promise, resolve };
-}
-
 async function settleMicrotasks() {
 	await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('sync race conditions', () => {
-	/** @type {Map<string, string>} */
-	let storage;
-
 	beforeEach(() => {
-		storage = new Map();
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			value: {
-				getItem: vi.fn((key) => storage.get(key) ?? null),
-				setItem: vi.fn((key, value) => {
-					storage.set(key, String(value));
-				}),
-				removeItem: vi.fn((key) => {
-					storage.delete(key);
-				})
-			}
-		});
-		Object.defineProperty(globalThis, 'window', {
-			configurable: true,
-			value: {}
-		});
+		installMemoryStorage();
+		vi.stubGlobal('window', {});
 		setTaskStorageOwner(null);
 		setOfflineQueueOwner(null);
 		replaceTasks([]);
@@ -90,9 +53,6 @@ describe('sync race conditions', () => {
 		replaceTasks([]);
 		setTaskStorageOwner(null);
 		setOfflineQueueOwner(null);
-		Reflect.deleteProperty(globalThis, 'fetch');
-		Reflect.deleteProperty(globalThis, 'window');
-		Reflect.deleteProperty(globalThis, 'localStorage');
 	});
 
 	it('coalesces rapid edits into one serialized PATCH with the current version', async () => {
@@ -100,13 +60,10 @@ describe('sync race conditions', () => {
 		const deferred = createDeferred();
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn((_url, init) => {
-				bodies.push(JSON.parse(init.body));
-				return deferred.promise;
-			})
-		});
+		vi.stubGlobal('fetch', vi.fn((_url, init) => {
+			bodies.push(JSON.parse(init.body));
+			return deferred.promise;
+		}));
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		updateTask(SERVER_TASK_ID, { text: 'Three' });
@@ -133,13 +90,10 @@ describe('sync race conditions', () => {
 		const responses = [first, second];
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn((_url, init) => {
-				bodies.push(JSON.parse(init.body));
-				return responses[bodies.length - 1].promise;
-			})
-		});
+		vi.stubGlobal('fetch', vi.fn((_url, init) => {
+			bodies.push(JSON.parse(init.body));
+			return responses[bodies.length - 1].promise;
+		}));
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -172,13 +126,10 @@ describe('sync race conditions', () => {
 		const deleteResponse = createDeferred();
 		/** @type {{ method: string; body: string | undefined }[]} */
 		const requests = [];
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn((_url, init) => {
-				requests.push({ method: init.method, body: init.body });
-				return requests.length === 1 ? patchResponse.promise : deleteResponse.promise;
-			})
-		});
+		vi.stubGlobal('fetch', vi.fn((_url, init) => {
+			requests.push({ method: init.method, body: init.body });
+			return requests.length === 1 ? patchResponse.promise : deleteResponse.promise;
+		}));
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -213,13 +164,10 @@ describe('sync race conditions', () => {
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
 		const extraResponse = createDeferred();
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn((_url, init) => {
-				bodies.push(JSON.parse(init.body));
-				return [firstResponse.promise, secondResponse][bodies.length - 1] ?? extraResponse.promise;
-			})
-		});
+		vi.stubGlobal('fetch', vi.fn((_url, init) => {
+			bodies.push(JSON.parse(init.body));
+			return [firstResponse.promise, secondResponse][bodies.length - 1] ?? extraResponse.promise;
+		}));
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -238,7 +186,7 @@ describe('sync race conditions', () => {
 		const { bodies, extraResponse } = await queueEditBehindStaleStoreVersion(secondResponse.promise);
 
 		// A retryable failure reports no version, so the store stays at 3.
-		secondResponse.resolve(jsonResponse({ message: 'Busy.' }, 503));
+		secondResponse.resolve(jsonResponse({ message: 'Busy.' }, { status: 503 }));
 		await settleMicrotasks();
 
 		expect(bodies).toHaveLength(3);
@@ -309,7 +257,7 @@ describe('sync race conditions', () => {
 
 		deferred.resolve(jsonResponse({
 			task: { id: SERVER_TASK_ID, text: 'Created offline' }
-		}, 201));
+		}, { status: 201 }));
 		await expect(firstFlush).resolves.toMatchObject({ flushed: 1, remaining: 0, blocked: false });
 		expect(fetcher).toHaveBeenCalledTimes(1);
 		expect(loadOfflineQueue()).toEqual([]);
@@ -333,7 +281,7 @@ describe('sync race conditions', () => {
 					text: 'Added mid-flush'
 				});
 			}
-			return jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Created offline' } }, 201);
+			return jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Created offline' } }, { status: 201 });
 		});
 
 		const result = await flushOfflineWriteQueue(fetcher);
@@ -365,7 +313,7 @@ describe('sync race conditions', () => {
 		const fetcher = vi.fn(async (_url, init) => {
 			bodies.push(JSON.parse(init.body));
 			return bodies.length === 1
-				? jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Task', version: 7 } }, 201)
+				? jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Task', version: 7 } }, { status: 201 })
 				: jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Patched later', version: 8 } });
 		});
 
@@ -408,13 +356,10 @@ describe('sync race conditions', () => {
 		const responses = [first, second];
 		/** @type {Record<string, unknown>[]} */
 		const bodies = [];
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn((_url, init) => {
-				bodies.push(JSON.parse(init.body));
-				return responses[bodies.length - 1].promise;
-			})
-		});
+		vi.stubGlobal('fetch', vi.fn((_url, init) => {
+			bodies.push(JSON.parse(init.body));
+			return responses[bodies.length - 1].promise;
+		}));
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -441,13 +386,10 @@ describe('sync race conditions', () => {
 		const patchResponse = createDeferred();
 		/** @type {{ url: string; body: string }[]} */
 		const requests = [];
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn((url, init) => {
-				requests.push({ url, body: init.body });
-				return requests.length === 1 ? createResponse.promise : patchResponse.promise;
-			})
-		});
+		vi.stubGlobal('fetch', vi.fn((url, init) => {
+			requests.push({ url, body: init.body });
+			return requests.length === 1 ? createResponse.promise : patchResponse.promise;
+		}));
 
 		addSubtask(SERVER_TASK_ID, 'First');
 		const localItemId = get(tasks)[0]?.subtasks[0]?.id;
@@ -463,7 +405,7 @@ describe('sync race conditions', () => {
 				version: 2,
 				subtasks: [{ id: serverItemId, text: 'First', done: false }]
 			}
-		}, 201));
+		}, { status: 201 }));
 		await settleMicrotasks();
 
 		expect(requests[1]).toMatchObject({
@@ -485,12 +427,9 @@ describe('sync race conditions', () => {
 
 	it('coalesces a chained rename into the queued create when the create request fails', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn(async () => {
-				throw new Error('offline');
-			})
-		});
+		vi.stubGlobal('fetch', vi.fn(async () => {
+			throw new Error('offline');
+		}));
 
 		addSubtask(SERVER_TASK_ID, 'First');
 		const localItemId = get(tasks)[0]?.subtasks[0]?.id;
@@ -514,10 +453,7 @@ describe('sync race conditions', () => {
 			localOnlyTask
 		]);
 		const deferred = createDeferred();
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn(() => deferred.promise)
-		});
+		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
 
 		updateTask(SERVER_TASK_ID, { text: 'Mine edited' });
 		await settleMicrotasks();
@@ -552,7 +488,7 @@ describe('sync race conditions', () => {
 			text: 'Dependent item'
 		});
 
-		const fetcher = vi.fn(async () => jsonResponse({ message: 'Conflict.' }, 409));
+		const fetcher = vi.fn(async () => jsonResponse({ message: 'Conflict.' }, { status: 409 }));
 
 		const result = await flushOfflineWriteQueue(fetcher);
 
@@ -565,10 +501,7 @@ describe('sync race conditions', () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'One', version: 3 })]);
 		const deferred = createDeferred();
 		const fetchMock = vi.fn(() => deferred.promise);
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: fetchMock
-		});
+		vi.stubGlobal('fetch', fetchMock);
 
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
 		await settleMicrotasks();
@@ -593,10 +526,7 @@ describe('sync race conditions', () => {
 	it('drains an edit to a checklist item whose create is in flight as a re-create with final state', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
 		const deferred = createDeferred();
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn(() => deferred.promise)
-		});
+		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
 
 		addSubtask(SERVER_TASK_ID, 'First');
 		await settleMicrotasks();
@@ -623,17 +553,14 @@ describe('sync race conditions', () => {
 				version: 2,
 				subtasks: [{ id: '22222222-2222-4222-8222-222222222222', text: 'First', done: false }]
 			}
-		}, 201));
+		}, { status: 201 }));
 		await waitForPendingTaskSyncs();
 	});
 
 	it('coalesces a drained rename into a drained create instead of duplicating the item', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'One', version: 1 })]);
 		const deferred = createDeferred();
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn(() => deferred.promise)
-		});
+		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
 
 		// Occupy the chain so the checklist ops stay queued-but-unstarted.
 		updateTask(SERVER_TASK_ID, { text: 'Two' });
@@ -658,10 +585,7 @@ describe('sync race conditions', () => {
 	it('drains a delete of a never-created checklist item as a no-op', async () => {
 		replaceTasks([normalizeTask({ id: SERVER_TASK_ID, text: 'Task', version: 1 })]);
 		const deferred = createDeferred();
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn(() => deferred.promise)
-		});
+		vi.stubGlobal('fetch', vi.fn(() => deferred.promise));
 
 		addSubtask(SERVER_TASK_ID, 'Ephemeral');
 		await settleMicrotasks();
@@ -674,36 +598,32 @@ describe('sync race conditions', () => {
 
 		deferred.resolve(jsonResponse({
 			task: { id: SERVER_TASK_ID, text: 'Task', version: 2, subtasks: [] }
-		}, 201));
+		}, { status: 201 }));
 		await waitForPendingTaskSyncs();
 	});
 
 	it('reports blocked without executing when the flush lock is held (fallback path)', async () => {
 		vi.stubGlobal('navigator', undefined);
-		try {
-			enqueueOfflineMutation({
-				type: 'task.create',
-				localTaskId: 'local-1',
-				payload: { text: 'Created offline', parentId: null }
-			});
-			const deferred = createDeferred();
-			const fetcher = vi.fn(() => deferred.promise);
+		enqueueOfflineMutation({
+			type: 'task.create',
+			localTaskId: 'local-1',
+			payload: { text: 'Created offline', parentId: null }
+		});
+		const deferred = createDeferred();
+		const fetcher = vi.fn(() => deferred.promise);
 
-			const firstFlush = flushOfflineWriteQueue(fetcher);
-			const secondFlush = await flushOfflineWriteQueue(fetcher);
+		const firstFlush = flushOfflineWriteQueue(fetcher);
+		const secondFlush = await flushOfflineWriteQueue(fetcher);
 
-			expect(secondFlush).toMatchObject({ flushed: 0, blocked: true, remaining: 1 });
-			expect(fetcher).toHaveBeenCalledTimes(1);
+		expect(secondFlush).toMatchObject({ flushed: 0, blocked: true, remaining: 1 });
+		expect(fetcher).toHaveBeenCalledTimes(1);
 
-			deferred.resolve(jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Created offline' } }, 201));
-			await expect(firstFlush).resolves.toMatchObject({ flushed: 1, blocked: false });
+		deferred.resolve(jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Created offline' } }, { status: 201 }));
+		await expect(firstFlush).resolves.toMatchObject({ flushed: 1, blocked: false });
 
-			// The in-flight flag must reset so later flushes run again.
-			const thirdFlush = await flushOfflineWriteQueue(fetcher);
-			expect(thirdFlush).toMatchObject({ flushed: 0, remaining: 0, blocked: false });
-		} finally {
-			vi.unstubAllGlobals();
-		}
+		// The in-flight flag must reset so later flushes run again.
+		const thirdFlush = await flushOfflineWriteQueue(fetcher);
+		expect(thirdFlush).toMatchObject({ flushed: 0, remaining: 0, blocked: false });
 	});
 
 	it('passes the lock name and ifAvailable to Web Locks and blocks on a denied lock', async () => {
@@ -712,26 +632,22 @@ describe('sync race conditions', () => {
 			(_name, _opts, callback) => Promise.resolve(callback(null))
 		);
 		vi.stubGlobal('navigator', { locks: { request } });
-		try {
-			enqueueOfflineMutation({
-				type: 'task.patch',
-				taskId: SERVER_TASK_ID,
-				patch: { text: 'Queued' }
-			});
-			const fetcher = vi.fn();
+		enqueueOfflineMutation({
+			type: 'task.patch',
+			taskId: SERVER_TASK_ID,
+			patch: { text: 'Queued' }
+		});
+		const fetcher = vi.fn();
 
-			const result = await flushOfflineWriteQueue(fetcher);
+		const result = await flushOfflineWriteQueue(fetcher);
 
-			expect(request).toHaveBeenCalledWith(
-				'todokanban:offline-write-queue-flush',
-				{ ifAvailable: true },
-				expect.any(Function)
-			);
-			expect(result).toMatchObject({ flushed: 0, blocked: true, remaining: 1 });
-			expect(fetcher).not.toHaveBeenCalled();
-		} finally {
-			vi.unstubAllGlobals();
-		}
+		expect(request).toHaveBeenCalledWith(
+			'todokanban:offline-write-queue-flush',
+			{ ifAvailable: true },
+			expect.any(Function)
+		);
+		expect(result).toMatchObject({ flushed: 0, blocked: true, remaining: 1 });
+		expect(fetcher).not.toHaveBeenCalled();
 	});
 
 	it('converges on another tab\'s task cache write instead of clobbering it', () => {

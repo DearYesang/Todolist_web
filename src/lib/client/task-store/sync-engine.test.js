@@ -8,8 +8,6 @@ import { clearDoneTasks, deleteTaskCascade, updateTask } from './task-mutations.
 describe('task store server sync', () => {
     afterEach(() => {
         replaceTasks([]);
-        Reflect.deleteProperty(globalThis, 'fetch');
-        Reflect.deleteProperty(globalThis, 'window');
     });
 
     it('syncs clear-done deletes for server-backed tasks', async () => {
@@ -29,14 +27,8 @@ describe('task store server sync', () => {
             headers: { 'content-type': 'application/json' }
         }));
 
-        Object.defineProperty(globalThis, 'window', {
-            configurable: true,
-            value: {}
-        });
-        Object.defineProperty(globalThis, 'fetch', {
-            configurable: true,
-            value: fetcher
-        });
+        vi.stubGlobal('window', {});
+        vi.stubGlobal('fetch', fetcher);
 
         replaceTasks([parent, child]);
         clearDoneTasks();
@@ -58,7 +50,6 @@ describe('task versions from other endpoints', () => {
         await waitForPendingTaskSyncs();
         resetTaskSyncStateForTests();
         replaceTasks([]);
-        vi.unstubAllGlobals();
     });
 
     it('moves an idle task forward only from one version behind', () => {

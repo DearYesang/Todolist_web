@@ -1,16 +1,11 @@
 import { getTableName } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb, schema } from '$lib/server/db/index.js';
-import { importTasksForUser, replaceTasksForUser } from './repository.js';
+import { importTasksForUser, replaceTasksForUser } from './import-repository.js';
 
 vi.mock('$lib/server/db/index.js', async () => {
-	const { drizzle } = await import('drizzle-orm/neon-http');
-	const { neon } = await import('@neondatabase/serverless');
-	const schema = await import('./../db/schema.js');
-	// neon-http performs no I/O until a query executes, so statements can be
-	// built and rendered against a fake URL.
-	const db = drizzle(neon('postgresql://user:pass@import-test.invalid/db'), { schema });
-	return { getDb: () => db, schema };
+	const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+	return createFakeDbModule();
 });
 
 const USER_ID = 'user-id';

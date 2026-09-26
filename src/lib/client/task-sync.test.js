@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { normalizeTask } from '../shared/task-domain.js';
 import {
 	addSubtask,
@@ -21,23 +22,8 @@ import {
 import { syncServerTasks } from './task-sync.js';
 
 describe('client task sync', () => {
-	/** @type {Map<string, string>} */
-	let storage;
-
 	beforeEach(() => {
-		storage = new Map();
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			value: {
-				getItem: vi.fn((key) => storage.get(key) ?? null),
-				setItem: vi.fn((key, value) => {
-					storage.set(key, String(value));
-				}),
-				removeItem: vi.fn((key) => {
-					storage.delete(key);
-				})
-			}
-		});
+		installMemoryStorage();
 		replaceTasks([]);
 		setCurrentView('kanban');
 		setOfflineQueueOwner(null);
@@ -47,9 +33,6 @@ describe('client task sync', () => {
 		replaceTasks([]);
 		setCurrentView('kanban');
 		setOfflineQueueOwner(null);
-		Reflect.deleteProperty(globalThis, 'fetch');
-		Reflect.deleteProperty(globalThis, 'localStorage');
-		Reflect.deleteProperty(globalThis, 'window');
 	});
 
 	it('applies the server board default view during task sync', async () => {
@@ -133,10 +116,7 @@ describe('client task sync', () => {
 	});
 
 	it('coalesces local pending task edits into the queued create payload', () => {
-		Object.defineProperty(globalThis, 'window', {
-			configurable: true,
-			value: {}
-		});
+		vi.stubGlobal('window', {});
 		const localTask = normalizeTask({
 			id: 'local-task',
 			text: 'Draft task',
@@ -204,16 +184,10 @@ describe('client task sync', () => {
 	});
 
 	it('coalesces pending checklist create edits and deletes through the task store', async () => {
-		Object.defineProperty(globalThis, 'window', {
-			configurable: true,
-			value: {}
-		});
-		Object.defineProperty(globalThis, 'fetch', {
-			configurable: true,
-			value: vi.fn(async () => {
-				throw new Error('offline');
-			})
-		});
+		vi.stubGlobal('window', {});
+		vi.stubGlobal('fetch', vi.fn(async () => {
+			throw new Error('offline');
+		}));
 		const task = normalizeTask({
 			id: '44444444-4444-4444-8444-444444444444',
 			text: 'Server task'

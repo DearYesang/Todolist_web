@@ -65,7 +65,6 @@ export {
     applyServerTaskResults,
     applyServerTaskSnapshot,
     drainPendingTaskSyncsToOfflineQueue,
-    resetTaskSyncStateForTests,
     waitForPendingTaskSyncs
 } from './task-store/sync-engine.js';
 
@@ -82,9 +81,6 @@ export {
     updateTask
 } from './task-store/task-mutations.js';
 
-export {
-    handleExternalTaskStorageEvent,
-    setupCrossTabTaskSync
-} from './task-store/cross-tab-sync.js';
+export { setupCrossTabTaskSync } from './task-store/cross-tab-sync.js';
 
 /** @typedef {import('./task-store/view-preference.js').AppView} AppView */
