@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { jsonResponse } from '$lib/test-support/http.js';
 import {
     applyServerCategoryCatalog,
     assignTaskCategory,
@@ -13,17 +14,6 @@ import { replaceTasks, tasks } from './task-cache.js';
 import { resetFilters } from './filters.js';
 import { resetTaskSyncStateForTests, waitForPendingTaskSyncs } from './sync-engine.js';
 import { updateTask } from './task-mutations.js';
-
-/**
- * @param {unknown} body
- * @param {number} [status]
- */
-function jsonResponse(body, status = 200) {
-    return new Response(JSON.stringify(body), {
-        status,
-        headers: { 'content-type': 'application/json' }
-    });
-}
 
 describe('category entity client state', () => {
     beforeEach(() => {
@@ -137,7 +127,6 @@ describe('assigning a task category', () => {
         resetTaskSyncStateForTests();
         replaceTasks([]);
         applyServerCategoryCatalog([]);
-        vi.unstubAllGlobals();
     });
 
     it('moves a task that has a category to another catalog category, ignoring case', async () => {
@@ -216,7 +205,7 @@ describe('task versions after a category write', () => {
                 return jsonResponse({ ...categoryResponse, taskVersions: [{ id: TASK_ID, version: serverVersion }] });
             }
             if (body.expectedVersion !== serverVersion) {
-                return jsonResponse({ message: 'Task changed on another device. Sync and try again.' }, 409);
+                return jsonResponse({ message: 'Task changed on another device. Sync and try again.' }, { status: 409 });
             }
             serverVersion += 1;
             const current = get(tasks).find((task) => task.id === TASK_ID);
@@ -231,7 +220,6 @@ describe('task versions after a category write', () => {
         resetTaskSyncStateForTests();
         replaceTasks([]);
         applyServerCategoryCatalog([]);
-        vi.unstubAllGlobals();
     });
 
     it.each([

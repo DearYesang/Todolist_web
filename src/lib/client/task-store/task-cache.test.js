@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { normalizeTask } from '../../shared/task-domain.js';
 import {
     mergeTasks,
@@ -65,19 +66,7 @@ describe('task storage owner scope', () => {
     let storage;
 
     beforeEach(() => {
-        storage = new Map();
-        Object.defineProperty(globalThis, 'localStorage', {
-            configurable: true,
-            value: {
-                getItem: vi.fn((key) => storage.get(key) ?? null),
-                setItem: vi.fn((key, value) => {
-                    storage.set(key, String(value));
-                }),
-                removeItem: vi.fn((key) => {
-                    storage.delete(key);
-                })
-            }
-        });
+        storage = installMemoryStorage();
         setTaskStorageOwner(null);
         replaceTasks([]);
     });
@@ -85,7 +74,6 @@ describe('task storage owner scope', () => {
     afterEach(() => {
         setTaskStorageOwner(null);
         replaceTasks([]);
-        Reflect.deleteProperty(globalThis, 'localStorage');
     });
 
     it('keeps cached task lists scoped by user', () => {

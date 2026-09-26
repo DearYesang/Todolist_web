@@ -1,5 +1,7 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
+import { jsonResponse } from '$lib/test-support/http.js';
 import { exportTaskBackup, importTaskBackup } from './backup-transfer.js';
 import { loadOfflineQueue, setOfflineQueueOwner } from './offline-write-queue.js';
 import { filters, replaceTasks, setPriorityFilter, tasks } from './task-store.js';
@@ -10,18 +12,10 @@ const SERVER_TASK = { id: '33333333-3333-4333-8333-333333333333', text: 'Server 
 const FILE_TEXT = JSON.stringify([{ id: 'file-task', text: 'File task', status: 'doing' }]);
 
 /**
- * @param {number} status
- * @param {unknown} body
- */
-function jsonResponse(status, body) {
-	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-}
-
-/**
  * @param {Partial<import('./task-api.js').TaskImportSummary>} [summary]
  */
 function importedResponse(summary = {}) {
-	return jsonResponse(200, {
+	return jsonResponse({
 		tasks: [SERVER_TASK],
 		summary: {
 			receivedTasks: 1,
@@ -55,25 +49,11 @@ function createDialogs({ replace = false } = {}) {
 }
 
 describe('importing a backup file', () => {
-	/** @type {Map<string, string>} */
-	let storage;
 	/** @type {import('vitest').Mock} */
 	let fetcher;
 
 	beforeEach(() => {
-		storage = new Map();
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			value: {
-				getItem: vi.fn((key) => storage.get(key) ?? null),
-				setItem: vi.fn((key, value) => {
-					storage.set(key, String(value));
-				}),
-				removeItem: vi.fn((key) => {
-					storage.delete(key);
-				})
-			}
-		});
+		installMemoryStorage();
 		fetcher = vi.fn();
 		vi.stubGlobal('fetch', fetcher);
 		replaceTasks([EXISTING]);
@@ -81,10 +61,8 @@ describe('importing a backup file', () => {
 	});
 
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		setOfflineQueueOwner(null);
 		replaceTasks([]);
-		Reflect.deleteProperty(globalThis, 'localStorage');
 	});
 
 	it('replaces the board with the server import when the question is accepted', async () => {
@@ -127,7 +105,7 @@ describe('importing a backup file', () => {
 	});
 
 	it('imports on this device and queues the import when the server is unavailable', async () => {
-		fetcher.mockResolvedValue(jsonResponse(503, { message: 'Database unavailable.' }));
+		fetcher.mockResolvedValue(jsonResponse({ message: 'Database unavailable.' }, { status: 503 }));
 		const dialogs = createDialogs({ replace: true });
 
 		await importTaskBackup(FILE_TEXT, dialogs);
@@ -146,7 +124,7 @@ describe('importing a backup file', () => {
 	});
 
 	it('shows the server message and leaves the board alone when the import is refused', async () => {
-		fetcher.mockResolvedValue(jsonResponse(400, { message: 'Too many tasks.' }));
+		fetcher.mockResolvedValue(jsonResponse({ message: 'Too many tasks.' }, { status: 400 }));
 		const dialogs = createDialogs();
 
 		await importTaskBackup(FILE_TEXT, dialogs);
@@ -174,7 +152,6 @@ describe('importing a backup file', () => {
 describe('exporting a backup file', () => {
 	afterEach(() => {
 		vi.useRealTimers();
-		vi.unstubAllGlobals();
 		replaceTasks([]);
 	});
 
@@ -201,7 +178,7 @@ describe('exporting a backup file', () => {
 	it('saves the server export under the local date', async () => {
 		vi.useFakeTimers({ toFake: ['Date'] });
 		vi.setSystemTime(new Date(2026, 8, 24, 8, 30));
-		vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, [SERVER_TASK])));
+		vi.stubGlobal('fetch', vi.fn(async () => jsonResponse([SERVER_TASK])));
 		const fake = createFakeEnvironment();
 
 		await exportTaskBackup(fake.environment);
@@ -214,7 +191,7 @@ describe('exporting a backup file', () => {
 
 	it('saves the tasks on this device when the server export fails', async () => {
 		replaceTasks([EXISTING]);
-		vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(503, { message: 'Database unavailable.' })));
+		vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ message: 'Database unavailable.' }, { status: 503 })));
 		const fake = createFakeEnvironment();
 
 		await exportTaskBackup(fake.environment);

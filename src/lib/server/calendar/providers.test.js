@@ -1,12 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { normalizeTask } from '../../shared/task-domain.js';
 import { upsertProviderCalendarEvent } from './providers.js';
 
 describe('calendar provider sync helpers', () => {
-    afterEach(() => {
-        Reflect.deleteProperty(globalThis, 'fetch');
-    });
-
     it('keeps provider events as full inclusive all-day task ranges', async () => {
         const task = normalizeTask({
             text: 'Range task',
@@ -24,10 +20,7 @@ describe('calendar provider sync helpers', () => {
                 headers: { 'content-type': 'application/json' }
             });
         });
-        Object.defineProperty(globalThis, 'fetch', {
-            configurable: true,
-            value: fetcher
-        });
+        vi.stubGlobal('fetch', fetcher);
 
         await expect(upsertProviderCalendarEvent('google', 'access-token', null, task)).resolves.toEqual({
             id: 'provider-event-id',
