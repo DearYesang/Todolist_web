@@ -108,13 +108,20 @@ export function applyServerTaskResults(serverTasks) {
 }
 
 /**
- * Advances tasks to the versions another endpoint left them at. A category
- * rename, merge or delete rewrites every task in the category on the server
- * and bumps its version; the caller has made the same change locally, so only
- * the version moves here, and only forward. A copy left on the old version
- * would send a stale expectedVersion with its next edit and get a false 409.
- * A task with a sync in flight or queued also records the version for its
- * chain, as a snapshot does. latestServerVersions is dropped when a chain
+ * Advances tasks to the versions a category rename, merge or delete left them
+ * at. Those writes rewrite every task in the category on the server and bump
+ * its version by one; the caller has made the same change locally, so only
+ * the version moves here. A copy left on the old version would send a stale
+ * expectedVersion with its next edit and get a false 409.
+ *
+ * An idle task moves only from exactly one version behind: that proves its
+ * copy was current before the category write. A copy further behind missed
+ * an edit from another device, and must keep its old version so its next
+ * edit gets the real 409 instead of overwriting that edit (every patch sends
+ * all fields). A task with a sync in flight or queued may already count its
+ * own write in the reported version, so it moves forward by any amount and
+ * also records the version for its chain, as a snapshot does; that chain
+ * reports its own conflicts. latestServerVersions is dropped when a chain
  * drains, so an idle task needs only the store.
  * @param {{ id: string; version: number }[]} taskVersions
  */
@@ -131,9 +138,13 @@ export function applyServerTaskVersions(taskVersions) {
     });
     tasks.update((current) => current.map((task) => {
         const version = versionById.get(task.id);
-        return version !== undefined && (typeof task.version !== 'number' || version > task.version)
-            ? { ...task, version }
-            : task;
+        if (version === undefined) {
+            return task;
+        }
+
+        const advances = typeof task.version !== 'number'
+            || (hasPendingTaskSync(task.id) ? version > task.version : version === task.version + 1);
+        return advances ? { ...task, version } : task;
     }));
 }
 

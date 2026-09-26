@@ -61,23 +61,27 @@ describe('task versions from other endpoints', () => {
         vi.unstubAllGlobals();
     });
 
-    it('moves the versions of known tasks forward only', () => {
+    it('moves an idle task forward only from one version behind', () => {
         replaceTasks([
             normalizeTask({ id: '11111111-1111-4111-8111-111111111111', text: 'Newer here', version: 5 }),
-            normalizeTask({ id: '22222222-2222-4222-8222-222222222222', text: 'Older here', version: 2 }),
+            normalizeTask({ id: '22222222-2222-4222-8222-222222222222', text: 'Current here', version: 2 }),
+            normalizeTask({ id: '55555555-5555-4555-8555-555555555555', text: 'Stale here', version: 2 }),
             normalizeTask({ id: TASK_ID, text: 'No version yet' })
         ]);
 
         applyServerTaskVersions([
             { id: '11111111-1111-4111-8111-111111111111', version: 4 },
             { id: '22222222-2222-4222-8222-222222222222', version: 3 },
+            // Another device edited this task (3) before the category write (4).
+            { id: '55555555-5555-4555-8555-555555555555', version: 4 },
             { id: TASK_ID, version: 1 },
             { id: '44444444-4444-4444-8444-444444444444', version: 9 }
         ]);
 
         expect(get(tasks).map((task) => [task.text, task.version])).toEqual([
             ['Newer here', 5],
-            ['Older here', 3],
+            ['Current here', 3],
+            ['Stale here', 2],
             ['No version yet', 1]
         ]);
     });

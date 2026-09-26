@@ -250,4 +250,23 @@ describe('task versions after a category write', () => {
             .toEqual([expect.objectContaining({ text: 'Read more', category, expectedVersion: 4 })]);
         expect(get(tasks)[0]).toMatchObject({ text: 'Read more', category, version: 5 });
     });
+
+    it('keeps the 409 for a copy that missed an edit from another device', async () => {
+        // Another device edited the task (version 4); nothing refreshed this
+        // copy, which is still on 3. The rename then leaves the server on 5.
+        serverVersion = 4;
+        categoryResponse = { category: { ...SOURCE, name: '국어' }, updatedTasks: 1 };
+        await renameCategory(SOURCE, '국어');
+
+        expect(get(tasks)[0]).toMatchObject({ category: '국어', version: 3 });
+
+        updateTask(TASK_ID, { priority: 'high' });
+        await waitForPendingTaskSyncs();
+
+        // Sent on the old version, the edit gets the real 409 instead of
+        // overwriting the other device's edit with this copy's fields.
+        expect(requests.filter((request) => request.url === `/api/tasks/${TASK_ID}`).map((request) => request.body))
+            .toEqual([expect.objectContaining({ priority: 'high', expectedVersion: 3 })]);
+        expect(serverVersion).toBe(5);
+    });
 });
