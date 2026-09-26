@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { schema } from '$lib/server/db/index.js';
 import { normalizeCategoryKey, normalizeCategoryName } from '$lib/shared/category-suggestions.js';
 import { ApiError } from '$lib/server/http/api-error.js';
+import { LIMITS } from '$lib/shared/task-rules.js';
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
@@ -142,8 +143,8 @@ export function parseCategoryName(value) {
 	}
 
 	const name = normalizeCategoryName(value);
-	if (name.length > 80) {
-		throw new ApiError('Category name must be 80 characters or less.');
+	if (name.length > LIMITS.category) {
+		throw new ApiError(`Category name must be ${LIMITS.category} characters or less.`);
 	}
 	return name;
 }

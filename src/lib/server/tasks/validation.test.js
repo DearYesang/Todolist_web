@@ -125,4 +125,17 @@ describe('server task validation', () => {
         expect(() => parseUpdateChecklistItemInput({})).toThrow('At least one checklist field is required.');
         expect(() => parseUpdateChecklistItemInput({ done: 'yes' })).toThrow('done must be a boolean.');
     });
+
+    it('caps titles, categories and checklist texts at the shared limits', () => {
+        const dates = { startDate: '2026-05-03', endDate: '2026-05-04' };
+
+        expect(parseCreateTaskInput({ text: 't'.repeat(300), category: 'c'.repeat(80), ...dates })).toMatchObject({
+            title: 't'.repeat(300),
+            category: 'c'.repeat(80)
+        });
+        expect(() => parseCreateTaskInput({ text: 't'.repeat(301), ...dates })).toThrow('Task title must be 300 characters or less.');
+        expect(() => parseUpdateTaskInput({ category: 'c'.repeat(81) })).toThrow('category must be 80 characters or less.');
+        expect(parseCreateChecklistItemInput({ text: 'x'.repeat(500) })).toEqual({ text: 'x'.repeat(500) });
+        expect(() => parseUpdateChecklistItemInput({ text: 'x'.repeat(501) })).toThrow('Checklist text must be 500 characters or less.');
+    });
 });

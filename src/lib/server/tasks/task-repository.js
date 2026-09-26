@@ -13,6 +13,7 @@ import { attachCategoryMetaToTaskRow, mapTaskRowToClientTask, mapTaskRowsToClien
 import { createPositionValue, getWritableTaskForUser, loadClientTask } from './task-rows.js';
 import {
 	assertValidTaskDateRange,
+	hasField,
 	parseCreateTaskInput,
 	parseDeleteTaskInput,
 	parseTaskIdParam,
@@ -444,12 +445,4 @@ async function canAssignParentTask(db, boardId, taskId, parentId) {
 	}
 
 	return true;
-}
-
-/**
- * @param {Record<string, unknown>} source
- * @param {string} field
- */
-function hasField(source, field) {
-	return Object.prototype.hasOwnProperty.call(source, field);
 }
