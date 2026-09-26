@@ -1,4 +1,24 @@
+import { getStorage } from './browser-storage.js';
+import { setLinkOpenOwner } from './link-opener.js';
+import { clearOfflineWriteQueue, getOfflineQueueSize, setOfflineQueueOwner } from './offline-write-queue.js';
+import {
+	clearCategoryCatalog,
+	clearLocalTaskCache,
+	clearPendingDefaultView,
+	setTaskStorageOwner
+} from './task-store.js';
+
+/**
+ * What this device keeps for one user: the user last seen signed in, so the
+ * app can open offline, and the per-user state that applyUserScope switches
+ * when the signed-in user changes (the task cache, the offline queue, the
+ * link-open state and the category catalog).
+ */
+
 const AUTH_SCOPE_KEY = 'todokanbanAuthScope';
+
+/** @type {string | null} */
+let scopedUserId = null;
 
 /**
  * @typedef {{
@@ -73,15 +93,41 @@ export function clearCachedAuthScope() {
 }
 
 /**
- * @returns {Storage | null}
+ * Points the per-user stores at `userId`, or at the signed-out (anonymous)
+ * data for null. Called again with the same id, as every session refetch
+ * does, it changes nothing.
+ * @param {string | null} userId
  */
-function getStorage() {
-	try {
-		const storage = globalThis.localStorage;
-		return storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function'
-			? storage
-			: null;
-	} catch {
-		return null;
+export function applyUserScope(userId) {
+	if (userId === scopedUserId) {
+		return;
 	}
+
+	scopedUserId = userId;
+	setTaskStorageOwner(userId);
+	setOfflineQueueOwner(userId);
+	setLinkOpenOwner(userId);
+	// The catalog belongs to the previous user's board until the next
+	// finished sync loads this one (a blocked queue skips it). Kept, it
+	// would list their categories and give the task panel their ids.
+	clearCategoryCatalog();
+}
+
+/**
+ * Deletes the signed-in user's data from this device, for a sign-out that
+ * asks for it: the offline queue, the cached tasks and a default view
+ * still waiting to be sent.
+ */
+export function clearUserLocalData() {
+	clearOfflineWriteQueue();
+	clearLocalTaskCache();
+	clearPendingDefaultView();
+}
+
+/**
+ * The number of the signed-in user's offline changes not yet sent to the
+ * server.
+ */
+export function countPendingLocalChanges() {
+	return getOfflineQueueSize();
 }

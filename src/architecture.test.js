@@ -28,6 +28,7 @@ const TEST_SUPPORT = 'lib/test-support/';
 const TASK_STORE_DIR = 'lib/client/task-store/';
 const TASK_STORE_FACADE = 'lib/client/task-store.js';
 const OFFLINE_QUEUE = 'lib/client/offline-write-queue.js';
+const USER_SCOPE = 'lib/client/user-scope.js';
 
 /** @param {string} file */
 const isTest = (file) => file.endsWith('.test.js');
@@ -247,16 +248,15 @@ describe('source architecture', () => {
 		expect(writes).toEqual([]);
 	});
 
-	it('adds to and flushes the offline queue only from lib/client/task-store/', () => {
-		// Outside the folder, production code only scopes the queue to the
-		// signed-in user, counts its entries and clears it on sign-out.
+	it('imports the offline queue only in lib/client/task-store/ and user-scope.js', () => {
+		// The folder adds to the queue and flushes it. user-scope.js only
+		// scopes it to the signed-in user, counts its entries and clears it
+		// on sign-out.
 		const scopeNames = ['clearOfflineWriteQueue', 'getOfflineQueueSize', 'setOfflineQueueOwner'];
-		expect(files
-			.filter((file) => isProduction(file) && !isInTaskStore(file) && imports.get(file)?.includes(OFFLINE_QUEUE))
-			.filter((file) => {
-				const names = [...readNamedImports(file, OFFLINE_QUEUE).keys()];
-				return names.length === 0 || names.some((name) => !scopeNames.includes(name));
-			})).toEqual([]);
+		expect(files.filter((file) =>
+			isProduction(file) && !isInTaskStore(file) && imports.get(file)?.includes(OFFLINE_QUEUE)
+		)).toEqual([USER_SCOPE]);
+		expect([...readNamedImports(USER_SCOPE, OFFLINE_QUEUE).keys()].sort()).toEqual(scopeNames);
 	});
 
 	it('reaches the server task repository modules only through repository.js', () => {

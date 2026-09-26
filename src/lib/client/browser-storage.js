@@ -1,10 +1,6 @@
 /**
- * Signing out clears a pending default view together with the cached tasks,
- * so this key is shared by view-preference.js and task-cache.js.
- */
-export const PENDING_VIEW_STORAGE_KEY = 'todokanbanPendingDefaultView';
-
-/**
+ * The page's localStorage, or null when there is none or it cannot be used
+ * (reading it can throw when site data is blocked).
  * @returns {Storage | null}
  */
 export function getStorage() {

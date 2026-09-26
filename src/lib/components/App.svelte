@@ -3,6 +3,7 @@
     import { get } from 'svelte/store';
     import { authClient } from '$lib/client/auth-client.js';
     import {
+        applyUserScope,
         cacheAuthScope,
         clearCachedAuthScope,
         readCachedAuthScope
@@ -13,12 +14,9 @@
         resolveLocalConflict
     } from '$lib/client/offline-conflicts.js';
     import { createDatedFilename, downloadJson } from '$lib/client/download.js';
-    import { setLinkOpenOwner } from '$lib/client/link-opener.js';
-    import { setOfflineQueueOwner } from '$lib/client/offline-write-queue.js';
     import { setupPageLifecycle } from '$lib/client/page-lifecycle.js';
     import { updateBoardPreferences } from '$lib/client/task-api.js';
     import {
-        clearCategoryCatalog,
         clearDoneTasks,
         clearPendingDefaultView,
         currentView,
@@ -27,7 +25,6 @@
         readPendingDefaultView,
         drainPendingTaskSyncsToOfflineQueue,
         setCurrentView,
-        setTaskStorageOwner,
         setupCrossTabTaskSync,
         syncServerTasks,
         tasks,
@@ -50,8 +47,6 @@
     let cachedAuthScope = $state(readCachedAuthScope());
     let isOnline = $state(true);
     /** @type {string | null} */
-    let scopedUserId = null;
-    /** @type {string | null} */
     let syncedSessionUserId = null;
     /** @type {string | null} */
     let syncNotice = $state(null);
@@ -65,7 +60,7 @@
         if (sessionUser?.id) {
             const nextScope = cacheAuthScope(sessionUser);
             cachedAuthScope = nextScope;
-            applyStorageScope(nextScope?.id ?? null);
+            applyUserScope(nextScope?.id ?? null);
             if (nextScope?.id && syncedSessionUserId !== nextScope.id) {
                 syncedSessionUserId = nextScope.id;
                 void runServerSync();
@@ -78,14 +73,14 @@
         }
 
         if (!isOnline && cachedAuthScope?.id) {
-            applyStorageScope(cachedAuthScope.id);
+            applyUserScope(cachedAuthScope.id);
             return;
         }
 
         clearCachedAuthScope();
         cachedAuthScope = null;
         syncedSessionUserId = null;
-        applyStorageScope(null);
+        applyUserScope(null);
     });
 
     onMount(() => {
@@ -94,7 +89,7 @@
         // the session resolves must not be stamped with the anonymous owner,
         // or they become invisible once the user scope applies.
         if (cachedAuthScope?.id) {
-            applyStorageScope(cachedAuthScope.id);
+            applyUserScope(cachedAuthScope.id);
         }
 
         const teardownCrossTabSync = setupCrossTabTaskSync(window);
@@ -119,24 +114,6 @@
             window.removeEventListener('offline', handleOffline);
         };
     });
-
-    /**
-     * @param {string | null} userId
-     */
-    function applyStorageScope(userId) {
-        if (userId === scopedUserId) {
-            return;
-        }
-
-        scopedUserId = userId;
-        setTaskStorageOwner(userId);
-        setOfflineQueueOwner(userId);
-        setLinkOpenOwner(userId);
-        // The catalog belongs to the previous user's board until the next
-        // finished sync loads this one (a blocked queue skips it). Kept, it
-        // would list their categories and give the task panel their ids.
-        clearCategoryCatalog();
-    }
 
     /**
      * @param {string} id
