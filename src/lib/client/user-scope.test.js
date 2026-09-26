@@ -492,6 +492,38 @@ describe('signing out while a task write is still in flight', () => {
 		expect(get(tasks)).toEqual([]);
 	});
 
+	// Verifier finding, older than this PR. The answer stays off the next
+	// board, and the user's cached board keeps the version the write started
+	// from. The user's next sign-in here opens the board from that cache; an
+	// edit made before the first sync expects that version and meets a 409.
+	it.fails('moves the task in the user\'s cached board to the version a write that lands after the sign-out reached', async () => {
+		await editInFlight();
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+
+		expect(JSON.parse(storage.get('kanbanTasks:user-a') ?? '[]')).toEqual([
+			expect.objectContaining({ id: TASK_ID, text: 'Edit 1', version: 2 })
+		]);
+		applyUserScope('user-a');
+		expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['Edit 1', 2]]);
+	});
+
+	// The same for an item whose create lands after the sign-out: the cache
+	// keeps its local id. With no create of that id left in the queue, an
+	// edit or delete of it before the user's first sync is dropped.
+	it.fails('gives the item in the user\'s cached board the id its create got after the sign-out', async () => {
+		addSubtask(TASK_ID, 'New');
+		await vi.advanceTimersByTimeAsync(0);
+		await signOut({ clearLocalData: false });
+
+		await answerFirstRequest(itemCreated());
+
+		expect(JSON.parse(storage.get('kanbanTasks:user-a') ?? '[]')).toEqual([
+			expect.objectContaining({ id: TASK_ID, version: 2, subtasks: [ITEM, { id: NEW_ITEM_ID, text: 'New', done: false }] })
+		]);
+	});
+
 	it('keeps a write that lands after the sign-out off the next board, even one holding the same task', async () => {
 		// Server ids are per user, so another board holds the task only in a
 		// case like this one: a device that ran the app before caches were
