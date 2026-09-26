@@ -12,7 +12,8 @@ import {
 	setCategoryFilter,
 	setPriorityFilter,
 	syncServerTasks,
-	tasks
+	tasks,
+	updateTask
 } from './task-store.js';
 import {
 	applyUserScope,
@@ -214,6 +215,81 @@ describe('user scope', () => {
 			'kanbanTasks:user-a': '[]',
 			'kanbanTasks:user-b': expect.stringContaining('User B task'),
 			'kanbanOfflineWriteQueue:user-b': expect.stringContaining('mutation-user-b-0')
+		});
+	});
+});
+
+describe('signing out during a task edit', () => {
+	const TASK_ID = '11111111-1111-4111-8111-111111111111';
+	/** @type {Map<string, string>} */
+	let storage;
+	let signedIn = true;
+	/** @type {string[]} */
+	let sent = [];
+
+	/** @param {number} ms */
+	const network = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		storage = installMemoryStorage();
+		// The sync engine sends task writes only in a browser.
+		vi.stubGlobal('window', {});
+		signedIn = true;
+		sent = [];
+		// Each request takes 10 ms; the server checks the session when it
+		// arrives.
+		vi.stubGlobal('fetch', vi.fn(async (/** @type {unknown} */ _url, /** @type {RequestInit} */ init) => {
+			const body = JSON.parse(String(init.body));
+			const accepted = signedIn;
+			sent.push(`${body.text} (${accepted ? 'signed in' : 'signed out'})`);
+			await network(10);
+			return accepted
+				? jsonResponse({ task: { id: TASK_ID, text: body.text, version: body.expectedVersion + 1 } })
+				: jsonResponse({ message: 'Unauthorized' }, { status: 401 });
+		}));
+		storage.set('kanbanTasks:user-a', JSON.stringify([{ id: TASK_ID, text: 'Saved', version: 1 }]));
+		applyUserScope('user-a');
+	});
+
+	afterEach(() => {
+		applyUserScope(null);
+		vi.useRealTimers();
+	});
+
+	/**
+	 * Sign-out as AuthAccountControls.svelte runs it with "clear local data"
+	 * off, then the session refetch that signs the app out.
+	 */
+	async function signOut() {
+		// authClient.signOut(): the server ends the session and answers.
+		signedIn = false;
+		await network(10);
+		// $session.refetch() finds no session, and App.svelte hands the board
+		// to no user.
+		await network(5);
+		applyUserScope(null);
+	}
+
+	// Probe P1.
+	it.fails('sends an edit made just before sign-out while the user is still signed in', async () => {
+		updateTask(TASK_ID, { text: 'Edit 1' });
+		await vi.advanceTimersByTimeAsync(0);
+		// Waits in the task's chain behind the first PATCH.
+		updateTask(TASK_ID, { text: 'Edit 2' });
+
+		const signingOut = signOut();
+		await vi.advanceTimersByTimeAsync(100);
+		await signingOut;
+
+		expect({
+			sent,
+			anonymousQueue: JSON.parse(storage.get('kanbanOfflineWriteQueue:anonymous') ?? '[]'),
+			userATasks: JSON.parse(storage.get('kanbanTasks:user-a') ?? '[]')
+		}).toMatchObject({
+			sent: ['Edit 1 (signed in)', 'Edit 2 (signed in)'],
+			anonymousQueue: [],
+			userATasks: [{ text: 'Edit 2', version: 3 }]
 		});
 	});
 });
