@@ -1,4 +1,4 @@
-import { derived, writable } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 import {
     deleteServerCategory,
     mergeServerCategory,
@@ -253,6 +253,47 @@ export async function reorderCategories(categoryIds) {
 }
 
 /**
+ * Puts one task in the category called `name`. category, categoryId and
+ * categoryMeta change together: normalizeTask takes the name from
+ * categoryMeta, so changing `category` alone on a task that has one is undone.
+ * A name the catalog holds (ignoring case) takes that category. Any other name
+ * goes to the server without an id, and the server finds or creates the
+ * category by name. An empty name clears the category.
+ * @param {string} taskId
+ * @param {string} name
+ */
+export function assignTaskCategory(taskId, name) {
+    const categoryName = normalizeCategoryName(name);
+    const key = toCategoryKey(categoryName);
+    const target = categoryName
+        ? get(categoryCatalog).find((category) => !category.archivedAt && toCategoryKey(category.name) === key) ?? null
+        : null;
+
+    /** @type {import('../../shared/task-domain.js').Task | null} */
+    let changedTask = null;
+    tasks.update((current) => {
+        const task = current.find((candidate) => candidate.id === taskId);
+        // The same name is a no-op, and keeps the task's own id when the
+        // catalog has not loaded (offline) or does not list it.
+        if (!task || (toCategoryKey(task.category) === key && (!target || task.categoryId === target.id))) {
+            return current;
+        }
+
+        const next = normalizeTaskList(current.map((candidate) => candidate.id === taskId
+            ? {
+                ...candidate,
+                category: target?.name ?? categoryName,
+                categoryId: target?.id ?? null,
+                categoryMeta: target ? toCategoryMeta(target) : null
+            }
+            : candidate));
+        changedTask = next.find((candidate) => candidate.id === taskId) ?? null;
+        return next;
+    });
+    syncTaskSnapshot(changedTask);
+}
+
+/**
  * @param {{ id?: string | null; name: string }} source
  * @param {{ id?: string | null; name: string; color: string | null; sortOrder: number; hiddenAt: string | null; archivedAt: string | null } | null} target
  * @param {{ sync: boolean }} options
@@ -284,16 +325,7 @@ function rewriteLocalCategory(source, target, options) {
                 ...task,
                 category: targetName,
                 categoryId: target?.id || null,
-                categoryMeta: target?.id
-                    ? {
-                        id: target.id,
-                        name: target.name,
-                        color: target.color,
-                        sortOrder: target.sortOrder,
-                        hiddenAt: target.hiddenAt,
-                        archivedAt: target.archivedAt
-                    }
-                    : null
+                categoryMeta: target ? toCategoryMeta(target) : null
             };
             changedTasks.push(nextTask);
             return nextTask;
@@ -312,6 +344,32 @@ function rewriteLocalCategory(source, target, options) {
         changedTasks.forEach((task) => syncTaskSnapshot(task));
     }
     return changedTasks.length;
+}
+
+/**
+ * The categoryMeta a task carries for a category; null when it has no server id.
+ * @param {{ id?: string | null; name: string; color: string | null; sortOrder: number; hiddenAt: string | null; archivedAt: string | null }} category
+ * @returns {import('../../shared/task-domain.js').TaskCategoryMeta | null}
+ */
+function toCategoryMeta(category) {
+    return category.id
+        ? {
+            id: category.id,
+            name: category.name,
+            color: category.color,
+            sortOrder: category.sortOrder,
+            hiddenAt: category.hiddenAt,
+            archivedAt: category.archivedAt
+        }
+        : null;
+}
+
+/**
+ * The key the server keeps category names unique by, per board.
+ * @param {string} name
+ */
+function toCategoryKey(name) {
+    return normalizeCategoryName(name).toLocaleLowerCase('ko');
 }
 
 /**
@@ -355,14 +413,7 @@ function updateLocalCategoryMeta(category) {
             ? {
                 ...task,
                 category: category.name,
-                categoryMeta: {
-                    id: category.id,
-                    name: category.name,
-                    color: category.color,
-                    sortOrder: category.sortOrder,
-                    hiddenAt: category.hiddenAt,
-                    archivedAt: category.archivedAt
-                }
+                categoryMeta: toCategoryMeta(category)
             }
             : task
     )));

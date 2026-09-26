@@ -1,5 +1,5 @@
 <script>
-    import { categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
+    import { assignTaskCategory, categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
@@ -15,7 +15,6 @@
     import OpenLinksButton from './OpenLinksButton.svelte';
 
     let { taskId, onclose } = $props();
-    let categoryDraft = $state('');
 
     const task = $derived($tasks.find((candidate) => candidate.id === taskId) || null);
     const parentTask = $derived(task?.parentId ? $tasks.find((candidate) => candidate.id === task.parentId) || null : null);
@@ -26,14 +25,10 @@
     // subtreeLinks always includes ownLinks; OpenLinksButton needs 2 or more.
     const hasLinkActions = $derived(subtreeLinks.length >= 2);
 
-    $effect(() => {
-        if (task && categoryDraft !== task.category) {
-            categoryDraft = task.category;
-        }
-    });
-
     /**
-     * @param {'text' | 'startDate' | 'endDate' | 'priority' | 'urgency' | 'category' | 'status'} field
+     * The category is not one of these fields: it goes through
+     * assignTaskCategory, which also moves categoryId and categoryMeta.
+     * @param {'text' | 'startDate' | 'endDate' | 'priority' | 'urgency' | 'status'} field
      * @param {string} value
      */
     function updateField(field, value) {
@@ -60,11 +55,10 @@
     }
 
     /**
-     * @param {string} nextCategory
+     * @param {string} name
      */
-    function updateCategory(nextCategory) {
-        categoryDraft = nextCategory;
-        updateField('category', nextCategory);
+    function commitCategory(name) {
+        assignTaskCategory(taskId, name);
     }
 
     /**
@@ -203,14 +197,18 @@
                 <div class="form-grid">
                     <div class="form-section">
                         <label for="modal-category">카테고리</label>
-                        <CategoryInput
-                            id="modal-category"
-                            bind:value={categoryDraft}
-                            categories={$categories}
-                            parentCategory={parentTask?.category ?? ''}
-                            taskText={task.text}
-                            placeholder="예: 개발, 기획"
-                            onchange={updateCategory} />
+                        <!-- One-way value: the field keeps what is typed and saves it on
+                             commit. The key resets it when the panel shows another task. -->
+                        {#key taskId}
+                            <CategoryInput
+                                id="modal-category"
+                                value={task.category}
+                                categories={$categories}
+                                parentCategory={parentTask?.category ?? ''}
+                                taskText={task.text}
+                                placeholder="예: 개발, 기획"
+                                oncommit={commitCategory} />
+                        {/key}
                     </div>
 
                     <div class="form-section">

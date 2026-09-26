@@ -9,7 +9,11 @@
         taskText = '',
         parentCategory = '',
         placeholder = '예: 개발, 디자인, 마케팅',
-        onchange = () => {}
+        // Called on every keystroke with the text so far.
+        onchange = () => {},
+        // Called once the name is final: on leaving the field or pressing
+        // Enter (the native change event) and on picking a suggestion.
+        oncommit = () => {}
     } = $props();
 
     const listId = $derived(`${id}-list`);
@@ -26,10 +30,24 @@
         onchange(value);
     }
 
+    function handleCommit() {
+        oncommit(value);
+    }
+
+    /**
+     * Keeps the focus in the field while a suggestion is pressed, so leaving
+     * the field does not commit a half-typed name before the suggestion.
+     * @param {MouseEvent} event
+     */
+    function keepFieldFocus(event) {
+        event.preventDefault();
+    }
+
     /** @param {string} nextCategory */
     function applyCategory(nextCategory) {
         value = nextCategory;
         onchange(value);
+        oncommit(value);
     }
 </script>
 
@@ -42,7 +60,8 @@
         {placeholder}
         list={listId}
         autocomplete="off"
-        oninput={handleInput} />
+        oninput={handleInput}
+        onchange={handleCommit} />
     <datalist id={listId}>
         {#each categories as categoryOption}
             <option value={categoryOption}></option>
@@ -57,6 +76,7 @@
                     class="category-suggestion-chip"
                     type="button"
                     title={suggestion.reason}
+                    onmousedown={keepFieldFocus}
                     onclick={() => applyCategory(suggestion.name)}
                     style={`--category-fg:${color.fg}; --category-bg:${color.bg}; --category-border:${color.border};`}>
                     <span class="category-suggestion-dot" aria-hidden="true"></span>

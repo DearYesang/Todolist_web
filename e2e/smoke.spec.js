@@ -535,6 +535,50 @@ test('shows the card labels for status, priority and urgency in the detail panel
 	await expect(cardByTitle(page, 'E2E cached task').locator('.priority-badge')).toHaveText('🟢 낮음');
 });
 
+test('saves a category typed in the detail panel when the field is left or Enter is pressed', async ({ page }) => {
+	const categoryId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+	await seedOfflineBoard(page, {
+		extraTasks: [{
+			id: 'local-categorized-task',
+			text: 'Categorized task',
+			category: '개발',
+			categoryId,
+			categoryMeta: { id: categoryId, name: '개발', color: '#ff0000', sortOrder: 0, hiddenAt: null, archivedAt: null }
+		}]
+	});
+	await page.goto('/');
+
+	const card = cardByTitle(page, 'Categorized task');
+	const modal = page.locator('.side-panel');
+	const input = modal.locator('#modal-category');
+	await expect(card.locator('.category-tag')).toHaveText('개발');
+	await card.locator('.card-text').click();
+	await expect(input).toHaveValue('개발');
+
+	// Typing keeps what is typed, spaces included, and saves nothing yet.
+	await input.fill('');
+	await input.pressSequentially('신규 기획');
+	await expect(input).toHaveValue('신규 기획');
+	await expect(modal.locator('.category-chip')).toHaveText('개발');
+
+	await input.blur();
+	await expect(modal.locator('.category-chip')).toHaveText('신규 기획');
+	await modal.locator('.close-btn').click();
+	await expect(card.locator('.category-tag')).toHaveText('신규 기획');
+	expect(await readPersistedTask(page, 'local-categorized-task')).toMatchObject({
+		category: '신규 기획',
+		categoryId: null,
+		categoryMeta: null
+	});
+
+	await card.locator('.card-text').click();
+	await expect(input).toHaveValue('신규 기획');
+	await input.fill('리서치');
+	await input.press('Enter');
+	await expect(modal.locator('.category-chip')).toHaveText('리서치');
+	await expect(input).toHaveValue('리서치');
+});
+
 /**
  * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').Locator} card

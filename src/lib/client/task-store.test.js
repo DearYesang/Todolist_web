@@ -28,6 +28,7 @@ const FUNCTIONS = [
 	'applyServerTaskResults',
 	'applyServerTaskSnapshot',
 	'assignParent',
+	'assignTaskCategory',
 	'clearCategory',
 	'clearDoneTasks',
 	'clearLocalTaskCache',
