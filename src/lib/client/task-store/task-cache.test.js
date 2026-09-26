@@ -7,6 +7,7 @@ import {
     mergeTasks,
     replaceTasks,
     setTaskStorageOwner,
+    taskIndex,
     tasks
 } from './task-cache.js';
 import { resetFilters } from './filters.js';
@@ -98,6 +99,32 @@ describe('client task creation', () => {
             { id: 'shared-id', text: 'Server value', status: 'doing' },
             { id: 'server-only', text: 'Server only', status: 'done' }
         ]);
+    });
+});
+
+describe('task index', () => {
+    it('follows every change of the task list', () => {
+        /** @type {string[][]} */
+        const rootChildren = [];
+        const stop = taskIndex.subscribe((index) => {
+            rootChildren.push((index.childrenByParentId.get('root') ?? []).map((task) => task.id));
+        });
+
+        replaceTasks([
+            { id: 'root', text: 'Root' },
+            { id: 'child-b', text: 'B', parentId: 'root', status: 'done' },
+            { id: 'child-a', text: 'A', parentId: 'root' }
+        ]);
+        replaceTasks([
+            { id: 'root', text: 'Root' },
+            { id: 'child-a', text: 'A', parentId: 'root' }
+        ]);
+        stop();
+
+        // Children keep list order, across statuses.
+        expect(rootChildren.slice(-2)).toEqual([['child-b', 'child-a'], ['child-a']]);
+        // The index holds the list's own task objects.
+        expect(get(taskIndex).byId.get('child-a')).toBe(get(tasks)[1]);
     });
 });
 

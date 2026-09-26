@@ -20,6 +20,13 @@
  * }} LinkSourceTask
  *
  * @typedef {{ includeDone?: boolean }} LinkCollectOptions
+ *
+ * The full task list's lookups, as task-domain.js's buildTaskIndex builds
+ * them (the client shares one as task-store.js's taskIndex).
+ * @typedef {{
+ *   byId: ReadonlyMap<string, LinkSourceTask>;
+ *   childrenByParentId: ReadonlyMap<string, readonly LinkSourceTask[]>;
+ * }} LinkSourceIndex
  */
 
 // A match stops at whitespace, straight and typographic quotes, angle
@@ -262,26 +269,14 @@ export function extractTaskLinks(task, { includeDone = true } = {}) {
  * The task's own links first, then every descendant (via parentId over the
  * full task list, so collapsed, filtered and other-column children count)
  * depth-first in list order. Deduplicated by href; parentId cycles stop.
- * @param {LinkSourceTask[]} allTasks
+ * @param {LinkSourceIndex} index the full task list's index, not a filtered one
  * @param {string} taskId
  * @param {LinkCollectOptions} [options]
  * @returns {TaskLink[]}
  */
-export function collectSubtreeLinks(allTasks, taskId, options = {}) {
-	const root = allTasks.find((task) => task.id === taskId);
+export function collectSubtreeLinks(index, taskId, options = {}) {
+	const root = index.byId.get(taskId);
 	if (!root) return [];
-
-	/** @type {Map<string, LinkSourceTask[]>} */
-	const childrenByParent = new Map();
-	for (const task of allTasks) {
-		if (!task.parentId) continue;
-		const siblings = childrenByParent.get(task.parentId);
-		if (siblings) {
-			siblings.push(task);
-		} else {
-			childrenByParent.set(task.parentId, [task]);
-		}
-	}
 
 	/** @type {TaskLink[]} */
 	const links = [];
@@ -301,9 +296,9 @@ export function collectSubtreeLinks(allTasks, taskId, options = {}) {
 			links.push(link);
 		}
 
-		const children = childrenByParent.get(task.id) ?? [];
-		for (let index = children.length - 1; index >= 0; index -= 1) {
-			stack.push(children[index]);
+		const children = index.childrenByParentId.get(task.id) ?? [];
+		for (let position = children.length - 1; position >= 0; position -= 1) {
+			stack.push(children[position]);
 		}
 	}
 

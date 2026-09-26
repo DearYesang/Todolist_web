@@ -582,13 +582,16 @@ export function buildColumnHierarchy(taskList, status, activeFilters) {
  * parent and direct children instead of scanning every task. Unlike
  * buildHierarchy it ignores filters and columns. Children keep list order,
  * and the first task with a given id wins, as with Array#find.
- * @param {Task[]} taskList
- * @returns {TaskIndex}
+ * Given Task[] it returns a TaskIndex; it takes any task-like list so that
+ * collectSubtreeLinks' tests can index the plain tasks they build.
+ * @template {{ id: string; parentId?: string | null }} T
+ * @param {T[]} taskList
+ * @returns {{ byId: Map<string, T>; childrenByParentId: Map<string, T[]> }}
  */
 export function buildTaskIndex(taskList) {
-    /** @type {Map<string, Task>} */
+    /** @type {Map<string, T>} */
     const byId = new Map();
-    /** @type {Map<string, Task[]>} */
+    /** @type {Map<string, T[]>} */
     const childrenByParentId = new Map();
 
     taskList.forEach((task) => {

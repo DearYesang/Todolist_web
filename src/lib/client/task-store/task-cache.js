@@ -1,5 +1,5 @@
-import { get, writable } from 'svelte/store';
-import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
+import { derived, get, writable } from 'svelte/store';
+import { buildTaskIndex, normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
 import { getStorage } from '../browser-storage.js';
 
 const STORAGE_KEY = 'kanbanTasks';
@@ -28,6 +28,14 @@ function loadInitialTasks() {
 
 /** @type {import('svelte/store').Writable<import('../../shared/task-domain.js').Task[]>} */
 export const tasks = writable(loadInitialTasks());
+
+/**
+ * Parent and child lookups over the full task list, rebuilt once per change
+ * of the list however many cards and panels read them, and only while
+ * something reads them.
+ * @type {import('svelte/store').Readable<import('../../shared/task-domain.js').TaskIndex>}
+ */
+export const taskIndex = derived(tasks, (taskList) => buildTaskIndex(taskList));
 
 let isInitialTaskEmission = true;
 let isApplyingExternalTaskUpdate = false;

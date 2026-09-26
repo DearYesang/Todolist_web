@@ -1,7 +1,9 @@
 <script>
-    import { getContext, onDestroy } from 'svelte';
+    import { onDestroy } from 'svelte';
     import TaskTreeCard from './TaskTreeCard.svelte';
-    import OpenLinksButton from './OpenLinksButton.svelte';
+    import TaskBadges from './task/TaskBadges.svelte';
+    import TaskLinkActions from './task/TaskLinkActions.svelte';
+    import { getBoardContext } from './board-context.js';
     import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import {
         addSubtask,
@@ -9,74 +11,57 @@
         deleteTaskCascade,
         moveTask,
         renameSubtask,
+        taskIndex,
         toggleCollapse,
         toggleSubtask
     } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
-    import {
-        getCategoryColor,
-        getDeleteTaskConfirmMessage,
-        getTaskDueStatus,
-        PRIORITY_LABELS,
-        STATUS_LABELS,
-        URGENCY_LABELS
-    } from '$lib/shared/task-domain.js';
-    import { collectSubtreeLinks, extractTaskLinks, splitTextIntoLinkParts } from '$lib/shared/task-links.js';
+    import { getDeleteTaskConfirmMessage, getTaskDueStatus, STATUS_LABELS } from '$lib/shared/task-domain.js';
+    import { splitTextIntoLinkParts } from '$lib/shared/task-links.js';
     import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
 
     /** @type {{
      *   task: import('$lib/shared/task-domain.js').Task;
-     *   allTasks: import('$lib/shared/task-domain.js').Task[];
-     *   taskIndex: import('$lib/shared/task-domain.js').TaskIndex;
      *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
-     *   openTask: (id: string) => void;
      * }} */
     let {
         task,
-        allTasks,
-        taskIndex,
         childrenByParent,
-        depth = 0,
-        openTask
+        depth = 0
     } = $props();
 
-    /** @type {{ controller: ReturnType<typeof import('$lib/client/pointer-dnd.js').createPointerDndController>; state: { draggedId: string | null; hoveredZone: string | null }; cardDrops: boolean } | undefined} */
-    const dnd = getContext('task-dnd');
+    // The same for every card on the board, at every depth.
+    const { dnd, openTask } = getBoardContext();
 
     /**
      * @param {HTMLElement} node
      * @param {string} id
      */
     function cardDraggable(node, id) {
-        return dnd ? dnd.controller.draggable(node, id) : undefined;
+        return dnd.controller.draggable(node, id);
     }
     let newSubtaskText = $state('');
     const subtaskComposition = createImeCompositionGuard();
     onDestroy(() => subtaskComposition.reset());
 
     const children = $derived(childrenByParent[task.id] || []);
-    // taskIndex is built once per board from the full task list, so a card
-    // finds its children and parent without scanning allTasks.
-    const directChildren = $derived(taskIndex.childrenByParentId.get(task.id) ?? []);
+    // taskIndex covers the full task list, so a card finds its children and
+    // parent without scanning every task.
+    const directChildren = $derived($taskIndex.childrenByParentId.get(task.id) ?? []);
     const doneChildrenCount = $derived(directChildren.filter((candidate) => candidate.status === 'done').length);
     const dueStatus = $derived(getTaskDueStatus(task));
     const foreignParent = $derived.by(() => {
         if (!task.parentId) return null;
-        const parent = taskIndex.byId.get(task.parentId) || null;
+        const parent = $taskIndex.byId.get(task.parentId) || null;
         return parent && parent.status !== task.status ? parent : null;
     });
-    const categoryColor = $derived(getCategoryColor(task.category, task.categoryMeta?.color));
     const completedSubtasks = $derived(task.subtasks.filter((subtask) => subtask.done).length);
     const subtaskProgress = $derived(task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100));
     /** @type {Record<string, import('$lib/shared/task-links.js').LinkPart[]>} */
     const subtaskParts = $derived(Object.fromEntries(
         task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)])
     ));
-    const ownLinks = $derived(extractTaskLinks(task));
-    // Walks allTasks, not the column-filtered childrenByParent, so collapsed,
-    // filtered and other-column descendants still count.
-    const subtreeLinks = $derived(directChildren.length > 0 ? collectSubtreeLinks(allTasks, task.id) : ownLinks);
 
     /**
      * @param {MouseEvent} event
@@ -169,27 +154,16 @@
 <div
     class="task-card"
     class:child-card={depth > 0}
-    class:drag-over-card={Boolean(dnd?.cardDrops)
-        && dnd?.state.hoveredZone === `card:${task.id}`
-        && dnd?.state.draggedId !== task.id}
+    class:drag-over-card={dnd.cardDrops
+        && dnd.state.hoveredZone === `card:${task.id}`
+        && dnd.state.draggedId !== task.id}
     data-priority={task.priority}
     role="listitem"
     style={depth > 0 ? `margin-left:${depth * 32}px;` : ''}
     use:cardDraggable={task.id}
-    {...(dnd?.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {})}>
+    {...(dnd.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {})}>
     <div class="card-meta">
-        <span class="priority-badge {task.priority}">{PRIORITY_LABELS[task.priority]}</span>
-        <span class="urgency-badge {task.urgency}">{URGENCY_LABELS[task.urgency]}</span>
-
-        {#if task.category}
-            <span
-                class="category-tag"
-                style={`background:${categoryColor.bg}; color:${categoryColor.fg}; border-color:${categoryColor.border};`}>
-                {task.category}
-            </span>
-        {:else}
-            <button class="category-tag add-category" onclick={handleOpenTask}>+ 카테고리</button>
-        {/if}
+        <TaskBadges task={task} variant="card" onaddcategory={handleOpenTask} />
 
         {#if foreignParent}
             <span class="parent-indicator">
@@ -229,13 +203,7 @@
     {#if directChildren.length > 0}
         <div class="children-info">
             <span>📎 하위 작업 {directChildren.length}개 (완료 {doneChildrenCount}/{directChildren.length})</span>
-            {#if subtreeLinks.length > ownLinks.length}
-                <OpenLinksButton
-                    links={subtreeLinks}
-                    title={`${task.text} (하위 포함)`}
-                    label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
-                    description={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
-            {/if}
+            <TaskLinkActions task={task} show="subtree" />
         </div>
     {/if}
 
@@ -243,11 +211,7 @@
         {#if task.subtasks.length > 0}
             <div class="subtask-header">
                 <span class="subtask-progress-info">체크리스트 {completedSubtasks}/{task.subtasks.length}</span>
-                <OpenLinksButton
-                    links={ownLinks}
-                    title={task.text}
-                    label={`모두 열기 (${ownLinks.length})`}
-                    description={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
+                <TaskLinkActions task={task} show="own" />
             </div>
             <div class="progress-bar-container">
                 <div class="progress-bar-fill" style={`width:${subtaskProgress}%`}></div>
@@ -326,11 +290,8 @@
 {#if children.length > 0 && !task.collapsed}
     {#each children as child (child.id)}
         <TaskTreeCard
-            allTasks={allTasks}
-            taskIndex={taskIndex}
             childrenByParent={childrenByParent}
             depth={depth + 1}
-            openTask={openTask}
             task={child} />
     {/each}
 {/if}
