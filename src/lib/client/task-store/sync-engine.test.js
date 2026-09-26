@@ -236,6 +236,39 @@ describe('settling task writes before sign-out', () => {
             })
         ]);
     });
+
+    // b31d239 left this for the timeout: the later edit was queued with the
+    // version the request in flight started from. When that request lands,
+    // the task moves past that version, and the next sync sends the edit into
+    // a 409, which reports the user's own edit as a conflict. The late answer
+    // also put the first edit's text back on the board over the second's.
+    it.fails('moves the queued later edit to the version the request in flight landed at', async () => {
+        const firstAnswer = createDeferred();
+        vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        updateTask(TASK_ID, { text: 'Edit 2' });
+
+        const settling = settlePendingTaskSyncs({ timeoutMs: 5000 });
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(settling).resolves.toBe(false);
+        firstAnswer.resolve(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect({
+            queue: loadOfflineQueue(),
+            board: get(tasks).map((task) => [task.text, task.version])
+        }).toEqual({
+            queue: [
+                expect.objectContaining({
+                    type: 'task.patch',
+                    taskId: TASK_ID,
+                    patch: expect.objectContaining({ text: 'Edit 2', expectedVersion: 2 })
+                })
+            ],
+            board: [['Edit 2', 2]]
+        });
+    });
 });
 
 describe('task writes when sign-out clears local data', () => {

@@ -491,4 +491,26 @@ describe('signing out while a task write is still in flight', () => {
 		expect(readQueues()).toEqual({ userA: [queuedPatch('Edit 2')], anonymous: [] });
 		expect(sent).toEqual(['Edit 1']);
 	});
+
+	it.fails('queues that edit on top of the write in flight when the write lands after the sign-out', async () => {
+		await editInFlight();
+		await signOut({
+			clearLocalData: false,
+			duringSignOut: () => updateTask(TASK_ID, { text: 'Edit 2' })
+		});
+
+		await answerFirstRequest(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+
+		// Sent at the user's next sync, it must expect the version the first
+		// edit landed at, or it meets a 409 as a conflict with itself.
+		expect(readQueues()).toEqual({
+			userA: [expect.objectContaining({
+				type: 'task.patch',
+				taskId: TASK_ID,
+				ownerUserId: 'user-a',
+				patch: expect.objectContaining({ text: 'Edit 2', expectedVersion: 2 })
+			})],
+			anonymous: []
+		});
+	});
 });
