@@ -428,7 +428,7 @@ describe('signing out while a task write is still in flight', () => {
 		expect(readQueues()).toEqual({ userA: [queuedPatch('Edit 1')], anonymous: [] });
 	});
 
-	it.fails('counts a write still in flight when the wait ends, and keeps it when the question is cancelled', async () => {
+	it('counts a write still in flight when the wait ends, and keeps it when the question is cancelled', async () => {
 		await editInFlight();
 		await expect(signOut({ clearLocalData: true, confirm: false })).resolves.toEqual({ asked: 1, signedOut: false });
 
@@ -439,7 +439,7 @@ describe('signing out while a task write is still in flight', () => {
 		expect(countPendingLocalChanges()).toBe(1);
 	});
 
-	it.fails('drops the late failure of a write that a confirmed clear counted', async () => {
+	it('drops the late failure of a write that a confirmed clear counted', async () => {
 		await editInFlight();
 		await expect(signOut({ clearLocalData: true })).resolves.toEqual({ asked: 1, signedOut: true });
 

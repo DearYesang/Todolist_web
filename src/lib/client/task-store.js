@@ -66,7 +66,12 @@ export {
 
 export { setTaskStoreOwner } from './task-store/owner.js';
 
-export { drainPendingTaskSyncsToOfflineQueue, settlePendingTaskSyncs } from './task-store/sync-engine.js';
+export {
+    countPendingTaskSyncs,
+    discardPendingTaskSyncs,
+    drainPendingTaskSyncsToOfflineQueue,
+    settlePendingTaskSyncs
+} from './task-store/sync-engine.js';
 
 export {
     addSubtask,

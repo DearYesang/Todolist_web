@@ -22,6 +22,9 @@ import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
  *
  * - drained: it moved to the offline queue before it started, and never
  *   runs.
+ * - discarded: a sign-out cleared its user's local data. It never runs,
+ *   or, if its request is out, neither queues itself nor applies its
+ *   answer.
  * - taskStateQueued: while its request was out, a later snapshot patch or
  *   delete of the task moved to the queue. That write was built from the
  *   store after this one started, so it holds every field a snapshot
@@ -31,6 +34,7 @@ import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
  *   queueOwnerId: string;
  *   storeOwnerId: string | null;
  *   drained: boolean;
+ *   discarded: boolean;
  *   taskStateQueued: boolean;
  * }} TaskSyncWrite
  */
@@ -191,6 +195,7 @@ function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null) 
         queueOwnerId: getOfflineQueueOwner(),
         storeOwnerId: getTaskStorageOwner(),
         drained: false,
+        discarded: false,
         taskStateQueued: false
     };
     if (buildDrainMutation) {
@@ -201,7 +206,7 @@ function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null) 
     const next = previous
         .then(async () => {
             pendingChainOpDescriptors.delete(write);
-            if (write.drained) {
+            if (write.drained || write.discarded) {
                 return;
             }
 
@@ -273,6 +278,44 @@ export function drainPendingTaskSyncsToOfflineQueue() {
 }
 
 /**
+ * The number of task writes made for the offline queue's current owner
+ * that wait in a chain or wait for their answer. Sign-out asks before it
+ * clears local data, and counts these with the queued changes: a request
+ * still out when its wait ended may yet fail and need the queue.
+ */
+export function countPendingTaskSyncs() {
+    const owner = getOfflineQueueOwner();
+    return [...pendingChainOpDescriptors.keys(), ...writesInFlight]
+        .filter((write) => write.queueOwnerId === owner)
+        .length;
+}
+
+/**
+ * Drops the task writes made for the offline queue's current owner, for a
+ * sign-out that clears that user's data from this device. Writes still
+ * waiting in a chain are never sent. A request still out keeps going, but
+ * if it fails its edit is not queued again after the clear, and if it
+ * lands its answer is not applied.
+ */
+export function discardPendingTaskSyncs() {
+    const owner = getOfflineQueueOwner();
+    for (const write of [...pendingChainOpDescriptors.keys(), ...writesInFlight]) {
+        if (write.queueOwnerId !== owner) {
+            continue;
+        }
+
+        write.discarded = true;
+        writesInFlight.delete(write);
+        if (pendingChainOpDescriptors.delete(write)) {
+            // A snapshot sync removes its task from this set when it runs or
+            // drains. It does neither now, and left there the task's next
+            // edit would count on it and never be sent.
+            queuedSnapshotSyncs.delete(write.taskId);
+        }
+    }
+}
+
+/**
  * Resolves once every queued per-task server write has settled. Server
  * snapshots applied before this point could revert in-flight optimistic state.
  */
@@ -297,6 +340,10 @@ export async function waitForPendingTaskSyncs() {
  * store still holds that user's board. A failed task edit queues nothing
  * when a later edit of the task moved to the queue at the timeout: that
  * edit holds all of its fields, newer.
+ *
+ * Until it settles, countPendingTaskSyncs counts the request, so the
+ * "clear local data" question that follows includes it, and a confirmed
+ * clear drops it with discardPendingTaskSyncs.
  * @param {{ timeoutMs: number }} options
  * @returns {Promise<boolean>} whether every chain settled in time
  */
@@ -782,7 +829,7 @@ function toServerTaskPatch(task) {
  * @param {import('../../shared/task-domain.js').Task} serverTask
  */
 function applyWriteResult(write, serverTask) {
-    if (getTaskStorageOwner() !== write.storeOwnerId) {
+    if (write.discarded || getTaskStorageOwner() !== write.storeOwnerId) {
         return;
     }
 
@@ -792,11 +839,16 @@ function applyWriteResult(write, serverTask) {
 /**
  * Puts a write that was not sent, or failed in a way worth retrying, in
  * the offline queue of the user it was made for, even when the queue has
- * moved on to another user since.
+ * moved on to another user since, unless that user cleared their local
+ * data meanwhile.
  * @param {TaskSyncWrite} write
  * @param {import('../offline-write-queue.js').OfflineMutationInput} mutation
  */
 function queueWrite(write, mutation) {
+    if (write.discarded) {
+        return;
+    }
+
     enqueueOfflineMutation(mutation, { ownerId: write.queueOwnerId });
 }
 

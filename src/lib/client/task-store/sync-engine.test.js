@@ -6,6 +6,8 @@ import { normalizeTask } from '../../shared/task-domain.js';
 import { loadOfflineQueue, setOfflineQueueOwner } from '../offline-write-queue.js';
 import {
     applyServerTaskVersions,
+    countPendingTaskSyncs,
+    discardPendingTaskSyncs,
     resetTaskSyncStateForTests,
     settlePendingTaskSyncs,
     waitForPendingTaskSyncs
@@ -233,5 +235,88 @@ describe('settling task writes before sign-out', () => {
                 patch: expect.objectContaining({ text: 'Edit 2', expectedVersion: 1 })
             })
         ]);
+    });
+});
+
+describe('task writes when sign-out clears local data', () => {
+    const TASK_ID = '33333333-3333-4333-8333-333333333333';
+    /** @type {ReturnType<typeof createDeferred>} */
+    let firstAnswer;
+    /** @type {string[]} */
+    let sent;
+
+    beforeEach(() => {
+        installMemoryStorage();
+        vi.stubGlobal('window', {});
+        setOfflineQueueOwner('user-a');
+        replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1 })]);
+        firstAnswer = createDeferred();
+        sent = [];
+        // The first request waits for the test; later ones succeed at once.
+        vi.stubGlobal('fetch', vi.fn((/** @type {unknown} */ _url, /** @type {RequestInit} */ init) => {
+            const body = JSON.parse(String(init.body));
+            sent.push(body.text);
+            return sent.length === 1
+                ? firstAnswer.promise
+                : Promise.resolve(jsonResponse({ task: { id: TASK_ID, text: body.text, version: body.expectedVersion + 1 } }));
+        }));
+    });
+
+    afterEach(async () => {
+        firstAnswer.resolve(jsonResponse({ message: 'Unavailable' }, { status: 503 }));
+        await waitForPendingTaskSyncs();
+        resetTaskSyncStateForTests();
+        replaceTasks([]);
+        setOfflineQueueOwner(null);
+    });
+
+    /** A PATCH out and a second edit waiting behind it. */
+    async function editTwice() {
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        updateTask(TASK_ID, { text: 'Edit 2' });
+    }
+
+    it('counts the writes waiting or out for the current queue owner only', async () => {
+        await editTwice();
+        expect(countPendingTaskSyncs()).toBe(2);
+
+        setOfflineQueueOwner('user-b');
+        expect(countPendingTaskSyncs()).toBe(0);
+        setOfflineQueueOwner('user-a');
+
+        firstAnswer.resolve(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+        await waitForPendingTaskSyncs();
+        expect(countPendingTaskSyncs()).toBe(0);
+        expect(sent).toEqual(['Edit 1', 'Edit 2']);
+    });
+
+    it('never sends a waiting write, queues nothing when the request out fails, and syncs the task again later', async () => {
+        await editTwice();
+
+        discardPendingTaskSyncs();
+        expect(countPendingTaskSyncs()).toBe(0);
+        firstAnswer.resolve(jsonResponse({ message: 'Unauthorized' }, { status: 401 }));
+        await waitForPendingTaskSyncs();
+
+        expect(sent).toEqual(['Edit 1']);
+        expect(loadOfflineQueue()).toEqual([]);
+
+        // The dropped snapshot sync no longer stands in for the task's next one.
+        updateTask(TASK_ID, { text: 'Edit 3' });
+        await waitForPendingTaskSyncs();
+        expect(sent).toEqual(['Edit 1', 'Edit 3']);
+    });
+
+    it('leaves the board alone when the request out lands after the clear', async () => {
+        await editTwice();
+
+        discardPendingTaskSyncs();
+        firstAnswer.resolve(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+        await waitForPendingTaskSyncs();
+
+        // The sign-out empties the board next; until then the answer does not
+        // put the task back or move it on.
+        expect(get(tasks).map((task) => [task.text, task.version])).toEqual([['Edit 2', 1]]);
     });
 });

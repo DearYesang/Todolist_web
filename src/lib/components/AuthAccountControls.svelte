@@ -68,12 +68,14 @@
 
         try {
             // Task edits still on their way to the server go out while the
-            // session is valid: sent after it ends, they would fail and be
-            // queued under no user. Waits at most 5 seconds. It runs before
-            // the "clear local data" question, so the count includes the
-            // edits it leaves in the queue: those that failed in a way worth
-            // retrying (offline, 401, 409, 429, 503) and, on a timeout, those
-            // not yet sent.
+            // session is valid: sent after it ends, they would fail and wait
+            // in the queue for this user's next sign-in. Waits at most 5
+            // seconds. It runs before the "clear local data" question, so the
+            // count includes the edits it leaves in the queue: those that
+            // failed in a way worth retrying (offline, 401, 409, 429, 503)
+            // and, on a timeout, those not yet sent. It also counts a request
+            // still waiting for its answer when the wait ends: that edit may
+            // yet fail, and the clear drops it too.
             await settlePendingTaskSyncs({ timeoutMs: 5000 });
             if (clearLocalDataOnSignOut && !confirmLocalDataClear()) {
                 authMessage = '로그아웃을 취소했습니다. 먼저 Sync로 오프라인 변경을 동기화해 주세요.';

@@ -1,7 +1,13 @@
 import { getStorage } from './browser-storage.js';
 import { setLinkOpenOwner } from './link-opener.js';
 import { clearOfflineWriteQueue, getOfflineQueueSize, setOfflineQueueOwner } from './offline-write-queue.js';
-import { clearLocalTaskCache, clearPendingDefaultView, setTaskStoreOwner } from './task-store.js';
+import {
+	clearLocalTaskCache,
+	clearPendingDefaultView,
+	countPendingTaskSyncs,
+	discardPendingTaskSyncs,
+	setTaskStoreOwner
+} from './task-store.js';
 
 /**
  * What this device keeps for one user: the user last seen signed in, so the
@@ -110,18 +116,22 @@ export function applyUserScope(userId) {
 /**
  * Deletes the signed-in user's data from this device, for a sign-out that
  * asks for it: the offline queue, the cached tasks and a default view
- * still waiting to be sent.
+ * still waiting to be sent. Task writes still waiting to be sent, or for
+ * their answer, go too: a request that fails after this does not put its
+ * edit back in the queue.
  */
 export function clearUserLocalData() {
+	discardPendingTaskSyncs();
 	clearOfflineWriteQueue();
 	clearLocalTaskCache();
 	clearPendingDefaultView();
 }
 
 /**
- * The number of the signed-in user's offline changes not yet sent to the
- * server.
+ * The number of the signed-in user's changes the server may not have: the
+ * offline queue, and the task writes still waiting to be sent or for their
+ * answer, which may yet fail and join the queue.
  */
 export function countPendingLocalChanges() {
-	return getOfflineQueueSize();
+	return getOfflineQueueSize() + countPendingTaskSyncs();
 }
