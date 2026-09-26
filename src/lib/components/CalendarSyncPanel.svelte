@@ -184,6 +184,7 @@
 
                 <details class="calendar-oauth-help">
                     <summary>Google 연결 도움말</summary>
+                    <!-- prettier-ignore -->
                     <p>
                         Google OAuth 앱이 Testing 상태이면 현재 로그인한 Google 계정을 Google Cloud의 Test users에 추가해야 합니다.
                         개인 장기 동기화는 앱을 In production으로 전환해야 7일 후 재승인 문제를 줄일 수 있습니다.

@@ -192,6 +192,7 @@
         {task.text}
     </div>
 
+    <!-- prettier-ignore -->
     <button
         class="date-tag"
         class:overdue={dueStatus === 'overdue'}

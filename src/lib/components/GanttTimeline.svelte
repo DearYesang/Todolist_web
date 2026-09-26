@@ -241,6 +241,7 @@
                             {#if item.depth > 0}
                                 <div class="gantt-link-line"></div>
                             {/if}
+                            <!-- prettier-ignore -->
                             <span>
                                 {item.task.status === 'done' ? '☑️' : '🗓️'} {item.task.text}
                             </span>

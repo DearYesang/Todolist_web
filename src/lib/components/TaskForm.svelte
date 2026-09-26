@@ -127,6 +127,7 @@
                     <select id="parent-id" class="form-select" bind:value={parentId}>
                         <option value="">없음 (최상위)</option>
                         {#each $tasks as task (task.id)}
+                            <!-- prettier-ignore -->
                             <option value={task.id}>
                                 {task.status === 'todo' ? '📋' : task.status === 'doing' ? '🔄' : '✅'} {task.text}
                             </option>

@@ -1,0 +1,26 @@
+# Build output and tool caches
+/build/
+/.svelte-kit/
+/.vercel/
+/.netlify/
+node_modules/
+/test-results/
+/playwright-report/
+
+# Package manager lockfile (npm writes it)
+package-lock.json
+
+# Static assets, served as they are
+/static/
+
+# drizzle-kit generated migrations and snapshots
+/drizzle/
+
+# Its plan-vs-state table has paragraph-long cells; Prettier would pad every
+# row to the longest cell (about 1,900 columns) and re-pad the whole table on
+# each edit.
+/docs/IMPLEMENTATION_STATUS.md
+
+# Its empty bullets end in a space so the cursor lands after "- "; Prettier
+# trims that trailing space.
+/.github/pull_request_template.md

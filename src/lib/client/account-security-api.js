@@ -134,14 +134,11 @@ function isRecoveryCodeBody(body) {
  * @returns {value is RecoveryCodeSummary}
  */
 function isRecoveryCodeSummary(value) {
-	return Boolean(
-		value
-		&& typeof value === 'object'
-		&& typeof /** @type {{ total?: unknown }} */ (value).total === 'number'
-		&& typeof /** @type {{ available?: unknown }} */ (value).available === 'number'
-		&& (
-			/** @type {{ lastCreatedAt?: unknown }} */ (value).lastCreatedAt === null
-			|| typeof /** @type {{ lastCreatedAt?: unknown }} */ (value).lastCreatedAt === 'string'
-		)
+	if (!value || typeof value !== 'object') return false;
+	const summary = /** @type {{ total?: unknown; available?: unknown; lastCreatedAt?: unknown }} */ (value);
+	return (
+		typeof summary.total === 'number'
+		&& typeof summary.available === 'number'
+		&& (summary.lastCreatedAt === null || typeof summary.lastCreatedAt === 'string')
 	);
 }

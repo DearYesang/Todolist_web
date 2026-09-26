@@ -120,6 +120,7 @@
         {#if isOpen}
             <div class="calendar-feed-popover">
                 <div class="calendar-feed-actions">
+                    <!-- prettier-ignore -->
                     <p class="calendar-feed-warning">
                         이 링크는 비밀번호 없이 전체 일정을 읽는 비밀 주소입니다. 캘린더 앱에 추가할 때만 복사하고, 의심되면 바로 중지하세요.
                     </p>
