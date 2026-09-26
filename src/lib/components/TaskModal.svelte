@@ -2,17 +2,16 @@
     import { assignTaskCategory, categories, deleteTaskCascade, taskIndex, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
-        getCategoryColor,
         getDeleteTaskConfirmMessage,
         PRIORITY_LABELS,
         STATUS_LABELS,
         URGENCY_LABELS
     } from '$lib/shared/task-domain.js';
-    import { collectSubtreeLinks, extractTaskLinks } from '$lib/shared/task-links.js';
     import { fade, fly } from 'svelte/transition';
     import CategoryInput from './CategoryInput.svelte';
     import DateRangePicker from './DateRangePicker.svelte';
-    import OpenLinksButton from './OpenLinksButton.svelte';
+    import TaskBadges from './task/TaskBadges.svelte';
+    import TaskLinkActions from './task/TaskLinkActions.svelte';
 
     /** @type {{ taskId: string; onclose: () => void }} */
     let { taskId, onclose } = $props();
@@ -20,11 +19,6 @@
     const task = $derived($taskIndex.byId.get(taskId) ?? null);
     const parentTask = $derived(task?.parentId ? $taskIndex.byId.get(task.parentId) ?? null : null);
     const childCount = $derived(task ? $taskIndex.childrenByParentId.get(task.id)?.length ?? 0 : 0);
-    const categoryColor = $derived(task ? getCategoryColor(task.category, task.categoryMeta?.color) : null);
-    const ownLinks = $derived(task ? extractTaskLinks(task) : []);
-    const subtreeLinks = $derived(task && childCount > 0 ? collectSubtreeLinks($taskIndex, task.id) : ownLinks);
-    // subtreeLinks always includes ownLinks; OpenLinksButton needs 2 or more.
-    const hasLinkActions = $derived(subtreeLinks.length >= 2);
 
     /**
      * The category is not one of these fields: it goes through
@@ -116,17 +110,7 @@
             <div class="panel-body">
                 <div class="summary-row">
                     <span class="summary-chip status-chip {task.status}">{STATUS_LABELS[task.status]}</span>
-                    <span class="summary-chip priority-chip {task.priority}">
-                        {PRIORITY_LABELS[task.priority]}
-                    </span>
-                    <span class="summary-chip urgency-chip {task.urgency}">
-                        {URGENCY_LABELS[task.urgency]}
-                    </span>
-                    {#if task.category && categoryColor}
-                        <span class="summary-chip category-chip" style={`background:${categoryColor.bg}; color:${categoryColor.fg}; border-color:${categoryColor.border};`}>
-                            {task.category}
-                        </span>
-                    {/if}
+                    <TaskBadges task={task} variant="summary" />
                 </div>
 
                 {#if parentTask || childCount > 0}
@@ -146,24 +130,9 @@
                     </div>
                 {/if}
 
-                {#if hasLinkActions}
-                    <!-- In the body, not the footer: the footer has no room on the
-                         440px side panel and stacks every button on phones. -->
-                    <div class="modal-link-actions">
-                        <OpenLinksButton
-                            links={ownLinks}
-                            title={task.text}
-                            label={`모두 열기 (${ownLinks.length})`}
-                            description={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
-                        {#if subtreeLinks.length > ownLinks.length}
-                            <OpenLinksButton
-                                links={subtreeLinks}
-                                title={`${task.text} (하위 포함)`}
-                                label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
-                                description={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
-                        {/if}
-                    </div>
-                {/if}
+                <!-- In the body, not the footer: the footer has no room on the
+                     440px side panel and stacks every button on phones. -->
+                <TaskLinkActions task={task} show="both" />
 
                 <div class="form-section">
                     <label for="modal-task-text">작업명</label>

@@ -1,7 +1,8 @@
 <script>
     import { onDestroy } from 'svelte';
     import TaskTreeCard from './TaskTreeCard.svelte';
-    import OpenLinksButton from './OpenLinksButton.svelte';
+    import TaskBadges from './task/TaskBadges.svelte';
+    import TaskLinkActions from './task/TaskLinkActions.svelte';
     import { getBoardContext } from './board-context.js';
     import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
     import {
@@ -15,15 +16,8 @@
         toggleSubtask
     } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
-    import {
-        getCategoryColor,
-        getDeleteTaskConfirmMessage,
-        getTaskDueStatus,
-        PRIORITY_LABELS,
-        STATUS_LABELS,
-        URGENCY_LABELS
-    } from '$lib/shared/task-domain.js';
-    import { collectSubtreeLinks, extractTaskLinks, splitTextIntoLinkParts } from '$lib/shared/task-links.js';
+    import { getDeleteTaskConfirmMessage, getTaskDueStatus, STATUS_LABELS } from '$lib/shared/task-domain.js';
+    import { splitTextIntoLinkParts } from '$lib/shared/task-links.js';
     import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
 
     /** @type {{
@@ -62,17 +56,12 @@
         const parent = $taskIndex.byId.get(task.parentId) || null;
         return parent && parent.status !== task.status ? parent : null;
     });
-    const categoryColor = $derived(getCategoryColor(task.category, task.categoryMeta?.color));
     const completedSubtasks = $derived(task.subtasks.filter((subtask) => subtask.done).length);
     const subtaskProgress = $derived(task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100));
     /** @type {Record<string, import('$lib/shared/task-links.js').LinkPart[]>} */
     const subtaskParts = $derived(Object.fromEntries(
         task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)])
     ));
-    const ownLinks = $derived(extractTaskLinks(task));
-    // Walks the full task index, not the column-filtered childrenByParent, so
-    // collapsed, filtered and other-column descendants still count.
-    const subtreeLinks = $derived(directChildren.length > 0 ? collectSubtreeLinks($taskIndex, task.id) : ownLinks);
 
     /**
      * @param {MouseEvent} event
@@ -174,18 +163,7 @@
     use:cardDraggable={task.id}
     {...(dnd.cardDrops ? { [DND_ZONE_ATTRIBUTE]: `card:${task.id}` } : {})}>
     <div class="card-meta">
-        <span class="priority-badge {task.priority}">{PRIORITY_LABELS[task.priority]}</span>
-        <span class="urgency-badge {task.urgency}">{URGENCY_LABELS[task.urgency]}</span>
-
-        {#if task.category}
-            <span
-                class="category-tag"
-                style={`background:${categoryColor.bg}; color:${categoryColor.fg}; border-color:${categoryColor.border};`}>
-                {task.category}
-            </span>
-        {:else}
-            <button class="category-tag add-category" onclick={handleOpenTask}>+ 카테고리</button>
-        {/if}
+        <TaskBadges task={task} variant="card" onaddcategory={handleOpenTask} />
 
         {#if foreignParent}
             <span class="parent-indicator">
@@ -225,13 +203,7 @@
     {#if directChildren.length > 0}
         <div class="children-info">
             <span>📎 하위 작업 {directChildren.length}개 (완료 {doneChildrenCount}/{directChildren.length})</span>
-            {#if subtreeLinks.length > ownLinks.length}
-                <OpenLinksButton
-                    links={subtreeLinks}
-                    title={`${task.text} (하위 포함)`}
-                    label={`하위 포함 모두 열기 (${subtreeLinks.length})`}
-                    description={`하위 작업 포함 링크 ${subtreeLinks.length}개를 새 탭에서 모두 열기`} />
-            {/if}
+            <TaskLinkActions task={task} show="subtree" />
         </div>
     {/if}
 
@@ -239,11 +211,7 @@
         {#if task.subtasks.length > 0}
             <div class="subtask-header">
                 <span class="subtask-progress-info">체크리스트 {completedSubtasks}/{task.subtasks.length}</span>
-                <OpenLinksButton
-                    links={ownLinks}
-                    title={task.text}
-                    label={`모두 열기 (${ownLinks.length})`}
-                    description={`체크리스트 링크 ${ownLinks.length}개를 새 탭에서 모두 열기`} />
+                <TaskLinkActions task={task} show="own" />
             </div>
             <div class="progress-bar-container">
                 <div class="progress-bar-fill" style={`width:${subtaskProgress}%`}></div>
