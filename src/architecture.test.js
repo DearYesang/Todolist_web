@@ -16,6 +16,7 @@ const LINE_COMMENT = /^\s*\/\/.*$/gm;
 const FROM_IMPORT = /^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm;
 const BARE_IMPORT = /^\s*import\s*['"]([^'"]+)['"]/gm;
 const DYNAMIC_IMPORT = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
+const NAMED_IMPORT = /^\s*import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/gm;
 
 // Which lib/ folders each layer's production code may not import from.
 const LAYER_RULES = [
@@ -60,14 +61,43 @@ function resolveImport(importer, specifier) {
 	return { path, target };
 }
 
-/** @param {string} file */
-function readSpecifiers(file) {
-	const source = readFileSync(posix.join(SRC_DIR, file), 'utf8')
+/**
+ * A file's source without its comments.
+ * @param {string} file
+ */
+function readSource(file) {
+	return readFileSync(posix.join(SRC_DIR, file), 'utf8')
 		.replace(BLOCK_COMMENT, '')
 		.replace(LINE_COMMENT, '');
+}
+
+/** @param {string} file */
+function readSpecifiers(file) {
+	const source = readSource(file);
 	return [FROM_IMPORT, BARE_IMPORT, DYNAMIC_IMPORT].flatMap((pattern) =>
 		[...source.matchAll(pattern)].map((match) => match[1])
 	);
+}
+
+/**
+ * The local names a file gives the exports it imports from `module` with
+ * `import { a, b as c } from '...'`.
+ * @param {string} file
+ * @param {string} module a file under src/
+ */
+function readNamedImports(file, module) {
+	/** @type {Map<string, string>} imported name -> local name */
+	const names = new Map();
+	for (const [, list, specifier] of readSource(file).matchAll(NAMED_IMPORT)) {
+		if (resolveImport(file, specifier)?.target !== module) {
+			continue;
+		}
+		for (const entry of list.split(',').map((part) => part.trim()).filter(Boolean)) {
+			const [imported, local = imported] = entry.split(/\s+as\s+/);
+			names.set(imported, local);
+		}
+	}
+	return names;
 }
 
 /** @type {Map<string, string[]>} each file's imports of other files under src/ */
@@ -166,6 +196,41 @@ describe('source architecture', () => {
 		expect(findImports((importer, imported) =>
 			isProduction(importer) && importer !== facade && !importer.startsWith(storeDir) && imported.startsWith(storeDir)
 		)).toEqual([]);
+	});
+
+	it('writes the client task store stores only inside lib/client/task-store/', async () => {
+		const facadePath = 'lib/client/task-store.js';
+		/** @type {Record<string, unknown>} */
+		const facade = await import('./lib/client/task-store.js');
+		/** @param {unknown} value */
+		const isStore = (value) => typeof /** @type {{ subscribe?: unknown }} */ (value)?.subscribe === 'function';
+		const storeNames = Object.keys(facade).filter((name) => isStore(facade[name]));
+		expect(storeNames).toContain('tasks');
+
+		// The facade hands out read-only views of the stores ...
+		expect(storeNames.filter((name) => {
+			const store = /** @type {object} */ (facade[name]);
+			return 'set' in store || 'update' in store;
+		})).toEqual([]);
+
+		// ... and no file outside the folder writes one: not with store.set()
+		// or store.update(), and not with a component's `$store = ...`,
+		// `$store.field = ...` or `bind:value={$store...}`, which svelte-check
+		// lets through and which would only fail when they run.
+		const writes = files
+			.filter((file) => !file.startsWith('lib/client/task-store'))
+			.flatMap((file) => {
+				const source = readSource(file);
+				return [...readNamedImports(file, facadePath)]
+					.filter(([imported]) => storeNames.includes(imported))
+					.filter(([, local]) => [
+						new RegExp(`(?<![\\w$.])${local}\\s*\\.\\s*(?:set|update)\\s*\\(`),
+						new RegExp(`\\$${local}(?:\\.[\\w$]+|\\[[^\\]]*\\])*\\s*(?:[-+*/%&|^]|\\*\\*|<<|>>>?|&&|\\|\\||\\?\\?)?=(?![=>])`),
+						new RegExp(`bind:[\\w|]+=\\{\\s*\\$${local}\\b`)
+					].some((pattern) => pattern.test(source)))
+					.map(([imported]) => `${file} writes ${imported}`);
+			});
+		expect(writes).toEqual([]);
 	});
 
 	it('reaches the server task repository modules only through repository.js', () => {

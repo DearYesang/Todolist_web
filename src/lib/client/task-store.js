@@ -14,10 +14,21 @@
  * - task-create.js: the add-task form's server payload and local task.
  * - cross-tab-sync.js: applying another tab's cache writes.
  *
- * The order of the exports below is the modules' load order. task-cache.js
- * loads first so the tasks cache is read before the view preference, as it
- * was when this was one file.
+ * The order of the imports and exports below is the modules' load order.
+ * task-cache.js loads first so the tasks cache is read before the view
+ * preference, as it was when this was one file.
  */
+
+import { readonly } from 'svelte/store';
+import { tasks as writableTasks } from './task-store/task-cache.js';
+import { currentView as writableCurrentView } from './task-store/view-preference.js';
+import { filters as writableFilters } from './task-store/filters.js';
+
+// Only the modules in ./task-store/ write these stores; everyone else reads
+// them and changes the board through the commands below.
+export const tasks = readonly(writableTasks);
+export const currentView = readonly(writableCurrentView);
+export const filters = readonly(writableFilters);
 
 export {
     clearLocalTaskCache,
@@ -25,21 +36,18 @@ export {
     removeTasksByIds,
     replaceLocalTaskWithServerTask,
     replaceTasks,
-    setTaskStorageOwner,
-    tasks
+    setTaskStorageOwner
 } from './task-store/task-cache.js';
 
 export {
     applyServerDefaultView,
     clearPendingDefaultView,
-    currentView,
     markPendingDefaultView,
     readPendingDefaultView,
     setCurrentView
 } from './task-store/view-preference.js';
 
 export {
-    filters,
     resetFilters,
     setCategoryFilter,
     setPriorityFilter,
@@ -51,7 +59,6 @@ export {
     applyServerCategoryCatalog,
     assignTaskCategory,
     categories,
-    categoryCatalog,
     categorySummaries,
     clearCategory,
     mergeCategory,

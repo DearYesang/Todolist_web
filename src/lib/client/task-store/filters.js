@@ -46,3 +46,19 @@ export function setCategoryFilter(value, name = null) {
 export function resetFilters() {
     filters.set({ ...DEFAULT_FILTERS });
 }
+
+/**
+ * Moves the category filter along with a category rename, merge or clear.
+ * A filter on `source` (by name, or by id when it has one) moves to
+ * `target`, or back to all categories when there is no target.
+ * @param {{ id: string | null; name: string }} source
+ * @param {{ id?: string | null; name: string } | null} target
+ */
+export function renameCategoryFilter(source, target) {
+    filters.update((current) => {
+        const categoryMatches = current.category === source.name || (source.id && current.categoryId === source.id);
+        return categoryMatches
+            ? { ...current, category: target?.name || 'all', categoryId: target?.id ?? 'all' }
+            : current;
+    });
+}
