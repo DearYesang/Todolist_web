@@ -232,9 +232,7 @@ describe('task versions after a category write', () => {
         vi.unstubAllGlobals();
     });
 
-    // Fails until the client applies the taskVersions a category write
-    // returns: the edit goes out with the stale expectedVersion 3 and gets 409.
-    it.fails.each([
+    it.each([
         ['rename', () => renameCategory(SOURCE, '국어'), { category: { ...SOURCE, name: '국어' }, updatedTasks: 1 }, '국어'],
         ['merge', () => mergeCategory(SOURCE, TARGET), { source: ARCHIVED, target: TARGET, updatedTasks: 1 }, '학습'],
         ['delete', () => clearCategory(SOURCE), { category: ARCHIVED, clearedTasks: 1 }, '']

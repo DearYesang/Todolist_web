@@ -9,7 +9,7 @@ import { normalizeTaskList } from '../../shared/task-domain.js';
 import { normalizeCategoryName } from '../../shared/category-suggestions.js';
 import { tasks } from './task-cache.js';
 import { filters } from './filters.js';
-import { syncTaskSnapshot } from './sync-engine.js';
+import { applyServerTaskVersions, syncTaskSnapshot } from './sync-engine.js';
 
 /** @type {import('svelte/store').Writable<import('../category-api.js').ClientCategory[]>} */
 export const categoryCatalog = writable([]);
@@ -126,6 +126,7 @@ export async function renameCategory(sourceCategory, targetCategory) {
         if (result.ok) {
             upsertCategoryCatalog(result.category);
             const changed = rewriteLocalCategory(source, result.category, { sync: false });
+            applyServerTaskVersions(result.taskVersions);
             return { ok: true, changed, message: `${changed}개 작업의 카테고리를 수정했습니다.` };
         }
         if (!result.fallback) {
@@ -154,6 +155,7 @@ export async function mergeCategory(sourceCategory, targetCategory) {
             upsertCategoryCatalog(result.target);
             archiveCategoryInCatalog(result.source.id);
             const changed = rewriteLocalCategory(source, result.target, { sync: false });
+            applyServerTaskVersions(result.taskVersions);
             return { ok: true, changed, message: `${changed}개 작업을 "${result.target.name}" 카테고리로 병합했습니다.` };
         }
         if (!result.fallback) {
@@ -184,6 +186,7 @@ export async function clearCategory(category) {
         if (result.ok) {
             archiveCategoryInCatalog(result.category.id);
             const changed = rewriteLocalCategory(source, null, { sync: false });
+            applyServerTaskVersions(result.taskVersions);
             return { ok: true, changed, message: `${changed}개 작업을 미분류로 옮겼습니다.` };
         }
         if (!result.fallback) {

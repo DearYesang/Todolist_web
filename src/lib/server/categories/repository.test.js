@@ -21,6 +21,8 @@ const BOARD_ID = '22222222-2222-4222-8222-222222222222';
 const CATEGORY_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const TARGET_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const TASK_IDS = ['11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333'];
+// What the tasks UPDATE returns: each rewritten task with its bumped version.
+const TASK_VERSIONS = [{ id: TASK_IDS[0], version: 4 }, { id: TASK_IDS[1], version: 8 }];
 const NOW = new Date('2026-07-06T12:00:00.000Z');
 // toSQL() hands timestamp parameters over as ISO strings.
 const STAMP = NOW.toISOString();
@@ -97,7 +99,7 @@ describe('category writes that rewrite tasks', () => {
 	it('renames a category and the name on its tasks in one batch, bumping each task version', async () => {
 		stubSelects(db, [[createCategoryRow()]]);
 		const renamed = createCategoryRow({ name: '학습', normalizedName: '학습' });
-		batchMock.mockResolvedValue([[renamed], TASK_IDS.map((id) => ({ id }))]);
+		batchMock.mockResolvedValue([[renamed], TASK_VERSIONS]);
 
 		const result = await updateCategoryForUser(USER_ID, CATEGORY_ID, { name: ' 학습 ' });
 
@@ -107,12 +109,13 @@ describe('category writes that rewrite tasks', () => {
 			params: ['학습', '학습', '#58a6ff', null, null, STAMP, CATEGORY_ID, BOARD_ID]
 		});
 		expect(taskUpdate).toEqual({
-			sql: 'update "tasks" set "category" = $1, "version" = "tasks"."version" + 1, "updated_at" = $2 where ("tasks"."board_id" = $3 and "tasks"."category_id" = $4 and "tasks"."deleted_at" is null) returning "id"',
+			sql: 'update "tasks" set "category" = $1, "version" = "tasks"."version" + 1, "updated_at" = $2 where ("tasks"."board_id" = $3 and "tasks"."category_id" = $4 and "tasks"."deleted_at" is null) returning "id", "version"',
 			params: ['학습', STAMP, BOARD_ID, CATEGORY_ID]
 		});
 		expect(result).toEqual({
 			category: { id: CATEGORY_ID, name: '학습', color: '#58a6ff', sortOrder: 0, hiddenAt: null, archivedAt: null },
-			updatedTasks: 2
+			updatedTasks: 2,
+			taskVersions: TASK_VERSIONS
 		});
 	});
 
@@ -125,7 +128,7 @@ describe('category writes that rewrite tasks', () => {
 		const statements = renderBatch(batchMock);
 		expect(statements).toHaveLength(1);
 		expect(statements[0].sql).toMatch(/^update "categories" set/);
-		expect(result).toMatchObject({ category: { color: '#ff0000' }, updatedTasks: 0 });
+		expect(result).toMatchObject({ category: { color: '#ff0000' }, updatedTasks: 0, taskVersions: [] });
 	});
 
 	it('reports an unknown category as 404 and a taken name as 409', async () => {
@@ -144,13 +147,13 @@ describe('category writes that rewrite tasks', () => {
 		const target = createCategoryRow({ id: TARGET_ID, name: '학습', normalizedName: '학습', color: null, sortOrder: 1 });
 		stubSelects(db, [[createCategoryRow()], [target]]);
 		const archived = createCategoryRow({ hiddenAt: NOW, archivedAt: NOW });
-		batchMock.mockResolvedValue([TASK_IDS.map((id) => ({ id })), [archived]]);
+		batchMock.mockResolvedValue([TASK_VERSIONS, [archived]]);
 
 		const result = await mergeCategoryForUser(USER_ID, CATEGORY_ID, { targetCategoryId: TARGET_ID });
 
 		const [taskUpdate, categoryUpdate] = renderBatch(batchMock);
 		expect(taskUpdate).toEqual({
-			sql: 'update "tasks" set "category" = $1, "category_id" = $2, "version" = "tasks"."version" + 1, "updated_at" = $3 where ("tasks"."board_id" = $4 and "tasks"."category_id" = $5 and "tasks"."deleted_at" is null) returning "id"',
+			sql: 'update "tasks" set "category" = $1, "category_id" = $2, "version" = "tasks"."version" + 1, "updated_at" = $3 where ("tasks"."board_id" = $4 and "tasks"."category_id" = $5 and "tasks"."deleted_at" is null) returning "id", "version"',
 			params: ['학습', TARGET_ID, STAMP, BOARD_ID, CATEGORY_ID]
 		});
 		expect(categoryUpdate).toEqual({
@@ -160,26 +163,28 @@ describe('category writes that rewrite tasks', () => {
 		expect(result).toEqual({
 			source: { id: CATEGORY_ID, name: '공부', color: '#58a6ff', sortOrder: 0, hiddenAt: NOW.toISOString(), archivedAt: NOW.toISOString() },
 			target: { id: TARGET_ID, name: '학습', color: null, sortOrder: 1, hiddenAt: null, archivedAt: null },
-			updatedTasks: 2
+			updatedTasks: 2,
+			taskVersions: TASK_VERSIONS
 		});
 	});
 
 	it('deletes by clearing the category from its tasks, bumping each version, then archiving it', async () => {
 		stubSelects(db, [[createCategoryRow()]]);
 		const archived = createCategoryRow({ hiddenAt: NOW, archivedAt: NOW });
-		batchMock.mockResolvedValue([TASK_IDS.map((id) => ({ id })), [archived]]);
+		batchMock.mockResolvedValue([TASK_VERSIONS, [archived]]);
 
 		const result = await deleteCategoryForUser(USER_ID, CATEGORY_ID);
 
 		const [taskUpdate, categoryUpdate] = renderBatch(batchMock);
 		expect(taskUpdate).toEqual({
-			sql: 'update "tasks" set "category" = $1, "category_id" = $2, "version" = "tasks"."version" + 1, "updated_at" = $3 where ("tasks"."board_id" = $4 and "tasks"."category_id" = $5 and "tasks"."deleted_at" is null) returning "id"',
+			sql: 'update "tasks" set "category" = $1, "category_id" = $2, "version" = "tasks"."version" + 1, "updated_at" = $3 where ("tasks"."board_id" = $4 and "tasks"."category_id" = $5 and "tasks"."deleted_at" is null) returning "id", "version"',
 			params: ['', null, STAMP, BOARD_ID, CATEGORY_ID]
 		});
 		expect(categoryUpdate.sql).toMatch(/^update "categories" set "hidden_at" = \$1, "archived_at" = \$2/);
 		expect(result).toEqual({
 			category: { id: CATEGORY_ID, name: '공부', color: '#58a6ff', sortOrder: 0, hiddenAt: NOW.toISOString(), archivedAt: NOW.toISOString() },
-			clearedTasks: 2
+			clearedTasks: 2,
+			taskVersions: TASK_VERSIONS
 		});
 	});
 });

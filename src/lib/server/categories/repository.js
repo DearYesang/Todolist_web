@@ -15,6 +15,14 @@ import {
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
+ * Rename, merge and delete rewrite every task in the category and bump its
+ * version. They return the new versions so the client can advance its copies:
+ * a copy left on the old version sends a stale expectedVersion with its next
+ * edit and gets a false 409.
+ */
+const TASK_VERSION_COLUMNS = { id: schema.tasks.id, version: schema.tasks.version };
+
+/**
  * @param {string} userId
  */
 export async function listCategoriesForUser(userId) {
@@ -108,7 +116,7 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 							eq(schema.tasks.categoryId, existing.id),
 							isNull(schema.tasks.deletedAt)
 						))
-						.returning({ id: schema.tasks.id })
+						.returning(TASK_VERSION_COLUMNS)
 				])
 		]);
 
@@ -118,7 +126,8 @@ export async function updateCategoryForUser(userId, categoryId, payload) {
 
 		return {
 			category: mapCategoryRowToClientCategory(updatedCategory[0]),
-			updatedTasks: updatedTasks.length
+			updatedTasks: updatedTasks.length,
+			taskVersions: toTaskVersions(updatedTasks)
 		};
 	} catch (error) {
 		if (isUniqueConstraintError(error)) {
@@ -165,7 +174,7 @@ export async function mergeCategoryForUser(userId, sourceCategoryId, payload) {
 				eq(schema.tasks.categoryId, source.id),
 				isNull(schema.tasks.deletedAt)
 			))
-			.returning({ id: schema.tasks.id }),
+			.returning(TASK_VERSION_COLUMNS),
 		db
 			.update(schema.categories)
 			.set({
@@ -180,7 +189,8 @@ export async function mergeCategoryForUser(userId, sourceCategoryId, payload) {
 	return {
 		source: mapCategoryRowToClientCategory(archivedSource[0] ?? source),
 		target: mapCategoryRowToClientCategory(target),
-		updatedTasks: updatedTasks.length
+		updatedTasks: updatedTasks.length,
+		taskVersions: toTaskVersions(updatedTasks)
 	};
 }
 
@@ -212,7 +222,7 @@ export async function deleteCategoryForUser(userId, categoryId) {
 				eq(schema.tasks.categoryId, category.id),
 				isNull(schema.tasks.deletedAt)
 			))
-			.returning({ id: schema.tasks.id }),
+			.returning(TASK_VERSION_COLUMNS),
 		db
 			.update(schema.categories)
 			.set({
@@ -226,7 +236,8 @@ export async function deleteCategoryForUser(userId, categoryId) {
 
 	return {
 		category: mapCategoryRowToClientCategory(archivedCategory[0] ?? category),
-		clearedTasks: clearedTasks.length
+		clearedTasks: clearedTasks.length,
+		taskVersions: toTaskVersions(clearedTasks)
 	};
 }
 
@@ -268,6 +279,13 @@ export async function reorderCategoriesForUser(userId, payload) {
 	}
 
 	return listCategoriesForUser(userId);
+}
+
+/**
+ * @param {{ id: string; version: number }[]} rows
+ */
+function toTaskVersions(rows) {
+	return rows.map((row) => ({ id: row.id, version: row.version }));
 }
 
 /**

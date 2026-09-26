@@ -108,6 +108,36 @@ export function applyServerTaskResults(serverTasks) {
 }
 
 /**
+ * Advances tasks to the versions another endpoint left them at. A category
+ * rename, merge or delete rewrites every task in the category on the server
+ * and bumps its version; the caller has made the same change locally, so only
+ * the version moves here, and only forward. A copy left on the old version
+ * would send a stale expectedVersion with its next edit and get a false 409.
+ * A task with a sync in flight or queued also records the version for its
+ * chain, as a snapshot does. latestServerVersions is dropped when a chain
+ * drains, so an idle task needs only the store.
+ * @param {{ id: string; version: number }[]} taskVersions
+ */
+export function applyServerTaskVersions(taskVersions) {
+    const versionById = new Map(taskVersions.map((entry) => [entry.id, entry.version]));
+    if (versionById.size === 0) {
+        return;
+    }
+
+    versionById.forEach((version, id) => {
+        if (hasPendingTaskSync(id)) {
+            rememberServerVersion({ id, version });
+        }
+    });
+    tasks.update((current) => current.map((task) => {
+        const version = versionById.get(task.id);
+        return version !== undefined && (typeof task.version !== 'number' || version > task.version)
+            ? { ...task, version }
+            : task;
+    }));
+}
+
+/**
  * @param {string} taskId
  * @param {() => Promise<void>} operation
  * @param {(() => import('../offline-write-queue.js').OfflineMutationInput | null) | null} [buildDrainMutation]
@@ -184,7 +214,7 @@ export async function waitForPendingTaskSyncs() {
 }
 
 /**
- * @param {import('../../shared/task-domain.js').Task} serverTask
+ * @param {{ id: string; version?: number }} serverTask
  */
 function rememberServerVersion(serverTask) {
     if (typeof serverTask.version !== 'number') {
