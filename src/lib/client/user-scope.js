@@ -6,6 +6,7 @@ import {
 	clearPendingDefaultView,
 	countPendingTaskSyncs,
 	discardPendingTaskSyncs,
+	drainPendingTaskSyncsToOfflineQueue,
 	setTaskStoreOwner
 } from './task-store.js';
 
@@ -97,6 +98,11 @@ export function clearCachedAuthScope() {
  * Points the per-user stores at `userId`, or at the signed-out (anonymous)
  * data for null. Called again with the same id, as every session refetch
  * does, it changes nothing.
+ *
+ * Task writes still waiting in a chain, behind a request that has not
+ * answered, first move to the previous user's offline queue, as on a page
+ * unload. They were made on that user's board, and left in the chain they
+ * would run on the next one, where their task is missing.
  * @param {string | null} userId
  */
 export function applyUserScope(userId) {
@@ -104,6 +110,7 @@ export function applyUserScope(userId) {
 		return;
 	}
 
+	drainPendingTaskSyncsToOfflineQueue();
 	scopedUserId = userId;
 	// Also resets what the previous user left on the board: the category
 	// catalog, the filters and, when one signed-in user hands over to

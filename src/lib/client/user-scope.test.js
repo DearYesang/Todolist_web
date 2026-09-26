@@ -476,7 +476,7 @@ describe('signing out while a task write is still in flight', () => {
 		expect(storage.get('kanbanTasks:anonymous') ?? storage.get('kanbanTasks')).not.toContain('Edit 1');
 	});
 
-	it.fails('queues an edit made during the sign-out behind the write in flight under the same user', async () => {
+	it('queues an edit made during the sign-out behind the write in flight under the same user', async () => {
 		await editInFlight();
 		await signOut({
 			clearLocalData: false,
