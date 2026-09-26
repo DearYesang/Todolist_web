@@ -1,10 +1,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handle } from './hooks.server.js';
 
+// The tests run without DATABASE_URL, as auth/index.js would see it: no
+// database and so no auth configuration error. The auth describe block
+// switches both.
+const authState = vi.hoisted(() => ({
+	databaseConfigured: false,
+	configurationError: /** @type {string | null} */ (null)
+}));
+
+vi.mock('$lib/server/auth/index.js', () => ({
+	get authDatabaseConfigured() {
+		return authState.databaseConfigured;
+	},
+	get authConfigurationError() {
+		return authState.configurationError;
+	}
+}));
+
 const originalEnv = { ...process.env };
 
 afterEach(() => {
 	process.env = { ...originalEnv };
+	authState.databaseConfigured = false;
+	authState.configurationError = null;
 });
 
 describe('server hook API write guard', () => {
@@ -52,6 +71,45 @@ describe('server hook API write guard', () => {
 		expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+	});
+});
+
+describe('server hook auth availability', () => {
+	/**
+	 * @param {string} pathname
+	 */
+	async function runHandle(pathname) {
+		const resolve = vi.fn(async () => new Response('ok'));
+		const response = await handle({ event: /** @type {any} */ (createEvent('GET', pathname)), resolve });
+		return { resolve, response };
+	}
+
+	it('answers the auth routes 503 without a database and 500 with an auth configuration error', async () => {
+		let { resolve, response } = await runHandle('/api/auth/get-session');
+		expect([response.status, await response.json()]).toEqual([503, { message: 'Auth service unavailable.' }]);
+		expect(resolve).not.toHaveBeenCalled();
+
+		authState.databaseConfigured = true;
+		authState.configurationError = 'BETTER_AUTH_SECRET is missing.';
+		({ resolve, response } = await runHandle('/api/auth/get-session'));
+		expect([response.status, await response.json()]).toEqual([500, { message: 'Auth service unavailable.' }]);
+		expect(resolve).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		{ name: 'an API route without a database', pathname: '/api/tasks', databaseConfigured: false, configurationError: null },
+		{ name: 'an API route with an auth configuration error', pathname: '/api/tasks', databaseConfigured: true, configurationError: 'BETTER_AUTH_SECRET is missing.' },
+		{ name: 'an auth route with a working auth service', pathname: '/api/auth/get-session', databaseConfigured: true, configurationError: null },
+		{ name: 'an app page with a working auth service', pathname: '/', databaseConfigured: true, configurationError: null }
+	])('passes $name to the route with the security headers', async ({ pathname, databaseConfigured, configurationError }) => {
+		authState.databaseConfigured = databaseConfigured;
+		authState.configurationError = configurationError;
+		const { resolve, response } = await runHandle(pathname);
+
+		expect(resolve).toHaveBeenCalledOnce();
+		expect(await response.text()).toBe('ok');
+		expect(response.headers.get('x-frame-options')).toBe('DENY');
+		expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
 	});
 });
 
