@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import { normalizeTask } from '../../shared/task-domain.js';
-import { loadOfflineQueue, setOfflineQueueOwner } from '../offline-write-queue.js';
+import { enqueueOfflineMutation, loadOfflineQueue, setOfflineQueueOwner } from '../offline-write-queue.js';
 import {
+    applyServerTaskResults,
+    applyServerTaskSnapshot,
     applyServerTaskVersions,
     countPendingTaskSyncs,
     discardPendingTaskSyncs,
@@ -593,5 +595,86 @@ describe('an edit that lands after an older edit of its task was queued', () => 
         await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ ...ITEM, done: true }] } }));
 
         expect(get(tasks).map((task) => [task.text, task.version, task.subtasks[0].done])).toEqual([['Edit 1', 2, true]]);
+    });
+
+    // Verifier findings on the retiring above. A landed edit covers a queued
+    // edit only when it was made on a board that held it. The queue is
+    // shared by every tab, and a server snapshot or a queue sync's answer can
+    // take a queued edit off the board, which the next edit is then built
+    // from. Dropped there, the queued edit is on neither the server nor the
+    // queue; kept, the next sync meets a 409 and reports it as a conflict,
+    // which the user can apply.
+    const queuedTexts = () => loadOfflineQueue().map((mutation) => mutation.type === 'task.patch' ? mutation.patch.text : mutation.type);
+
+    it.fails('keeps a queued task edit that a server snapshot took off the board when the next edit lands', async () => {
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        await answer(0, unavailable());
+        // The answer to a list request sent before the edit.
+        applyServerTaskSnapshot([{ id: TASK_ID, text: 'Saved', version: 1, subtasks: [ITEM] }]);
+        expect(get(tasks).map((task) => task.text)).toEqual(['Saved']);
+
+        updateTask(TASK_ID, { priority: 'high' });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bodies[1]).toMatchObject({ text: 'Saved', priority: 'high', expectedVersion: 1 });
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Saved', priority: 'high', version: 2, subtasks: [ITEM] } }));
+
+        expect(queuedTexts()).toEqual(['Edit 1']);
+    });
+
+    it.fails('keeps a queued task edit that a queue sync\'s answer took off the board when the next edit lands', async () => {
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        await answer(0, unavailable());
+        // A sync sent a checklist edit of the task queued before it, which
+        // landed; the queued task edit stays for the next sync.
+        applyServerTaskResults([normalizeTask({ id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ ...ITEM, done: true }] })]);
+        expect(get(tasks).map((task) => task.text)).toEqual(['Saved']);
+
+        updateTask(TASK_ID, { priority: 'high' });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bodies[1]).toMatchObject({ text: 'Saved', priority: 'high', expectedVersion: 2 });
+        await answer(1, jsonResponse({ task: { id: TASK_ID, text: 'Saved', priority: 'high', version: 3, subtasks: [{ ...ITEM, done: true }] } }));
+
+        expect(queuedTexts()).toEqual(['Edit 1']);
+    });
+
+    it.fails('keeps an edit of the task that another tab queued while this tab\'s edit was out', async () => {
+        updateTask(TASK_ID, { priority: 'high' });
+        await vi.advanceTimersByTimeAsync(0);
+        // The other tab's edit failed, and went to the queue every tab of
+        // the user shares.
+        enqueueOfflineMutation({ type: 'task.patch', taskId: TASK_ID, localParentId: null, patch: { ...bodies[0], text: 'Other tab', priority: 'low' } });
+        await answer(0, jsonResponse({ task: { id: TASK_ID, text: 'Saved', priority: 'high', version: 2, subtasks: [ITEM] } }));
+
+        expect(queuedTexts()).toEqual(['Other tab']);
+    });
+
+    // Here the other tab's edit sets the task back to what this tab's edit
+    // started from, field for field.
+    it.fails('keeps another tab\'s edit that sets the task back to the copy this tab\'s edit was made on', async () => {
+        const { priority } = get(tasks)[0];
+        updateTask(TASK_ID, { priority: 'high' });
+        await vi.advanceTimersByTimeAsync(0);
+        enqueueOfflineMutation({ type: 'task.patch', taskId: TASK_ID, localParentId: null, patch: { ...bodies[0], priority } });
+        await answer(0, jsonResponse({ task: { id: TASK_ID, text: 'Saved', priority: 'high', version: 2, subtasks: [ITEM] } }));
+
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({ type: 'task.patch', patch: expect.objectContaining({ priority }) })
+        ]);
+    });
+
+    // A checklist edit carries no version: the other tab's uncheck, made
+    // after this tab's check, is the item's last state.
+    it.fails('keeps a checklist edit that another tab queued while this tab\'s edit of the item was out', async () => {
+        toggleSubtask(TASK_ID, ITEM.id);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bodies[0]).toEqual({ done: true });
+        enqueueOfflineMutation({ type: 'checklist.patch', taskId: TASK_ID, itemId: ITEM.id, patch: { done: false } });
+        await answer(0, jsonResponse({ task: { id: TASK_ID, text: 'Saved', version: 2, subtasks: [{ ...ITEM, done: true }] } }));
+
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({ type: 'checklist.patch', itemId: ITEM.id, patch: { done: false } })
+        ]);
     });
 });
