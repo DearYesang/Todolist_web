@@ -9,8 +9,9 @@
  * - filters.js: the board filters.
  * - category-store.js: the category catalog, its summaries and category edits.
  * - owner.js: handing the board to the signed-in user.
- * - sync-engine.js: per-task server write chains, draining them to the offline
- *   queue, and server results that must not revert queued local edits.
+ * - sync-engine.js: per-task server write chains, settling them before
+ *   sign-out or draining them to the offline queue, and server results that
+ *   must not revert queued local edits.
  * - task-mutations.js: task creation, backup import, and optimistic task and
  *   checklist edits.
  * - task-create.js: the add-task form's server payload and local task.
@@ -65,7 +66,7 @@ export {
 
 export { setTaskStoreOwner } from './task-store/owner.js';
 
-export { drainPendingTaskSyncsToOfflineQueue } from './task-store/sync-engine.js';
+export { drainPendingTaskSyncsToOfflineQueue, settlePendingTaskSyncs } from './task-store/sync-engine.js';
 
 export {
     addSubtask,

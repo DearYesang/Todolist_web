@@ -1,7 +1,15 @@
 import { get } from 'svelte/store';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
+import { createDeferred, jsonResponse } from '$lib/test-support/http.js';
 import { normalizeTask } from '../../shared/task-domain.js';
-import { applyServerTaskVersions, resetTaskSyncStateForTests, waitForPendingTaskSyncs } from './sync-engine.js';
+import { loadOfflineQueue, setOfflineQueueOwner } from '../offline-write-queue.js';
+import {
+    applyServerTaskVersions,
+    resetTaskSyncStateForTests,
+    settlePendingTaskSyncs,
+    waitForPendingTaskSyncs
+} from './sync-engine.js';
 import { replaceTasks, tasks } from './task-cache.js';
 import { clearDoneTasks, deleteTaskCascade, updateTask } from './task-mutations.js';
 
@@ -136,5 +144,67 @@ describe('task versions from other endpoints', () => {
             { method: 'PATCH', body: expect.objectContaining({ expectedVersion: 3 }) },
             { method: 'DELETE', body: { expectedVersion: 5 } }
         ]);
+    });
+});
+
+describe('settling task writes before sign-out', () => {
+    const TASK_ID = '33333333-3333-4333-8333-333333333333';
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        installMemoryStorage();
+        vi.stubGlobal('window', {});
+        setOfflineQueueOwner('user-a');
+        replaceTasks([normalizeTask({ id: TASK_ID, text: 'Saved', version: 1 })]);
+    });
+
+    afterEach(async () => {
+        vi.useRealTimers();
+        await waitForPendingTaskSyncs();
+        resetTaskSyncStateForTests();
+        replaceTasks([]);
+        setOfflineQueueOwner(null);
+    });
+
+    it('resolves at once when no write is pending', async () => {
+        await expect(settlePendingTaskSyncs({ timeoutMs: 5000 })).resolves.toBe(true);
+    });
+
+    it('stops waiting after timeoutMs and queues the edits that have not gone out', async () => {
+        const firstAnswer = createDeferred();
+        /** @type {string[]} */
+        const sent = [];
+        vi.stubGlobal('fetch', vi.fn((/** @type {unknown} */ _url, /** @type {RequestInit} */ init) => {
+            sent.push(JSON.parse(String(init.body)).text);
+            return firstAnswer.promise;
+        }));
+        updateTask(TASK_ID, { text: 'Edit 1' });
+        await vi.advanceTimersByTimeAsync(0);
+        updateTask(TASK_ID, { text: 'Edit 2' });
+
+        /** @type {boolean | undefined} */
+        let settled;
+        void settlePendingTaskSyncs({ timeoutMs: 5000 }).then((value) => {
+            settled = value;
+        });
+        await vi.advanceTimersByTimeAsync(4999);
+        expect(settled).toBeUndefined();
+        expect(loadOfflineQueue()).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(settled).toBe(false);
+        expect(loadOfflineQueue()).toEqual([
+            expect.objectContaining({
+                type: 'task.patch',
+                taskId: TASK_ID,
+                ownerUserId: 'user-a',
+                patch: expect.objectContaining({ text: 'Edit 2' })
+            })
+        ]);
+
+        // The request in flight still ends; the queued edit is not sent twice.
+        firstAnswer.resolve(jsonResponse({ task: { id: TASK_ID, text: 'Edit 1', version: 2 } }));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(sent).toEqual(['Edit 1']);
     });
 });

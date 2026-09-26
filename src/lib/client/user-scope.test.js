@@ -11,6 +11,7 @@ import {
 	readPendingDefaultView,
 	setCategoryFilter,
 	setPriorityFilter,
+	settlePendingTaskSyncs,
 	syncServerTasks,
 	tasks,
 	updateTask
@@ -262,6 +263,7 @@ describe('signing out during a task edit', () => {
 	 * off, then the session refetch that signs the app out.
 	 */
 	async function signOut() {
+		await settlePendingTaskSyncs({ timeoutMs: 5000 });
 		// authClient.signOut(): the server ends the session and answers.
 		signedIn = false;
 		await network(10);
@@ -272,7 +274,7 @@ describe('signing out during a task edit', () => {
 	}
 
 	// Probe P1.
-	it.fails('sends an edit made just before sign-out while the user is still signed in', async () => {
+	it('sends an edit made just before sign-out while the user is still signed in', async () => {
 		updateTask(TASK_ID, { text: 'Edit 1' });
 		await vi.advanceTimersByTimeAsync(0);
 		// Waits in the task's chain behind the first PATCH.

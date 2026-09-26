@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { authClient } from '$lib/client/auth-client.js';
     import { createRecoveryCodes, revokeRecoveryCodes } from '$lib/client/account-security-api.js';
+    import { settlePendingTaskSyncs } from '$lib/client/task-store.js';
     import { clearUserLocalData, countPendingLocalChanges } from '$lib/client/user-scope.js';
     import { createSuggestedPasskeyName, getAuthErrorMessage } from '$lib/client/auth-labels.js';
     import AuthStatus from './AuthStatus.svelte';
@@ -70,6 +71,10 @@
         isWorking = true;
 
         try {
+            // Task edits still on their way to the server go out while the
+            // session is valid: sent after it ends, they would fail and be
+            // queued under no user. Waits at most 5 seconds.
+            await settlePendingTaskSyncs({ timeoutMs: 5000 });
             const result = await authClient.signOut();
             if (result.error) {
                 authError = getAuthErrorMessage(result.error);

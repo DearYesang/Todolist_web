@@ -225,6 +225,36 @@ export async function waitForPendingTaskSyncs() {
 }
 
 /**
+ * Lets the per-task server writes finish before the session ends. Sign-out
+ * calls this first: a write sent after the session ended would get 401 and
+ * go back to the offline queue under no user ('anonymous'), out of the
+ * signed-out user's reach.
+ *
+ * Waits up to `timeoutMs` for every write chain to settle, so edits made
+ * just before are sent while the session is still valid. Writes that have
+ * not started by then move to the offline queue of the user still signed
+ * in, as on a page unload; a request already in flight may still answer
+ * later.
+ * @param {{ timeoutMs: number }} options
+ * @returns {Promise<boolean>} whether every chain settled in time
+ */
+export async function settlePendingTaskSyncs({ timeoutMs }) {
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer;
+    const settled = await Promise.race([
+        waitForPendingTaskSyncs().then(() => true),
+        new Promise((resolve) => {
+            timer = setTimeout(() => resolve(false), timeoutMs);
+        })
+    ]);
+    clearTimeout(timer);
+    if (!settled) {
+        drainPendingTaskSyncsToOfflineQueue();
+    }
+    return settled;
+}
+
+/**
  * @param {{ id: string; version?: number }} serverTask
  */
 function rememberServerVersion(serverTask) {
