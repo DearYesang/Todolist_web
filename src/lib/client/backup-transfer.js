@@ -13,7 +13,9 @@ const REPLACE_QUESTION = '현재 목록을 파일 내용으로 교체하시겠�
  *
  * `notify` is called once with the message to show, also for a file that
  * is not JSON. After an import it runs once the board holds the imported
- * tasks, in the same event-loop task as the store writes.
+ * tasks and shows them: Svelte's DOM update, queued by importTasks' store
+ * writes, runs before the await on importTasks resumes. A blocking alert()
+ * therefore opens over the imported board.
  * @param {string} fileText
  * @param {{
  *   confirmReplace: (question: string) => boolean;
