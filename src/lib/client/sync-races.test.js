@@ -9,16 +9,16 @@ import {
 	deleteSubtask,
 	deleteTaskCascade,
 	drainPendingTaskSyncsToOfflineQueue,
-	handleExternalTaskStorageEvent,
 	mergeTasks,
 	renameSubtask,
 	replaceTasks,
-	resetTaskSyncStateForTests,
 	setTaskStorageOwner,
 	tasks,
 	updateTask,
 	waitForPendingTaskSyncs
 } from './task-store.js';
+import { handleExternalTaskStorageEvent } from './task-store/cross-tab-sync.js';
+import { resetTaskSyncStateForTests } from './task-store/sync-engine.js';
 import {
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,
