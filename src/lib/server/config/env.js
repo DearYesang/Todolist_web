@@ -381,9 +381,10 @@ function createCheck(key, required, status, message) {
 }
 
 /**
+ * The origin of a URL, or null when the value is empty or not a URL.
  * @param {string | undefined} value
  */
-function normalizeOrigin(value) {
+export function normalizeOrigin(value) {
 	if (!value) {
 		return null;
 	}
@@ -423,9 +424,11 @@ function isHostCoveredByRpId(hostname, rpId) {
 }
 
 /**
+ * A WebAuthn RP ID: the hostname of a URL-shaped value, or the value itself
+ * trimmed and lowercased; null when empty.
  * @param {string | undefined} value
  */
-function normalizeRpId(value) {
+export function normalizeRpId(value) {
 	if (!value) {
 		return null;
 	}
