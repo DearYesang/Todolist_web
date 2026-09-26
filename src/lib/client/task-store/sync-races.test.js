@@ -17,6 +17,7 @@ import {
 } from './sync-engine.js';
 import {
 	addSubtask,
+	createTask,
 	deleteSubtask,
 	deleteTaskCascade,
 	renameSubtask,
@@ -381,6 +382,63 @@ describe('sync race conditions', () => {
 		second.resolve(jsonResponse({ task: { id: SERVER_TASK_ID, text: 'Three', version: 5 } }));
 		await waitForPendingTaskSyncs();
 		expect(get(tasks)[0]).toMatchObject({ text: 'Three', version: 5 });
+	});
+
+	it('keeps edits made on a sync-listed copy while the create POST is still in flight', async () => {
+		const createdId = '33333333-3333-4333-8333-333333333333';
+		const createResponse = createDeferred();
+		const firstPatchResponse = createDeferred();
+		/** @type {Record<string, unknown>[]} */
+		const patchBodies = [];
+		const fetcher = vi.fn(async (url, init = {}) => {
+			const route = `${init.method ?? 'GET'} ${url}`;
+			if (route === 'POST /api/tasks') return createResponse.promise;
+			if (route === 'GET /api/tasks') {
+				return jsonResponse({ tasks: [{ id: createdId, text: 'Write report', status: 'todo', version: 1 }] });
+			}
+			if (route === 'GET /api/categories') return jsonResponse({ categories: [] });
+			if (route === 'GET /api/board/preferences') return jsonResponse({ defaultView: 'kanban' });
+			if (route === `PATCH /api/tasks/${createdId}`) {
+				const body = JSON.parse(String(init.body));
+				patchBodies.push(body);
+				return patchBodies.length === 1
+					? firstPatchResponse.promise
+					: jsonResponse({ task: { id: createdId, text: body.text, status: 'todo', version: 3 } });
+			}
+			throw new Error(`Unexpected request: ${route}`);
+		});
+		vi.stubGlobal('fetch', fetcher);
+
+		const created = createTask({
+			text: 'Write report',
+			priority: 'medium',
+			urgency: 'normal',
+			category: '',
+			startDate: '2026-05-03',
+			endDate: '2026-05-04',
+			parentId: null
+		});
+		// The create commits, and a sync lists the task before the POST answers.
+		await syncServerTasks(fetcher);
+		updateTask(createdId, { text: 'Mine 1' });
+		await settleMicrotasks();
+		// Queued behind the first PATCH; its patch is built from the store when it runs.
+		updateTask(createdId, { text: 'Mine 2' });
+		await settleMicrotasks();
+
+		createResponse.resolve(jsonResponse({
+			task: { id: createdId, text: 'Write report', status: 'todo', version: 1 }
+		}, { status: 201 }));
+		await created;
+		// The POST's answer is no newer than the listed copy, so the edit stays.
+		expect(get(tasks)).toEqual([expect.objectContaining({ id: createdId, text: 'Mine 2', version: 1 })]);
+
+		firstPatchResponse.resolve(jsonResponse({ task: { id: createdId, text: 'Mine 1', status: 'todo', version: 2 } }));
+		await waitForPendingTaskSyncs();
+
+		expect(patchBodies.map((body) => [body.text, body.expectedVersion])).toEqual([['Mine 1', 1], ['Mine 2', 2]]);
+		expect(get(tasks)).toEqual([expect.objectContaining({ id: createdId, text: 'Mine 2', version: 3 })]);
+		expect(loadOfflineQueue()).toEqual([]);
 	});
 
 	it('resolves a rename of a checklist item whose create is still in flight', async () => {

@@ -128,7 +128,7 @@ describe('creating a task from the add-task form', () => {
         expect(get(tasks).find((task) => task.id === SERVER_TASK_ID)?.parentId).toBe(SERVER_PARENT_ID);
     });
 
-    it('merges the created task into the copy a sync added while the create was in flight', async () => {
+    it('keeps the copy a sync added while the create was in flight instead of adding a second one', async () => {
         const response = createDeferred();
         fetcher.mockReturnValue(response.promise);
 

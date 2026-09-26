@@ -46,13 +46,29 @@ describe('task data normalization', () => {
         expect(get(tasks).map((task) => [task.id, task.status])).toEqual([['parent', 'doing'], ['child', 'doing']]);
     });
 
-    it('merges a created task into the copy the list already holds', () => {
+    it('keeps the copy the list already holds when a created task is no newer', () => {
+        // A sync listed the task while its create was in flight, and the user
+        // edited that copy since. Local edits do not bump the version.
         replaceTasks([
-            { id: 'created', text: 'Synced first', status: 'doing', collapsed: true, version: 1 },
+            { id: 'created', text: 'Edited after sync', status: 'doing', collapsed: true, version: 1 },
             { id: 'other', text: 'Other', status: 'todo' }
         ]);
 
         insertTask(normalizeTask({ id: 'created', text: 'Created', status: 'todo', version: 1 }));
+
+        expect(get(tasks).map((task) => ({ id: task.id, text: task.text, status: task.status }))).toEqual([
+            { id: 'created', text: 'Edited after sync', status: 'doing' },
+            { id: 'other', text: 'Other', status: 'todo' }
+        ]);
+    });
+
+    it('merges a created task that is newer than the copy the list already holds', () => {
+        replaceTasks([
+            { id: 'created', text: 'Listed', status: 'todo', collapsed: true, version: 1 },
+            { id: 'other', text: 'Other', status: 'todo' }
+        ]);
+
+        insertTask(normalizeTask({ id: 'created', text: 'Created', status: 'doing', version: 2 }));
 
         expect(get(tasks).map((task) => ({ id: task.id, text: task.text, collapsed: task.collapsed }))).toEqual([
             { id: 'created', text: 'Created', collapsed: true },
