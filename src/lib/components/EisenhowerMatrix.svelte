@@ -1,8 +1,8 @@
 <script>
     import { setContext } from 'svelte';
-    import { filters, tasks, updateTask } from '$lib/client/task-store.js';
+    import { filters, taskIndex, tasks, updateTask } from '$lib/client/task-store.js';
     import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
-    import { buildHierarchy, buildTaskIndex, isTaskInEisenhowerQuadrant, matchesFilters, resolveEisenhowerMove } from '$lib/shared/task-domain.js';
+    import { buildHierarchy, isTaskInEisenhowerQuadrant, matchesFilters, resolveEisenhowerMove } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
     /** @type {{ openTask: (id: string) => void }} */
@@ -81,9 +81,6 @@
         $tasks.filter((task) => task.status === 'done' && matchesFilters(task, $filters)).length
     );
 
-    // Parent and child lookups for every card, from the full task list.
-    const taskIndex = $derived(buildTaskIndex($tasks));
-
     const matrixData = $derived.by(() =>
         quadrants.map((quadrant) => {
             const quadrantTasks = $tasks.filter((task) =>
@@ -115,7 +112,7 @@
      * @param {EisenhowerQuadrant} quadrant
      */
     function moveTaskToQuadrant(taskId, quadrant) {
-        const task = $tasks.find((candidate) => candidate.id === taskId);
+        const task = $taskIndex.byId.get(taskId);
         const patch = task ? resolveEisenhowerMove(task, quadrant) : null;
         if (patch) {
             updateTask(taskId, patch);
@@ -154,8 +151,6 @@
                 {:else}
                     {#each quadrant.roots as task (task.id)}
                         <TaskTreeCard
-                            allTasks={$tasks}
-                            taskIndex={taskIndex}
                             childrenByParent={quadrant.childrenByParent}
                             openTask={openTask}
                             task={task} />

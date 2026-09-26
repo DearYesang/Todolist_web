@@ -3,8 +3,9 @@
  * commands that change the board. Everything outside ./task-store/ imports
  * it from here; the code lives in ./task-store/:
  *
- * - task-cache.js: the tasks store, its per-user localStorage cache and the
- *   whole-list writes (replace, insert, merge, remove, re-key a local task).
+ * - task-cache.js: the tasks store, its per-user localStorage cache, the
+ *   whole-list writes (replace, insert, merge, remove, re-key a local task)
+ *   and the task index derived from the list.
  * - view-preference.js: the current view, saving it as the server default
  *   view, and a default view chosen offline that the next sync sends.
  * - filters.js: the board filters.
@@ -35,7 +36,8 @@ export const tasks = readonly(writableTasks);
 export const currentView = readonly(writableCurrentView);
 export const filters = readonly(writableFilters);
 
-export { clearLocalTaskCache } from './task-store/task-cache.js';
+// taskIndex is derived from tasks, so it has no set or update to hide.
+export { clearLocalTaskCache, taskIndex } from './task-store/task-cache.js';
 
 export {
     clearPendingDefaultView,

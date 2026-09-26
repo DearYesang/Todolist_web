@@ -1,5 +1,5 @@
 <script>
-    import { assignTaskCategory, categories, deleteTaskCascade, tasks, updateTask } from '$lib/client/task-store.js';
+    import { assignTaskCategory, categories, deleteTaskCascade, taskIndex, updateTask } from '$lib/client/task-store.js';
     import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
     import {
         getCategoryColor,
@@ -17,12 +17,12 @@
     /** @type {{ taskId: string; onclose: () => void }} */
     let { taskId, onclose } = $props();
 
-    const task = $derived($tasks.find((candidate) => candidate.id === taskId) || null);
-    const parentTask = $derived(task?.parentId ? $tasks.find((candidate) => candidate.id === task.parentId) || null : null);
-    const childCount = $derived(task ? $tasks.filter((candidate) => candidate.parentId === task.id).length : 0);
+    const task = $derived($taskIndex.byId.get(taskId) ?? null);
+    const parentTask = $derived(task?.parentId ? $taskIndex.byId.get(task.parentId) ?? null : null);
+    const childCount = $derived(task ? $taskIndex.childrenByParentId.get(task.id)?.length ?? 0 : 0);
     const categoryColor = $derived(task ? getCategoryColor(task.category, task.categoryMeta?.color) : null);
     const ownLinks = $derived(task ? extractTaskLinks(task) : []);
-    const subtreeLinks = $derived(task && childCount > 0 ? collectSubtreeLinks($tasks, task.id) : ownLinks);
+    const subtreeLinks = $derived(task && childCount > 0 ? collectSubtreeLinks($taskIndex, task.id) : ownLinks);
     // subtreeLinks always includes ownLinks; OpenLinksButton needs 2 or more.
     const hasLinkActions = $derived(subtreeLinks.length >= 2);
 

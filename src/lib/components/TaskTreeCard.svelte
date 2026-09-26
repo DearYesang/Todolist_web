@@ -9,6 +9,7 @@
         deleteTaskCascade,
         moveTask,
         renameSubtask,
+        taskIndex,
         toggleCollapse,
         toggleSubtask
     } from '$lib/client/task-store.js';
@@ -26,16 +27,12 @@
 
     /** @type {{
      *   task: import('$lib/shared/task-domain.js').Task;
-     *   allTasks: import('$lib/shared/task-domain.js').Task[];
-     *   taskIndex: import('$lib/shared/task-domain.js').TaskIndex;
      *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
      *   openTask: (id: string) => void;
      * }} */
     let {
         task,
-        allTasks,
-        taskIndex,
         childrenByParent,
         depth = 0,
         openTask
@@ -56,14 +53,14 @@
     onDestroy(() => subtaskComposition.reset());
 
     const children = $derived(childrenByParent[task.id] || []);
-    // taskIndex is built once per board from the full task list, so a card
-    // finds its children and parent without scanning allTasks.
-    const directChildren = $derived(taskIndex.childrenByParentId.get(task.id) ?? []);
+    // taskIndex covers the full task list, so a card finds its children and
+    // parent without scanning every task.
+    const directChildren = $derived($taskIndex.childrenByParentId.get(task.id) ?? []);
     const doneChildrenCount = $derived(directChildren.filter((candidate) => candidate.status === 'done').length);
     const dueStatus = $derived(getTaskDueStatus(task));
     const foreignParent = $derived.by(() => {
         if (!task.parentId) return null;
-        const parent = taskIndex.byId.get(task.parentId) || null;
+        const parent = $taskIndex.byId.get(task.parentId) || null;
         return parent && parent.status !== task.status ? parent : null;
     });
     const categoryColor = $derived(getCategoryColor(task.category, task.categoryMeta?.color));
@@ -74,9 +71,9 @@
         task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)])
     ));
     const ownLinks = $derived(extractTaskLinks(task));
-    // Walks allTasks, not the column-filtered childrenByParent, so collapsed,
-    // filtered and other-column descendants still count.
-    const subtreeLinks = $derived(directChildren.length > 0 ? collectSubtreeLinks(allTasks, task.id) : ownLinks);
+    // Walks the full task index, not the column-filtered childrenByParent, so
+    // collapsed, filtered and other-column descendants still count.
+    const subtreeLinks = $derived(directChildren.length > 0 ? collectSubtreeLinks($taskIndex, task.id) : ownLinks);
 
     /**
      * @param {MouseEvent} event
@@ -326,8 +323,6 @@
 {#if children.length > 0 && !task.collapsed}
     {#each children as child (child.id)}
         <TaskTreeCard
-            allTasks={allTasks}
-            taskIndex={taskIndex}
             childrenByParent={childrenByParent}
             depth={depth + 1}
             openTask={openTask}

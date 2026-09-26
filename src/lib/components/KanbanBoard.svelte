@@ -1,8 +1,8 @@
 <script>
     import { setContext } from 'svelte';
-    import { assignParent, filters, moveTask, tasks } from '$lib/client/task-store.js';
+    import { assignParent, filters, moveTask, taskIndex, tasks } from '$lib/client/task-store.js';
     import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
-    import { buildColumnHierarchy, buildTaskIndex, canAssignParent } from '$lib/shared/task-domain.js';
+    import { buildColumnHierarchy, canAssignParent } from '$lib/shared/task-domain.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
     /** @type {{ openTask: (id: string) => void }} */
@@ -34,7 +34,7 @@
             }
 
             if (kind === 'column') {
-                const task = $tasks.find((candidate) => candidate.id === draggedId);
+                const task = $taskIndex.byId.get(draggedId);
                 // Dropping back into the same lane is a no-op; the old code
                 // silently detached the card from its parent here.
                 if (!task || task.status === target) return;
@@ -54,9 +54,6 @@
         const separator = zone.indexOf(':');
         return [zone.slice(0, separator), zone.slice(separator + 1)];
     }
-
-    // Parent and child lookups for every card, from the full task list.
-    const taskIndex = $derived(buildTaskIndex($tasks));
 
     const columnData = $derived.by(() =>
         columns.map((column) => ({
@@ -89,8 +86,6 @@
                 {:else}
                     {#each column.roots as task (task.id)}
                         <TaskTreeCard
-                            allTasks={$tasks}
-                            taskIndex={taskIndex}
                             childrenByParent={column.childrenByParent}
                             openTask={openTask}
                             task={task} />

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildTaskIndex } from './task-domain.js';
 import {
 	collectSubtreeLinks,
 	extractTaskLinks,
@@ -432,7 +433,7 @@ describe('collectSubtreeLinks', () => {
 		const root = /** @type {typeof externalInfo[number]} */ (externalInfo.find((candidate) => candidate.id === 'explore'));
 
 		expect(extractTaskLinks(root)).toHaveLength(2);
-		const links = collectSubtreeLinks(externalInfo, 'explore');
+		const links = collectSubtreeLinks(buildTaskIndex(externalInfo), 'explore');
 		expect(links).toHaveLength(10);
 		// The 3 real parenthesised URLs open without the closing ')'.
 		expect(links.filter((link) => link.href.endsWith(')'))).toEqual([]);
@@ -449,7 +450,7 @@ describe('collectSubtreeLinks', () => {
 			task('child-b', 'b', ['https://b.example.com'], { parentId: 'root' })
 		];
 
-		expect(collectSubtreeLinks(tree, 'root').map((link) => link.taskId)).toEqual([
+		expect(collectSubtreeLinks(buildTaskIndex(tree), 'root').map((link) => link.taskId)).toEqual([
 			'root',
 			'child-a',
 			'grandchild',
@@ -464,7 +465,7 @@ describe('collectSubtreeLinks', () => {
 			task('done-child', 'd', ['https://d.example.com'], { parentId: 'root', status: 'done' })
 		];
 
-		expect(collectSubtreeLinks(tree, 'root')).toHaveLength(3);
+		expect(collectSubtreeLinks(buildTaskIndex(tree), 'root')).toHaveLength(3);
 	});
 
 	it('counts a link shared by parent and child once', () => {
@@ -473,7 +474,7 @@ describe('collectSubtreeLinks', () => {
 			task('child', 'child', ['https://shared.example.com/', 'https://child.example.com'], { parentId: 'root' })
 		];
 
-		const links = collectSubtreeLinks(tree, 'root');
+		const links = collectSubtreeLinks(buildTaskIndex(tree), 'root');
 		expect(links.map((link) => link.href)).toEqual([
 			'https://shared.example.com/',
 			'https://root.example.com/',
@@ -488,17 +489,17 @@ describe('collectSubtreeLinks', () => {
 			task('b', 'b', ['https://b.example.com'], { parentId: 'a' })
 		];
 
-		expect(collectSubtreeLinks(cyclic, 'a').map((link) => link.href)).toEqual([
+		expect(collectSubtreeLinks(buildTaskIndex(cyclic), 'a').map((link) => link.href)).toEqual([
 			'https://a.example.com/',
 			'https://b.example.com/'
 		]);
 	});
 
 	it('passes includeDone through to every task', () => {
-		expect(collectSubtreeLinks(externalInfo, 'explore', { includeDone: false })).toHaveLength(9);
+		expect(collectSubtreeLinks(buildTaskIndex(externalInfo), 'explore', { includeDone: false })).toHaveLength(9);
 	});
 
 	it('returns nothing for an unknown task', () => {
-		expect(collectSubtreeLinks(externalInfo, 'missing')).toEqual([]);
+		expect(collectSubtreeLinks(buildTaskIndex(externalInfo), 'missing')).toEqual([]);
 	});
 });
