@@ -579,6 +579,37 @@ test('saves a category typed in the detail panel when the field is left or Enter
 	await expect(input).toHaveValue('리서치');
 });
 
+test('saves a category typed in the detail panel when the panel is closed with Escape', async ({ page }) => {
+	const categoryId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+	await seedOfflineBoard(page, {
+		extraTasks: [
+			{
+				id: 'local-categorized-task',
+				text: 'Task in a category',
+				category: '개발',
+				categoryId,
+				categoryMeta: { id: categoryId, name: '개발', color: '#ff0000', sortOrder: 0, hiddenAt: null, archivedAt: null }
+			},
+			{ id: 'local-uncategorized-task', text: 'Task without a category' }
+		]
+	});
+	await page.goto('/');
+
+	const modal = page.locator('.side-panel');
+	const input = modal.locator('#modal-category');
+	for (const [title, category] of [['Task in a category', '프로브'], ['Task without a category', '리서치']]) {
+		const card = cardByTitle(page, title);
+		await card.locator('.card-text').click();
+		await input.fill('');
+		await input.pressSequentially(category);
+		// Escape closes the panel with the field still focused; the name
+		// typed there is saved like the title typed above it.
+		await input.press('Escape');
+		await expect(modal).toHaveCount(0);
+		await expect(card.locator('.category-tag')).toHaveText(category);
+	}
+});
+
 /**
  * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').Locator} card

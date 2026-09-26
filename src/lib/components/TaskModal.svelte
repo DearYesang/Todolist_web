@@ -62,12 +62,25 @@
     }
 
     /**
+     * Leaves the focused field before closing. The category saves on its
+     * native change event, which fires on blur; unmounting a focused field
+     * (Escape closes the panel with the focus still in it) fires none, and
+     * the typed name would be lost.
+     */
+    function closePanel() {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        onclose();
+    }
+
+    /**
      * @param {KeyboardEvent} event
      */
     function handleDialogKeydown(event) {
         if (event.key === 'Escape') {
             event.stopPropagation();
-            onclose();
+            closePanel();
             return;
         }
 
@@ -80,8 +93,8 @@
         class="modal-backdrop"
         role="button"
         tabindex="-1"
-        onclick={onclose}
-        onkeydown={(event) => event.key === 'Escape' && onclose()}
+        onclick={closePanel}
+        onkeydown={(event) => event.key === 'Escape' && closePanel()}
         transition:fade={{ duration: 180 }}>
         <div
             class="side-panel"
@@ -96,7 +109,7 @@
                     <p class="panel-eyebrow">작업 상세 정보</p>
                     <h2>{task.text || '새 작업'}</h2>
                 </div>
-                <button class="close-btn" onclick={onclose}>✕</button>
+                <button class="close-btn" onclick={closePanel}>✕</button>
             </div>
 
             <div class="panel-body">
@@ -232,7 +245,7 @@
                 <button class="btn btn-danger" onclick={deleteTask}>🗑️ 작업 삭제</button>
                 <div class="panel-footer-actions">
                     <button class="btn btn-calendar" onclick={downloadCalendar}>📅 일정 추가(.ics)</button>
-                    <button class="btn btn-primary" onclick={onclose}>완료</button>
+                    <button class="btn btn-primary" onclick={closePanel}>완료</button>
                 </div>
             </div>
         </div>
