@@ -417,7 +417,7 @@ describe('signing out while a task write is still in flight', () => {
 	// writes that have not started to the queue. The request already out
 	// stays unprotected: when it fails after the sign-out, the queue belongs
 	// to no user.
-	it.fails('queues a write that fails after the sign-out under the user who made it', async () => {
+	it('queues a write that fails after the sign-out under the user who made it', async () => {
 		await editInFlight();
 		await expect(signOut({ clearLocalData: false })).resolves.toEqual({ asked: null, signedOut: true });
 
@@ -461,7 +461,7 @@ describe('signing out while a task write is still in flight', () => {
 		expect(get(tasks)).toEqual([]);
 	});
 
-	it.fails('keeps a write that lands after the sign-out off the next board, even one holding the same task', async () => {
+	it('keeps a write that lands after the sign-out off the next board, even one holding the same task', async () => {
 		// Server ids are per user, so another board holds the task only in a
 		// case like this one: a device that ran the app before caches were
 		// kept per user still shows that shared cache when signed out.

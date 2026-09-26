@@ -7,9 +7,33 @@ import {
     updateServerTask
 } from '../task-api.js';
 import { isServerId } from '../../shared/task-rules.js';
-import { enqueueOfflineMutation, loadOfflineQueue } from '../offline-write-queue.js';
+import { enqueueOfflineMutation, getOfflineQueueOwner, loadOfflineQueue } from '../offline-write-queue.js';
 import { normalizeTask, normalizeTaskList } from '../../shared/task-domain.js';
-import { mergeTasks, tasks } from './task-cache.js';
+import { getTaskStorageOwner, mergeTasks, tasks } from './task-cache.js';
+
+/**
+ * One server write in a task's chain, bound to the board it was made on:
+ * the offline queue owner and the task store owner when it was chained. A
+ * sign-out stops waiting for a request after its timeout, so the answer
+ * can come after the queue and the store have moved on to another user.
+ * The write keeps its own owners: a failure worth retrying goes to its
+ * queue owner's queue, and a success is applied only while the store
+ * still holds its store owner's board.
+ *
+ * - drained: it moved to the offline queue before it started, and never
+ *   runs.
+ * - taskStateQueued: while its request was out, a later snapshot patch or
+ *   delete of the task moved to the queue. That write was built from the
+ *   store after this one started, so it holds every field a snapshot
+ *   patch sends, newer.
+ * @typedef {{
+ *   taskId: string;
+ *   queueOwnerId: string;
+ *   storeOwnerId: string | null;
+ *   drained: boolean;
+ *   taskStateQueued: boolean;
+ * }} TaskSyncWrite
+ */
 
 /**
  * Server writes for one task run strictly one at a time. Rapid edits used to
@@ -50,9 +74,16 @@ const latestServerVersions = new Map();
 /**
  * Queued-but-unstarted chain ops exist only in memory. Each entry can rebuild
  * itself as an offline mutation so a page unload does not silently discard it.
- * @type {Map<{ drained: boolean }, () => import('../offline-write-queue.js').OfflineMutationInput | null>}
+ * @type {Map<TaskSyncWrite, () => import('../offline-write-queue.js').OfflineMutationInput | null>}
  */
 const pendingChainOpDescriptors = new Map();
+
+/**
+ * Chain writes that have started and not yet settled: their request may be
+ * out.
+ * @type {Set<TaskSyncWrite>}
+ */
+const writesInFlight = new Set();
 
 /**
  * A task with in-flight or queued chain ops has local state newer than any
@@ -150,20 +181,36 @@ export function applyServerTaskVersions(taskVersions) {
 
 /**
  * @param {string} taskId
- * @param {() => Promise<void>} operation
+ * @param {(write: TaskSyncWrite) => Promise<void>} operation
  * @param {(() => import('../offline-write-queue.js').OfflineMutationInput | null) | null} [buildDrainMutation]
  */
 function enqueueTaskSyncOperation(taskId, operation, buildDrainMutation = null) {
-    const token = { drained: false };
+    /** @type {TaskSyncWrite} */
+    const write = {
+        taskId,
+        queueOwnerId: getOfflineQueueOwner(),
+        storeOwnerId: getTaskStorageOwner(),
+        drained: false,
+        taskStateQueued: false
+    };
     if (buildDrainMutation) {
-        pendingChainOpDescriptors.set(token, buildDrainMutation);
+        pendingChainOpDescriptors.set(write, buildDrainMutation);
     }
 
     const previous = taskSyncChains.get(taskId) ?? Promise.resolve();
     const next = previous
-        .then(() => {
-            pendingChainOpDescriptors.delete(token);
-            return token.drained ? undefined : operation();
+        .then(async () => {
+            pendingChainOpDescriptors.delete(write);
+            if (write.drained) {
+                return;
+            }
+
+            writesInFlight.add(write);
+            try {
+                await operation(write);
+            } finally {
+                writesInFlight.delete(write);
+            }
         })
         .catch((error) => {
             console.error('Failed to run task sync operation', error);
@@ -195,21 +242,32 @@ export function resetTaskSyncStateForTests() {
     chainedChecklistItemsByTask.clear();
     latestServerVersions.clear();
     pendingChainOpDescriptors.clear();
+    writesInFlight.clear();
 }
 
 /**
- * Moves every queued-but-unstarted chain op into the durable offline queue.
- * Call on pagehide and before programmatic reloads: in-flight requests may
- * still land, but nothing queued behind them is lost with the page.
+ * Moves every queued-but-unstarted chain op into the durable offline queue
+ * of the user it was made for. Call on pagehide and before programmatic
+ * reloads: in-flight requests may still land, but nothing queued behind
+ * them is lost with the page.
  */
 export function drainPendingTaskSyncsToOfflineQueue() {
     const descriptors = [...pendingChainOpDescriptors.entries()];
     pendingChainOpDescriptors.clear();
-    for (const [token, buildDrainMutation] of descriptors) {
-        token.drained = true;
+    for (const [write, buildDrainMutation] of descriptors) {
+        write.drained = true;
         const mutation = buildDrainMutation();
-        if (mutation) {
-            enqueueOfflineMutation(mutation);
+        if (!mutation) {
+            continue;
+        }
+
+        enqueueOfflineMutation(mutation, { ownerId: write.queueOwnerId });
+        if (mutation.type === 'task.patch' || mutation.type === 'task.delete') {
+            writesInFlight.forEach((inFlight) => {
+                if (inFlight.taskId === mutation.taskId && inFlight.queueOwnerId === write.queueOwnerId) {
+                    inFlight.taskStateQueued = true;
+                }
+            });
         }
     }
 }
@@ -227,14 +285,18 @@ export async function waitForPendingTaskSyncs() {
 /**
  * Lets the per-task server writes finish before the session ends. Sign-out
  * calls this first: a write sent after the session ended would get 401 and
- * go back to the offline queue under no user ('anonymous'), out of the
- * signed-out user's reach.
+ * have to wait in the offline queue for the user's next sign-in.
  *
  * Waits up to `timeoutMs` for every write chain to settle, so edits made
  * just before are sent while the session is still valid. Writes that have
  * not started by then move to the offline queue of the user still signed
- * in, as on a page unload; a request already in flight may still answer
- * later.
+ * in, as on a page unload. A request already in flight keeps going, bound
+ * to that user (TaskSyncWrite): if it fails in a way worth retrying after
+ * the sign-out, it goes to that user's queue, not to whoever owns the
+ * queue by then, and if it lands, its answer is applied only while the
+ * store still holds that user's board. A failed task edit queues nothing
+ * when a later edit of the task moved to the queue at the timeout: that
+ * edit holds all of its fields, newer.
  * @param {{ timeoutMs: number }} options
  * @returns {Promise<boolean>} whether every chain settled in time
  */
@@ -331,7 +393,7 @@ function scheduleTaskSnapshotSync(taskId) {
     }
 
     queuedSnapshotSyncs.add(taskId);
-    enqueueTaskSyncOperation(taskId, async () => {
+    enqueueTaskSyncOperation(taskId, async (write) => {
         queuedSnapshotSyncs.delete(taskId);
         const current = get(tasks).find((item) => item.id === taskId);
         if (!current) {
@@ -341,11 +403,14 @@ function scheduleTaskSnapshotSync(taskId) {
         const patch = toChainedServerTaskPatch(taskId, current);
         const result = await updateServerTask(taskId, patch);
         if (result.ok) {
-            applyServerTaskResult(result.task);
+            applyWriteResult(write, result.task);
             return;
         }
 
-        reportSyncFailure(result, {
+        // The queue merges a task's patches with the later one on top.
+        // Queued after the newer edit already there, this patch would put
+        // its older values back over it.
+        reportSyncFailure(write, result, write.taskStateQueued ? null : {
             type: 'task.patch',
             taskId,
             localParentId: getLocalParentId(current),
@@ -402,11 +467,11 @@ export function syncTaskDelete(taskId, task = null) {
         return;
     }
 
-    enqueueTaskSyncOperation(taskId, async () => {
+    enqueueTaskSyncOperation(taskId, async (write) => {
         const expectedVersion = latestServerVersions.get(taskId) ?? capturedVersion;
         const result = await deleteServerTask(taskId, expectedVersion === undefined ? {} : { expectedVersion });
         if (!result.ok) {
-            reportSyncFailure(result, {
+            reportSyncFailure(write, result, {
                 type: 'task.delete',
                 taskId,
                 ...(expectedVersion === undefined ? {} : { expectedVersion })
@@ -486,7 +551,7 @@ export function syncChecklistCreate(taskId, subtaskId, text) {
     const chainedItems = chainedChecklistItemsByTask.get(taskId) ?? new Set();
     chainedItems.add(subtaskId);
     chainedChecklistItemsByTask.set(taskId, chainedItems);
-    enqueueTaskSyncOperation(taskId, async () => {
+    enqueueTaskSyncOperation(taskId, async (write) => {
         const knownItemIds = new Set(
             (get(tasks).find((task) => task.id === taskId)?.subtasks ?? [])
                 .map((subtask) => subtask.id)
@@ -498,11 +563,11 @@ export function syncChecklistCreate(taskId, subtaskId, text) {
             if (createdItem) {
                 resolvedChecklistItemIds.set(subtaskId, createdItem.id);
             }
-            applyServerTaskResult(result.task);
+            applyWriteResult(write, result.task);
             return;
         }
 
-        reportSyncFailure(result, {
+        reportSyncFailure(write, result, {
             type: 'checklist.create',
             taskId,
             localItemId: subtaskId,
@@ -557,10 +622,10 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
         return;
     }
 
-    enqueueTaskSyncOperation(taskId, async () => {
+    enqueueTaskSyncOperation(taskId, async (write) => {
         const itemId = isServerId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
         if (!itemId) {
-            enqueueOfflineMutation({
+            queueWrite(write, {
                 type: 'checklist.patch',
                 taskId,
                 itemId: subtaskId,
@@ -571,11 +636,11 @@ export function syncChecklistPatch(taskId, subtaskId, patch) {
 
         const result = await updateServerChecklistItem(taskId, itemId, patch);
         if (result.ok) {
-            applyServerTaskResult(result.task);
+            applyWriteResult(write, result.task);
             return;
         }
 
-        reportSyncFailure(result, {
+        reportSyncFailure(write, result, {
             type: 'checklist.patch',
             taskId,
             itemId,
@@ -602,10 +667,10 @@ export function syncChecklistDelete(taskId, subtaskId) {
         return;
     }
 
-    enqueueTaskSyncOperation(taskId, async () => {
+    enqueueTaskSyncOperation(taskId, async (write) => {
         const itemId = isServerId(subtaskId) ? subtaskId : resolvedChecklistItemIds.get(subtaskId);
         if (!itemId) {
-            enqueueOfflineMutation({
+            queueWrite(write, {
                 type: 'checklist.delete',
                 taskId,
                 itemId: subtaskId
@@ -615,11 +680,11 @@ export function syncChecklistDelete(taskId, subtaskId) {
 
         const result = await deleteServerChecklistItem(taskId, itemId);
         if (result.ok) {
-            applyServerTaskResult(result.task);
+            applyWriteResult(write, result.task);
             return;
         }
 
-        reportSyncFailure(result, {
+        reportSyncFailure(write, result, {
             type: 'checklist.delete',
             taskId,
             itemId
@@ -710,16 +775,44 @@ function toServerTaskPatch(task) {
 }
 
 /**
- * @param {{ ok: true } | { ok: false; fallback: boolean; message: string; status?: number }} result
- * @param {import('../offline-write-queue.js').OfflineMutationInput} [mutation]
+ * Applies a chained write's server answer, unless the store holds another
+ * user's board by now: the answer is about the board the write was made
+ * on, and a copy of the task there is no business of another user's.
+ * @param {TaskSyncWrite} write
+ * @param {import('../../shared/task-domain.js').Task} serverTask
  */
-function reportSyncFailure(result, mutation) {
+function applyWriteResult(write, serverTask) {
+    if (getTaskStorageOwner() !== write.storeOwnerId) {
+        return;
+    }
+
+    applyServerTaskResult(serverTask);
+}
+
+/**
+ * Puts a write that was not sent, or failed in a way worth retrying, in
+ * the offline queue of the user it was made for, even when the queue has
+ * moved on to another user since.
+ * @param {TaskSyncWrite} write
+ * @param {import('../offline-write-queue.js').OfflineMutationInput} mutation
+ */
+function queueWrite(write, mutation) {
+    enqueueOfflineMutation(mutation, { ownerId: write.queueOwnerId });
+}
+
+/**
+ * @param {TaskSyncWrite} write
+ * @param {{ ok: true } | { ok: false; fallback: boolean; message: string; status?: number }} result
+ * @param {import('../offline-write-queue.js').OfflineMutationInput | null} [mutation]
+ *   what to queue on a failure worth retrying; null queues nothing
+ */
+function reportSyncFailure(write, result, mutation) {
     if (!result.ok && !result.fallback) {
         console.error('Failed to sync task mutation', result.message);
         return;
     }
 
     if (!result.ok && result.fallback && mutation) {
-        enqueueOfflineMutation(mutation);
+        queueWrite(write, mutation);
     }
 }

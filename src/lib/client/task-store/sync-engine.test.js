@@ -211,7 +211,7 @@ describe('settling task writes before sign-out', () => {
     // The queue merges a task's patches with the later one's fields on top.
     // The request in flight fails after the edit behind it was queued, so
     // its older fields would land on top of the newer edit's.
-    it.fails('keeps the queued later edit when the request in flight fails after the wait', async () => {
+    it('keeps the queued later edit when the request in flight fails after the wait', async () => {
         const firstAnswer = createDeferred();
         vi.stubGlobal('fetch', vi.fn(() => firstAnswer.promise));
         updateTask(TASK_ID, { text: 'Edit 1' });
