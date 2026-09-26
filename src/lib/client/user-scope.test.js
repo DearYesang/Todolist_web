@@ -2,11 +2,15 @@ import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
 import { jsonResponse } from '$lib/test-support/http.js';
+import { DEFAULT_FILTERS } from '../shared/task-domain.js';
 import { linkOpenState, requestOpenLinks } from './link-opener.js';
 import {
 	categories,
+	filters,
 	markPendingDefaultView,
 	readPendingDefaultView,
+	setCategoryFilter,
+	setPriorityFilter,
 	syncServerTasks,
 	tasks
 } from './task-store.js';
@@ -152,6 +156,44 @@ describe('user scope', () => {
 		expect(countPendingLocalChanges()).toBe(1);
 		expect(get(linkOpenState)?.phase).toBe('confirm');
 		expect(get(categories)).toEqual(['서버 카테고리']);
+	});
+
+	// Probes P2 and P3: the category catalog was already emptied, but the
+	// filters and a pending default view outlived the user. App.svelte sends
+	// a pending view to whoever is signed in next.
+	it.fails.each([
+		{ change: 'another user signs in', nextUserId: 'user-b' },
+		{ change: 'the user signs out', nextUserId: null }
+	])('drops the previous user\'s catalog, filters and pending default view when $change', async ({ nextUserId }) => {
+		seedUserData('user-a', { taskText: 'User A task' });
+		applyUserScope('user-a');
+		await syncCategoryCatalog();
+		setCategoryFilter(CATEGORY_ID, '서버 카테고리');
+		setPriorityFilter('high');
+		markPendingDefaultView('gantt');
+
+		applyUserScope(nextUserId);
+
+		expect({
+			categories: get(categories),
+			filters: get(filters),
+			pendingView: readPendingDefaultView()
+		}).toEqual({
+			categories: [],
+			filters: DEFAULT_FILTERS,
+			pendingView: null
+		});
+	});
+
+	it('keeps a pending default view when the app opens as the cached user', () => {
+		// Set offline in an earlier visit; the first sync once the session
+		// is confirmed sends it.
+		storage.set('todokanbanPendingDefaultView', 'gantt');
+
+		applyUserScope('user-a');
+		applyUserScope('user-a');
+
+		expect(readPendingDefaultView()).toBe('gantt');
 	});
 
 	it('clears only the signed-in user\'s queue, cached tasks and pending default view on sign-out', () => {
