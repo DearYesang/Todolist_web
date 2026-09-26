@@ -1,6 +1,6 @@
-import { timingSafeEqual } from 'node:crypto';
 import { json } from '@sveltejs/kit';
 import { getRuntimeConfigReport } from '$lib/server/config/env.js';
+import { readBearerToken, secretsMatch } from '$lib/server/security/bearer-secret.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request, url }) {
@@ -39,17 +39,7 @@ function shouldExposeDetails(request) {
 	}
 
 	const token = process.env.HEALTH_DETAILS_TOKEN;
-	const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
-	return Boolean(token && token.length >= 32 && secretsMatch(bearer, token));
-}
-
-/**
- * @param {string | undefined} candidate
- * @param {string} secret
- */
-function secretsMatch(candidate, secret) {
-	if (!candidate || candidate.length !== secret.length) return false;
-	return timingSafeEqual(Buffer.from(candidate), Buffer.from(secret));
+	return Boolean(token && token.length >= 32 && secretsMatch(readBearerToken(request), token));
 }
 
 /**
