@@ -10,6 +10,15 @@ updates:
         dependency-type: production
       npm-development:
         dependency-type: development
+    ignore:
+      # SvelteKit 3 needs a dedicated migration (svelte.config.js moves into
+      # the Vite plugin, $lib, $service-worker, external redirects, the cookie
+      # override). adapter-vercel 7 requires Kit 3. Remove both entries when
+      # the migration branch lands.
+      - dependency-name: '@sveltejs/kit'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@sveltejs/adapter-vercel'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
