@@ -82,12 +82,15 @@ export const auth = betterAuth({
 					}
 
 					await consumePasskeyEmailCode(registration.email, registration.emailVerificationCode);
-					const created = await ctx.context.internalAdapter.createUser({
-						id: user.id,
-						email: registration.email,
-						name: registration.name,
-						emailVerified: true
-					});
+					const created = await ctx.context.internalAdapter.createUser(
+						{
+							id: user.id,
+							email: registration.email,
+							name: registration.name,
+							emailVerified: true
+						},
+						{ method: 'passkey' }
+					);
 
 					return { userId: created.id };
 				}
