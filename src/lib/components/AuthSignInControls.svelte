@@ -1,9 +1,9 @@
 <script>
     import { onMount } from 'svelte';
-    import { authClient } from '$lib/client/auth-client.js';
-    import { requestEmailVerificationCode } from '$lib/client/account-security-api.js';
-    import { createPasskeySignupContext, getPasskeySignupError } from '$lib/client/passkey-signup.js';
-    import { createSuggestedPasskeyName, getAuthErrorMessage } from '$lib/client/auth-labels.js';
+    import { authClient } from '#lib/client/auth-client.js';
+    import { requestEmailVerificationCode } from '#lib/client/account-security-api.js';
+    import { createPasskeySignupContext, getPasskeySignupError } from '#lib/client/passkey-signup.js';
+    import { createSuggestedPasskeyName, getAuthErrorMessage } from '#lib/client/auth-labels.js';
     import AuthStatus from './AuthStatus.svelte';
 
     // Signed out: sign up with an email code (or a recovery code) and a new
@@ -63,7 +63,7 @@
     async function registerPasskey() {
         if (isWorking) return;
 
-        /** @type {import('$lib/client/passkey-signup.js').PasskeySignupInput} */
+        /** @type {import('#lib/client/passkey-signup.js').PasskeySignupInput} */
         const signupInput = {
             email: email.trim().toLowerCase(),
             name,

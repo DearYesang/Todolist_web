@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { createCalendarTokenForUser, listCalendarTokensForUser } from '$lib/server/calendar/tokens.js';
-import { resetRateLimitBuckets } from '$lib/server/security/rate-limit.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { createCalendarTokenForUser, listCalendarTokensForUser } from '#lib/server/calendar/tokens.js';
+import { resetRateLimitBuckets } from '#lib/server/security/rate-limit.js';
 import { GET, POST } from './+server.js';
 
-vi.mock('$lib/server/auth/session.js', () => ({
+vi.mock('#lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/calendar/tokens.js', async (importOriginal) => ({
+vi.mock('#lib/server/calendar/tokens.js', async (importOriginal) => ({
 	...(await importOriginal()),
 	createCalendarTokenForUser: vi.fn(),
 	listCalendarTokensForUser: vi.fn()

@@ -1,10 +1,10 @@
 <script>
     import { onMount } from 'svelte';
-    import { authClient } from '$lib/client/auth-client.js';
-    import { createRecoveryCodes, revokeRecoveryCodes } from '$lib/client/account-security-api.js';
-    import { clearPendingDefaultView } from '$lib/client/task-store.js';
-    import { clearUserLocalData, countPendingLocalChanges } from '$lib/client/user-scope.js';
-    import { createSuggestedPasskeyName, getAuthErrorMessage } from '$lib/client/auth-labels.js';
+    import { authClient } from '#lib/client/auth-client.js';
+    import { createRecoveryCodes, revokeRecoveryCodes } from '#lib/client/account-security-api.js';
+    import { clearPendingDefaultView } from '#lib/client/task-store.js';
+    import { clearUserLocalData, countPendingLocalChanges } from '#lib/client/user-scope.js';
+    import { createSuggestedPasskeyName, getAuthErrorMessage } from '#lib/client/auth-labels.js';
     import AuthStatus from './AuthStatus.svelte';
     import PasskeyManager from './PasskeyManager.svelte';
 
@@ -18,7 +18,7 @@
     let authMessage = $state('');
     let authError = $state('');
     let recoverySummary = $state(
-        /** @type {import('$lib/client/account-security-api.js').RecoveryCodeSummary | null} */ (null)
+        /** @type {import('#lib/client/account-security-api.js').RecoveryCodeSummary | null} */ (null)
     );
     let newRecoveryCodes = $state(/** @type {string[]} */ ([]));
     let passkeyManagerOpen = $state(false);

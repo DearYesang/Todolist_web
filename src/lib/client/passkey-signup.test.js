@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { parsePasskeyRegistrationContext } from '$lib/server/auth/account-security.js';
+import { parsePasskeyRegistrationContext } from '#lib/server/auth/account-security.js';
 import { createPasskeySignupContext, getPasskeySignupError, isExpiredVerificationCode } from './passkey-signup.js';
 
 const NOW = Date.parse('2026-09-24T03:00:00.000Z');

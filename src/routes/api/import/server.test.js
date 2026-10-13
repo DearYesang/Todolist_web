@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { importTasksForUser, replaceTasksForUser } from '$lib/server/tasks/repository.js';
-import { normalizeTask } from '$lib/shared/task-domain.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { importTasksForUser, replaceTasksForUser } from '#lib/server/tasks/repository.js';
+import { normalizeTask } from '#lib/shared/task-domain.js';
 import { POST } from './+server.js';
 
-vi.mock('$lib/server/auth/session.js', () => ({
+vi.mock('#lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/tasks/repository.js', () => ({
+vi.mock('#lib/server/tasks/repository.js', () => ({
 	importTasksForUser: vi.fn(),
 	replaceTasksForUser: vi.fn()
 }));

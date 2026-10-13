@@ -1,10 +1,10 @@
 <script>
-    import { taskIndex } from '$lib/client/task-store.js';
-    import { collectSubtreeLinks, extractTaskLinks } from '$lib/shared/task-links.js';
+    import { taskIndex } from '#lib/client/task-store.js';
+    import { collectSubtreeLinks, extractTaskLinks } from '#lib/shared/task-links.js';
     import OpenLinksButton from '../OpenLinksButton.svelte';
 
     /** @type {{
-     *   task: import('$lib/shared/task-domain.js').Task;
+     *   task: import('#lib/shared/task-domain.js').Task;
      *   show: 'own' | 'subtree' | 'both';
      * }} */
     let { task, show } = $props();

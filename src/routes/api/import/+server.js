@@ -1,8 +1,7 @@
-import { json } from '@sveltejs/kit';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
-import { enforceImportRateLimit } from '$lib/server/security/rate-limit-guard.js';
-import { importTasksForUser, replaceTasksForUser } from '$lib/server/tasks/repository.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { apiErrorResponse, readJsonBody } from '#lib/server/http/api-error.js';
+import { enforceImportRateLimit } from '#lib/server/security/rate-limit-guard.js';
+import { importTasksForUser, replaceTasksForUser } from '#lib/server/tasks/repository.js';
 
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
@@ -28,7 +27,7 @@ export async function POST({ request, url }) {
 			mode === 'replace'
 				? await replaceTasksForUser(authResult.user.id, payload)
 				: await importTasksForUser(authResult.user.id, payload);
-		return json(result, {
+		return Response.json(result, {
 			status: 201,
 			headers: {
 				'cache-control': 'private, no-store'

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { enforceImportRateLimit, enforceTaskWriteRateLimit } from '$lib/server/security/rate-limit-guard.js';
-import * as repository from '$lib/server/tasks/repository.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { enforceImportRateLimit, enforceTaskWriteRateLimit } from '#lib/server/security/rate-limit-guard.js';
+import * as repository from '#lib/server/tasks/repository.js';
 import { POST as createTask } from './tasks/+server.js';
 import { PATCH as patchTask, DELETE as deleteTask } from './tasks/[taskId]/+server.js';
 import { POST as createChecklistItem } from './tasks/[taskId]/checklist/+server.js';
@@ -11,16 +11,16 @@ import {
 } from './tasks/[taskId]/checklist/[itemId]/+server.js';
 import { POST as importTasks } from './import/+server.js';
 
-vi.mock('$lib/server/auth/session.js', () => ({
+vi.mock('#lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/security/rate-limit-guard.js', () => ({
+vi.mock('#lib/server/security/rate-limit-guard.js', () => ({
 	enforceTaskWriteRateLimit: vi.fn(),
 	enforceImportRateLimit: vi.fn()
 }));
 
-vi.mock('$lib/server/tasks/repository.js', () => ({
+vi.mock('#lib/server/tasks/repository.js', () => ({
 	createTaskForUser: vi.fn(),
 	listTasksForUser: vi.fn(),
 	updateTaskForUser: vi.fn(),
@@ -106,10 +106,13 @@ describe('rate-limit guard wiring on every protected write route', () => {
 		'$name proceeds when the guard allows the request',
 		async ({ handler, method, guard }) => {
 			vi.mocked(guard).mockResolvedValue(null);
+			// The import route answers the repository's result itself, and
+			// Response.json() refuses undefined.
+			vi.mocked(repository.importTasksForUser).mockResolvedValue(/** @type {any} */ ({}));
 
 			const response = await handler(createEvent(method));
 
-			// Repository mocks resolve undefined, so a pass-through reaches the
+			// The other repository mocks resolve undefined, so a pass-through reaches the
 			// handler's success path (200/201) rather than the 429 short-circuit.
 			expect(response.status).not.toBe(429);
 			expect(guard).toHaveBeenCalledWith('user-id');

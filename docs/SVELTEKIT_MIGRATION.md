@@ -5,7 +5,7 @@ The project has moved from a Svelte 5 + Vite SPA shell to a SvelteKit shell. The
 ## Completed
 
 - `vite.config.js` uses the SvelteKit plugin.
-- `svelte.config.js` uses `@sveltejs/adapter-vercel`.
+- `vite.config.js` passes `@sveltejs/adapter-vercel` and the CSP to the SvelteKit plugin. SvelteKit 3 has no `svelte.config.js`.
 - `src/app.html` is the document shell.
 - `src/routes/+layout.svelte` imports the global stylesheet and owns document metadata.
 - `src/routes/+page.svelte` renders the existing app component.
@@ -32,7 +32,7 @@ Neon/Drizzle schema and lazy DB initialization live under `src/lib/server/db`.
 
 Better Auth server configuration lives under `src/lib/server/auth`; the SvelteKit hook mounts auth routes only when `DATABASE_URL` is configured.
 
-PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker.js` caches the app shell and static assets for repeat visits.
+PWA install metadata lives in `static/manifest.webmanifest`; `src/service-worker/index.js` caches the app shell and static assets for repeat visits. It is built against SvelteKit 3's `$app/manifest`, `$app/env`, `$app/paths` and `$app/service-worker` modules and has its own `src/service-worker/jsconfig.json`, which `npm run check` type-checks separately.
 
 Task-level iCalendar downloads use `src/lib/shared/calendar-ics.js`; `/api/calendar.ics` uses the same generator for authenticated server-backed calendar downloads. The visible calendar flow is `.ics`-first: `전체 일정 동기화` creates revocable whole-board `.ics` URLs through `/api/calendar/tokens` and `/api/calendar/subscriptions/[token].ics`, while task cards and detail panels download single-task `.ics` files.
 

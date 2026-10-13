@@ -1,10 +1,10 @@
 import { getTableName } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getDb, schema } from '$lib/server/db/index.js';
+import { getDb, schema } from '#lib/server/db/index.js';
 import { importTasksForUser, replaceTasksForUser } from './import-repository.js';
 
-vi.mock('$lib/server/db/index.js', async () => {
-	const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+vi.mock('#lib/server/db/index.js', async () => {
+	const { createFakeDbModule } = await import('#lib/test-support/fake-db.js');
 	return createFakeDbModule();
 });
 

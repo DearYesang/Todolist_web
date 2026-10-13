@@ -9,7 +9,7 @@ const authState = vi.hoisted(() => ({
 	configurationError: /** @type {string | null} */ (null)
 }));
 
-vi.mock('$lib/server/auth/index.js', () => ({
+vi.mock('#lib/server/auth/index.js', () => ({
 	get authDatabaseConfigured() {
 		return authState.databaseConfigured;
 	},

@@ -7,8 +7,8 @@
         reorderCategories,
         setCategoryHidden,
         updateCategoryColor
-    } from '$lib/client/task-store.js';
-    import { getCategoryColor } from '$lib/shared/task-domain.js';
+    } from '#lib/client/task-store.js';
+    import { getCategoryColor } from '#lib/shared/task-domain.js';
 
     /** @type {{ onclose: () => void }} */
     let { onclose } = $props();

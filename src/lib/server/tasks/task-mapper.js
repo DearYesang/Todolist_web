@@ -1,11 +1,11 @@
-import { normalizeTask, normalizeTaskList } from '$lib/shared/task-domain.js';
-import { mapCategoryRowToClientCategory } from '$lib/server/categories/category-service.js';
+import { normalizeTask, normalizeTaskList } from '#lib/shared/task-domain.js';
+import { mapCategoryRowToClientCategory } from '#lib/server/categories/category-service.js';
 
 /**
- * @typedef {typeof import('$lib/server/db/schema.js').tasks.$inferSelect} TaskRow
- * @typedef {typeof import('$lib/server/db/schema.js').categories.$inferSelect} CategoryRow
- * @typedef {typeof import('$lib/server/db/schema.js').checklistItems.$inferSelect} ChecklistItemRow
- * @typedef {TaskRow & { categoryMeta?: import('$lib/shared/task-domain.js').TaskCategoryMeta | null }} TaskRowWithCategoryMeta
+ * @typedef {typeof import('#lib/server/db/schema.js').tasks.$inferSelect} TaskRow
+ * @typedef {typeof import('#lib/server/db/schema.js').categories.$inferSelect} CategoryRow
+ * @typedef {typeof import('#lib/server/db/schema.js').checklistItems.$inferSelect} ChecklistItemRow
+ * @typedef {TaskRow & { categoryMeta?: import('#lib/shared/task-domain.js').TaskCategoryMeta | null }} TaskRowWithCategoryMeta
  */
 
 /**
@@ -23,7 +23,7 @@ export function attachCategoryMetaToTaskRow(taskRow, categoryRow) {
 /**
  * @param {TaskRowWithCategoryMeta[]} taskRows
  * @param {ChecklistItemRow[]} checklistRows
- * @returns {import('$lib/shared/task-domain.js').Task[]}
+ * @returns {import('#lib/shared/task-domain.js').Task[]}
  */
 export function mapTaskRowsToClientTasks(taskRows, checklistRows) {
 	const checklistByTask = groupChecklistRows(checklistRows);
@@ -34,7 +34,7 @@ export function mapTaskRowsToClientTasks(taskRows, checklistRows) {
 /**
  * @param {TaskRowWithCategoryMeta} taskRow
  * @param {ChecklistItemRow[]} checklistRows
- * @returns {import('$lib/shared/task-domain.js').Task}
+ * @returns {import('#lib/shared/task-domain.js').Task}
  */
 export function mapTaskRowToClientTask(taskRow, checklistRows = []) {
 	return normalizeTask(mapTaskRowToRawTask(taskRow, groupChecklistRows(checklistRows)[taskRow.id] ?? []));
@@ -42,7 +42,7 @@ export function mapTaskRowToClientTask(taskRow, checklistRows = []) {
 
 /**
  * @param {TaskRowWithCategoryMeta} task
- * @param {import('$lib/shared/task-domain.js').Subtask[]} subtasks
+ * @param {import('#lib/shared/task-domain.js').Subtask[]} subtasks
  */
 function mapTaskRowToRawTask(task, subtasks) {
 	const categoryMeta = task.categoryMeta ?? null;
@@ -67,10 +67,10 @@ function mapTaskRowToRawTask(task, subtasks) {
 
 /**
  * @param {ChecklistItemRow[]} rows
- * @returns {Record<string, import('$lib/shared/task-domain.js').Subtask[]>}
+ * @returns {Record<string, import('#lib/shared/task-domain.js').Subtask[]>}
  */
 function groupChecklistRows(rows) {
-	/** @type {Record<string, import('$lib/shared/task-domain.js').Subtask[]>} */
+	/** @type {Record<string, import('#lib/shared/task-domain.js').Subtask[]>} */
 	const grouped = {};
 
 	for (const row of rows) {

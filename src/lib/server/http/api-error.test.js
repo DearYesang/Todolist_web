@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { AccountSecurityConfigurationError, AccountSecurityPolicyError } from '$lib/server/auth/account-security.js';
-import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
-import { CalendarSyncError } from '$lib/server/calendar/provider-sync.js';
-import { CalendarProviderError } from '$lib/server/calendar/providers.js';
-import { CalendarTokenConfigurationError, CalendarTokenLimitError } from '$lib/server/calendar/tokens.js';
-import { RateLimitError } from '$lib/server/security/rate-limit.js';
-import { TaskWriteError } from '$lib/server/tasks/validation.js';
+import { AccountSecurityConfigurationError, AccountSecurityPolicyError } from '#lib/server/auth/account-security.js';
+import { CalendarTokenEncryptionError } from '#lib/server/calendar/oauth-encryption.js';
+import { CalendarSyncError } from '#lib/server/calendar/provider-sync.js';
+import { CalendarProviderError } from '#lib/server/calendar/providers.js';
+import { CalendarTokenConfigurationError, CalendarTokenLimitError } from '#lib/server/calendar/tokens.js';
+import { RateLimitError } from '#lib/server/security/rate-limit.js';
+import { TaskWriteError } from '#lib/server/tasks/validation.js';
 import { ApiError, apiErrorResponse, readJsonBody } from './api-error.js';
 
 /**
@@ -75,7 +75,7 @@ describe('apiErrorResponse', () => {
 		expect(await readResponse(apiErrorResponse(new TaskWriteError('Task changed on another device.', 409)))).toEqual({
 			status: 409,
 			body: { message: 'Task changed on another device.' },
-			headers: { 'content-type': 'application/json', 'content-length': '45' }
+			headers: { 'content-type': 'application/json' }
 		});
 	});
 
@@ -83,7 +83,7 @@ describe('apiErrorResponse', () => {
 		expect(await readResponse(apiErrorResponse(new RateLimitError('Too many task changes.', 42)))).toEqual({
 			status: 429,
 			body: { message: 'Too many task changes.' },
-			headers: { 'content-type': 'application/json', 'content-length': '36', 'retry-after': '42' }
+			headers: { 'content-type': 'application/json', 'retry-after': '42' }
 		});
 	});
 

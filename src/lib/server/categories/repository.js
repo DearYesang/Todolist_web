@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { ensurePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
-import { ApiError } from '$lib/server/http/api-error.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { ensurePersonalBoardForUser } from '#lib/server/boards/board-provisioning.js';
+import { ApiError } from '#lib/server/http/api-error.js';
 import {
 	findOrCreateCategoryRow,
 	getCategoryRowForBoard,
@@ -10,8 +10,8 @@ import {
 	parseCategoryColor,
 	parseCategoryName
 } from './category-service.js';
-import { normalizeCategoryKey } from '$lib/shared/category-suggestions.js';
-import { UUID_PATTERN } from '$lib/shared/task-rules.js';
+import { normalizeCategoryKey } from '#lib/shared/category-suggestions.js';
+import { UUID_PATTERN } from '#lib/shared/task-rules.js';
 
 /**
  * Rename, merge and delete rewrite every task in the category and bump its

@@ -1,5 +1,5 @@
-import { auth, authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
-import { normalizePasskeyRegistrationRequest } from '$lib/server/auth/passkey-request.js';
+import { auth, authConfigurationError, authDatabaseConfigured } from '#lib/server/auth/index.js';
+import { normalizePasskeyRegistrationRequest } from '#lib/server/auth/passkey-request.js';
 
 const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
 

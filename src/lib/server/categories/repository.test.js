@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getDb } from '$lib/server/db/index.js';
+import { getDb } from '#lib/server/db/index.js';
 import { deleteCategoryForUser, mergeCategoryForUser, updateCategoryForUser } from './repository.js';
 
-vi.mock('$lib/server/db/index.js', async () => {
-	const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+vi.mock('#lib/server/db/index.js', async () => {
+	const { createFakeDbModule } = await import('#lib/test-support/fake-db.js');
 	return createFakeDbModule();
 });
 
-vi.mock('$lib/server/boards/board-provisioning.js', () => ({
+vi.mock('#lib/server/boards/board-provisioning.js', () => ({
 	ensurePersonalBoardForUser: async () => ({ id: '22222222-2222-4222-8222-222222222222' })
 }));
 

@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
-import { jsonResponse } from '$lib/test-support/http.js';
+import { installMemoryStorage } from '#lib/test-support/browser-globals.js';
+import { jsonResponse } from '#lib/test-support/http.js';
 import { exportTaskBackup, importTaskBackup } from './backup-transfer.js';
 import { loadOfflineQueue, setOfflineQueueOwner } from './offline-write-queue.js';
 import { filters, setPriorityFilter, setTaskStoreOwner, tasks } from './task-store.js';

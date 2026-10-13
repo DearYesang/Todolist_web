@@ -1,6 +1,6 @@
 <script>
-    import { formatLocalDate, parseLocalDateNoon, todayString } from '$lib/shared/local-date.js';
-    import { normalizeDateRange } from '$lib/shared/task-domain.js';
+    import { formatLocalDate, parseLocalDateNoon, todayString } from '#lib/shared/local-date.js';
+    import { normalizeDateRange } from '#lib/shared/task-domain.js';
 
     /** @type {{
      *   startDate: string;

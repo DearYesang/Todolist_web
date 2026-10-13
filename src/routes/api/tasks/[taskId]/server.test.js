@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { deleteTaskCascadeForUser, updateTaskForUser } from '$lib/server/tasks/repository.js';
-import { TaskWriteError } from '$lib/server/tasks/validation.js';
-import { normalizeTask } from '$lib/shared/task-domain.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { deleteTaskCascadeForUser, updateTaskForUser } from '#lib/server/tasks/repository.js';
+import { TaskWriteError } from '#lib/server/tasks/validation.js';
+import { normalizeTask } from '#lib/shared/task-domain.js';
 import { DELETE, PATCH } from './+server.js';
 
-vi.mock('$lib/server/auth/session.js', () => ({
+vi.mock('#lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/tasks/repository.js', () => ({
+vi.mock('#lib/server/tasks/repository.js', () => ({
 	deleteTaskCascadeForUser: vi.fn(),
 	updateTaskForUser: vi.fn()
 }));

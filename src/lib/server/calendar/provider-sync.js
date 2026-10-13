@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, gt } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { ApiError } from '$lib/server/http/api-error.js';
-import { ensurePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
-import { listTasksForUser } from '$lib/server/tasks/repository.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { ApiError } from '#lib/server/http/api-error.js';
+import { ensurePersonalBoardForUser } from '#lib/server/boards/board-provisioning.js';
+import { listTasksForUser } from '#lib/server/tasks/repository.js';
 import {
 	decryptCalendarToken,
 	encryptCalendarToken,
@@ -571,7 +571,7 @@ function toSyncRunResponse(row) {
 }
 
 /**
- * @param {import('$lib/shared/task-domain.js').Task} task
+ * @param {import('#lib/shared/task-domain.js').Task} task
  */
 export function shouldSyncTaskToProvider(task) {
 	return task.status !== 'done';

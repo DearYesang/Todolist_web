@@ -9,7 +9,7 @@ import { createContext } from 'svelte';
  *
  * @typedef {{
  *   dnd: {
- *     controller: ReturnType<typeof import('$lib/client/pointer-dnd.js').createPointerDndController>;
+ *     controller: ReturnType<typeof import('#lib/client/pointer-dnd.js').createPointerDndController>;
  *     state: { draggedId: string | null; hoveredZone: string | null };
  *     cardDrops: boolean;
  *   };

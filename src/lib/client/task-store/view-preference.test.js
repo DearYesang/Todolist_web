@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
-import { jsonResponse } from '$lib/test-support/http.js';
+import { installMemoryStorage } from '#lib/test-support/browser-globals.js';
+import { jsonResponse } from '#lib/test-support/http.js';
 import {
 	currentView,
 	flushPendingViewPreference,

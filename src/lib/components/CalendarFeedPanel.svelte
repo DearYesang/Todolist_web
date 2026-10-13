@@ -1,10 +1,10 @@
 <script>
-    import { authClient } from '$lib/client/auth-client.js';
-    import { createCalendarToken, listCalendarTokens, revokeCalendarToken } from '$lib/client/calendar-token-api.js';
+    import { authClient } from '#lib/client/auth-client.js';
+    import { createCalendarToken, listCalendarTokens, revokeCalendarToken } from '#lib/client/calendar-token-api.js';
 
     const session = authClient.useSession();
 
-    let tokens = $state(/** @type {import('$lib/client/calendar-token-api.js').CalendarTokenRecord[]} */ ([]));
+    let tokens = $state(/** @type {import('#lib/client/calendar-token-api.js').CalendarTokenRecord[]} */ ([]));
     let latestUrl = $state('');
     let isOpen = $state(false);
     let isWorking = $state(false);
@@ -86,7 +86,7 @@
     }
 
     /**
-     * @param {import('$lib/client/calendar-token-api.js').CalendarTokenRecord} token
+     * @param {import('#lib/client/calendar-token-api.js').CalendarTokenRecord} token
      */
     function getTokenState(token) {
         if (token.revokedAt) return '해지됨';

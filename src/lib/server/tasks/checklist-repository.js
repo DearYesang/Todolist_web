@@ -1,5 +1,5 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
+import { getDb, schema } from '#lib/server/db/index.js';
 import { createPositionValue, getWritableTaskForUser, loadClientTask } from './task-rows.js';
 import {
 	parseChecklistItemIdParam,

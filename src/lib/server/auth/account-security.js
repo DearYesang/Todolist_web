@@ -1,9 +1,9 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { APIError } from 'better-auth/api';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { ApiError } from '$lib/server/http/api-error.js';
-import { assertRateLimit, createRateLimitHeaders, RateLimitError } from '$lib/server/security/rate-limit.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { ApiError } from '#lib/server/http/api-error.js';
+import { assertRateLimit, createRateLimitHeaders, RateLimitError } from '#lib/server/security/rate-limit.js';
 
 const EMAIL_VERIFICATION_PREFIX = 'passkey-email-verification:';
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;

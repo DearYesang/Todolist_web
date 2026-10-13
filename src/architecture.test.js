@@ -4,9 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // The import rules the code keeps, checked on the source text: every .js and
-// .svelte file under src/, and the files they import by a relative or $lib
-// path. Packages and SvelteKit's $app, $env and $service-worker modules are
-// not part of the graph.
+// .svelte file under src/, and the files they import by a relative or #lib
+// path. Packages and SvelteKit's $app modules are not part of the graph.
 
 const SRC_DIR = fileURLToPath(new URL('./', import.meta.url));
 
@@ -61,8 +60,8 @@ const fileSet = new Set(files);
  */
 function resolveImport(importer, specifier) {
 	let path;
-	if (specifier.startsWith('$lib/')) {
-		path = posix.join('lib', specifier.slice('$lib/'.length));
+	if (specifier.startsWith('#lib/')) {
+		path = posix.join('lib', specifier.slice('#lib/'.length));
 	} else if (specifier.startsWith('.')) {
 		path = posix.join(posix.dirname(importer), specifier);
 	} else {
@@ -212,7 +211,7 @@ function findServerPackageCycles() {
 }
 
 describe('source architecture', () => {
-	it('resolves every relative and $lib import to a file, so the rules below see every import', () => {
+	it('resolves every relative and #lib import to a file, so the rules below see every import', () => {
 		expect(files.length).toBeGreaterThan(100);
 		expect(unresolved).toEqual([]);
 	});
@@ -325,7 +324,7 @@ describe('source architecture', () => {
 
 	it('reaches the server task repository modules only through repository.js', () => {
 		// A route importing a module behind repository.js would escape the
-		// vi.mock('$lib/server/tasks/repository.js') factories in its tests.
+		// vi.mock('#lib/server/tasks/repository.js') factories in its tests.
 		// Tests may import the others, like validation.js for TaskWriteError.
 		const tasksDir = `${SERVER_DIR}tasks/`;
 		expect(

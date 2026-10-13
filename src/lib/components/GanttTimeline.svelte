@@ -1,6 +1,6 @@
 <script>
     import { onDestroy, tick } from 'svelte';
-    import { filters, tasks, toggleSubtask, updateTask } from '$lib/client/task-store.js';
+    import { filters, tasks, toggleSubtask, updateTask } from '#lib/client/task-store.js';
     import {
         buildGanttLayout,
         canStartResize,
@@ -9,8 +9,8 @@
         getResizeDayOffset,
         getResizePreview,
         ownsResizePointer
-    } from '$lib/shared/gantt-layout.js';
-    import { getCategoryColor, getFilteredTasks } from '$lib/shared/task-domain.js';
+    } from '#lib/shared/gantt-layout.js';
+    import { getCategoryColor, getFilteredTasks } from '#lib/shared/task-domain.js';
 
     /** @type {{ openTask: (id: string) => void }} */
     let { openTask } = $props();
@@ -48,7 +48,7 @@
     });
 
     /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      */
     function getCoords(task) {
         return getBarCoords(getRenderedDates(task), ganttData.minDate, dayWidth);
@@ -69,7 +69,7 @@
     }
 
     /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      */
     function getRenderedDates(task) {
         if (resizeState?.taskId === task.id) {
@@ -86,7 +86,7 @@
     }
 
     /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      */
     function getBarTitle(task) {
         const { startDate, endDate } = getRenderedDates(task);
@@ -101,7 +101,7 @@
 
     /**
      * @param {PointerEvent} event
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      * @param {'start' | 'end'} edge
      */
     function startResize(event, task, edge) {
@@ -171,7 +171,7 @@
     }
 
     /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      */
     function toggleChecklistPreview(task) {
         if (task.subtasks.length === 0) {
@@ -191,7 +191,7 @@
     }
 
     /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      */
     function getRowHeight(task) {
         if (expandedChecklistTaskId !== task.id || task.subtasks.length === 0) {
@@ -202,7 +202,7 @@
     }
 
     /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      */
     function getChecklistPreview(task) {
         return task.subtasks.slice(0, 3);

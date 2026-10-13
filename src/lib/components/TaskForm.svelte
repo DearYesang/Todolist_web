@@ -1,16 +1,16 @@
 <script>
     import { onDestroy } from 'svelte';
-    import { categories, createTask, tasks } from '$lib/client/task-store.js';
-    import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
-    import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
+    import { categories, createTask, tasks } from '#lib/client/task-store.js';
+    import { createImeCompositionGuard } from '#lib/client/ime-keyboard.js';
+    import { getDefaultDateRange, PRIORITY_LABELS, URGENCY_LABELS } from '#lib/shared/task-domain.js';
     import CategoryInput from './CategoryInput.svelte';
     import DateRangePicker from './DateRangePicker.svelte';
 
     let isFormOpen = $state(false);
     let newTaskText = $state('');
-    /** @type {import('$lib/shared/task-domain.js').TaskPriority} */
+    /** @type {import('#lib/shared/task-domain.js').TaskPriority} */
     let selectedPriority = $state('medium');
-    /** @type {import('$lib/shared/task-domain.js').TaskUrgency} */
+    /** @type {import('#lib/shared/task-domain.js').TaskUrgency} */
     let selectedUrgency = $state('normal');
     let category = $state('');
     let parentId = $state('');
@@ -160,7 +160,7 @@
                             class:active={selectedPriority === value}
                             data-p={value}
                             onclick={() =>
-                                (selectedPriority = /** @type {import('$lib/shared/task-domain.js').TaskPriority} */ (
+                                (selectedPriority = /** @type {import('#lib/shared/task-domain.js').TaskPriority} */ (
                                     value
                                 ))}>
                             {label}
@@ -178,7 +178,7 @@
                             class:active={selectedUrgency === value}
                             data-u={value}
                             onclick={() =>
-                                (selectedUrgency = /** @type {import('$lib/shared/task-domain.js').TaskUrgency} */ (
+                                (selectedUrgency = /** @type {import('#lib/shared/task-domain.js').TaskUrgency} */ (
                                     value
                                 ))}>
                             {label}

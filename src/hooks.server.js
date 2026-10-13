@@ -1,8 +1,8 @@
-import { authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
+import { authConfigurationError, authDatabaseConfigured } from '#lib/server/auth/index.js';
 
 const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
 
-/** @type {import('@sveltejs/kit').Handle} */
+/** @type {import('@sveltejs/kit/hooks').Handle} */
 export async function handle({ event, resolve }) {
 	if (!isTrustedUnsafeApiRequest(event)) {
 		return withSecurityHeaders(
@@ -134,7 +134,7 @@ function createFallbackContentSecurityPolicy(production) {
 		"worker-src 'self'",
 		"form-action 'self'"
 	];
-	// E2E_ALLOW_HTTP mirrors the svelte.config.js CSP exception: WebKit applies
+	// E2E_ALLOW_HTTP mirrors the vite.config.js CSP exception: WebKit applies
 	// upgrade-insecure-requests to loopback origins, breaking the HTTP preview
 	// the Playwright suite runs against. Never set on real deploys.
 	if (production && process.env.E2E_ALLOW_HTTP !== '1') {

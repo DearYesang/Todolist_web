@@ -1,9 +1,9 @@
 <script>
-    import { authClient } from '$lib/client/auth-client.js';
-    import { exportTaskBackup, importTaskBackup } from '$lib/client/backup-transfer.js';
-    import { refreshAppData, showNotice, syncStatus } from '$lib/client/sync-status.js';
-    import { currentView, selectView } from '$lib/client/task-store.js';
-    import { APP_VIEWS } from '$lib/shared/task-rules.js';
+    import { authClient } from '#lib/client/auth-client.js';
+    import { exportTaskBackup, importTaskBackup } from '#lib/client/backup-transfer.js';
+    import { refreshAppData, showNotice, syncStatus } from '#lib/client/sync-status.js';
+    import { currentView, selectView } from '#lib/client/task-store.js';
+    import { APP_VIEWS } from '#lib/shared/task-rules.js';
     import AuthPanel from './AuthPanel.svelte';
     import CalendarFeedPanel from './CalendarFeedPanel.svelte';
 
@@ -14,7 +14,7 @@
      * }} */
     let { appUnlocked, showOfflineStatus, oncleardone } = $props();
 
-    /** @typedef {import('$lib/shared/task-rules.js').AppView} AppView */
+    /** @typedef {import('#lib/shared/task-rules.js').AppView} AppView */
 
     /** @type {Record<AppView, { icon: string; label: string }>} */
     const VIEW_BUTTONS = {

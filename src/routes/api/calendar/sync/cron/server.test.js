@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { syncCalendarProvidersForConnectedUsers } from '$lib/server/calendar/provider-sync.js';
+import { syncCalendarProvidersForConnectedUsers } from '#lib/server/calendar/provider-sync.js';
 import { GET, POST } from './+server.js';
 
-vi.mock('$lib/server/calendar/provider-sync.js', () => ({
+vi.mock('#lib/server/calendar/provider-sync.js', () => ({
 	CalendarSyncError: class CalendarSyncError extends Error {
 		/**
 		 * @param {string} message

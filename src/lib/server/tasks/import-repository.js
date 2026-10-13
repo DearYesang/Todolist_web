@@ -1,8 +1,8 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { findOrCreateCategoryRow } from '$lib/server/categories/category-service.js';
-import { normalizeCategoryKey } from '$lib/shared/category-suggestions.js';
-import { getOrCreatePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { findOrCreateCategoryRow } from '#lib/server/categories/category-service.js';
+import { normalizeCategoryKey } from '#lib/shared/category-suggestions.js';
+import { getOrCreatePersonalBoardForUser } from '#lib/server/boards/board-provisioning.js';
 import { planTaskImport } from './import-planner.js';
 import { attachCategoryMetaToTaskRow, mapTaskRowsToClientTasks } from './task-mapper.js';
 import { createPositionValue } from './task-rows.js';
@@ -83,7 +83,7 @@ export async function replaceTasksForUser(userId, payload) {
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  * @param {string} userId
  * @param {ReturnType<typeof planTaskImport>['plans']} plans

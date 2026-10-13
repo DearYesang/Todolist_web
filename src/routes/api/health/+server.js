@@ -1,6 +1,5 @@
-import { json } from '@sveltejs/kit';
-import { getRuntimeConfigReport } from '$lib/server/config/env.js';
-import { readBearerToken, secretsMatch } from '$lib/server/security/bearer-secret.js';
+import { getRuntimeConfigReport } from '#lib/server/config/env.js';
+import { readBearerToken, secretsMatch } from '#lib/server/security/bearer-secret.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request, url }) {
@@ -26,7 +25,7 @@ export async function GET({ request, url }) {
 			: {})
 	};
 
-	return json(body, {
+	return Response.json(body, {
 		status,
 		headers: {
 			'cache-control': 'no-store'
@@ -45,7 +44,7 @@ function shouldExposeDetails(request) {
 }
 
 /**
- * @param {import('$lib/server/config/env.js').ConfigCheck} check
+ * @param {import('#lib/server/config/env.js').ConfigCheck} check
  */
 function toPublicCheck(check) {
 	return {

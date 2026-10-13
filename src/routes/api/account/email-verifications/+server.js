@@ -1,5 +1,4 @@
-import { json } from '@sveltejs/kit';
-import { authConfigurationError, authDatabaseConfigured } from '$lib/server/auth/index.js';
+import { authConfigurationError, authDatabaseConfigured } from '#lib/server/auth/index.js';
 import {
 	AccountSecurityConfigurationError,
 	AccountSecurityPolicyError,
@@ -7,9 +6,9 @@ import {
 	createPasskeyEmailVerification,
 	isAccountEmail,
 	normalizeAccountEmail
-} from '$lib/server/auth/account-security.js';
-import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
-import { assertRateLimit, createRateLimitKey } from '$lib/server/security/rate-limit.js';
+} from '#lib/server/auth/account-security.js';
+import { apiErrorResponse, readJsonBody } from '#lib/server/http/api-error.js';
+import { assertRateLimit, createRateLimitKey } from '#lib/server/security/rate-limit.js';
 
 const MAX_BODY_BYTES = 10_000;
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
@@ -19,16 +18,16 @@ const GENERIC_AUTH_UNAVAILABLE_MESSAGE = 'Auth service unavailable.';
 export async function POST(event) {
 	const { request } = event;
 	if (!authDatabaseConfigured) {
-		return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 503 });
+		return Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 503 });
 	}
 
 	if (authConfigurationError) {
-		return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 500 });
+		return Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: 500 });
 	}
 
 	const contentLength = Number(request.headers.get('content-length') ?? '0');
 	if (contentLength > MAX_BODY_BYTES) {
-		return json({ message: 'Request body is too large.' }, { status: 413 });
+		return Response.json({ message: 'Request body is too large.' }, { status: 413 });
 	}
 
 	/** @type {any} */
@@ -61,7 +60,7 @@ export async function POST(event) {
 			email,
 			name: payload?.name
 		});
-		return json(result, {
+		return Response.json(result, {
 			status: 201,
 			headers: {
 				'cache-control': 'private, no-store'
@@ -69,7 +68,7 @@ export async function POST(event) {
 		});
 	} catch (error) {
 		if (error instanceof AccountSecurityConfigurationError) {
-			return json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: error.status });
+			return Response.json({ message: GENERIC_AUTH_UNAVAILABLE_MESSAGE }, { status: error.status });
 		}
 
 		if (error instanceof AccountSecurityPolicyError) {
@@ -82,7 +81,7 @@ export async function POST(event) {
 
 /** @param {string} email */
 function createGenericAcceptedResponse(email) {
-	return json(
+	return Response.json(
 		{
 			email: normalizeAccountEmail(email),
 			expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS).toISOString()

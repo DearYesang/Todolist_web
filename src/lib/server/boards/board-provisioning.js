@@ -6,9 +6,9 @@
  */
 
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { ApiError } from '$lib/server/http/api-error.js';
-import { APP_VIEWS, isOneOf } from '$lib/shared/task-rules.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { ApiError } from '#lib/server/http/api-error.js';
+import { APP_VIEWS, isOneOf } from '#lib/shared/task-rules.js';
 
 const DEFAULT_WORKSPACE_NAME = 'Personal';
 const DEFAULT_BOARD_NAME = 'Inbox';

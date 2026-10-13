@@ -1,5 +1,3 @@
-import { json } from '@sveltejs/kit';
-
 const INVALID_JSON_MESSAGE = 'Request body must be valid JSON.';
 
 /**
@@ -57,7 +55,7 @@ export function apiErrorResponse(error, ...types) {
 		throw error;
 	}
 
-	return json({ message: error.message }, { status: error.status, headers: error.headers });
+	return Response.json({ message: error.message }, { status: error.status, headers: error.headers });
 }
 
 /**

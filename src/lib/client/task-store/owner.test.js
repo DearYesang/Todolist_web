@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
+import { installMemoryStorage } from '#lib/test-support/browser-globals.js';
 import { applyServerCategoryCatalog, categoryCatalog } from './category-store.js';
 import { filters, setCategoryFilter } from './filters.js';
 import { setTaskStoreOwner } from './owner.js';

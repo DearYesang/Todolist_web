@@ -1,8 +1,8 @@
 <script>
-    import { requestOpenLinks } from '$lib/client/link-opener.js';
+    import { requestOpenLinks } from '#lib/client/link-opener.js';
 
     /** @type {{
-     *   links: import('$lib/shared/task-links.js').TaskLink[];
+     *   links: import('#lib/shared/task-links.js').TaskLink[];
      *   title: string;
      *   label: string;
      *   description: string;

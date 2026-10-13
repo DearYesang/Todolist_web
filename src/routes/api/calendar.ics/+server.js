@@ -1,6 +1,6 @@
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { listTasksForUser } from '$lib/server/tasks/repository.js';
-import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { listTasksForUser } from '#lib/server/tasks/repository.js';
+import { createTaskCalendar } from '#lib/shared/calendar-ics.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
