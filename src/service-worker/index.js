@@ -9,8 +9,15 @@ const APP_SHELL = resolve('/');
 // resolve('/') is the base path followed by '/', so this is the base path:
 // '' unless paths.base is configured.
 const BASE = APP_SHELL.slice(0, -1);
+// Kit 2's $service-worker left .DS_Store out of `files`; Kit 3's manifest lists
+// every file under static/, dotfiles included.
+const PRECACHED_ASSETS = assets.filter((file) => !/(^|\/)\./.test(file.path));
 const STATIC_ASSETS = [
-	...new Set([...immutable.map((file) => `${BASE}/${file.path}`), ...assets.map((file) => asset(file.path)), APP_SHELL])
+	...new Set([
+		...immutable.map((file) => `${BASE}/${file.path}`),
+		...PRECACHED_ASSETS.map((file) => asset(file.path)),
+		APP_SHELL
+	])
 ];
 /**
  * The static files a deploy may replace under the same name, so the network

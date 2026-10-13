@@ -5,8 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 // The import rules the code keeps, checked on the source text: every .js and
 // .svelte file under src/, and the files they import by a relative or #lib
-// path. Packages and SvelteKit's $app, $env and $service-worker modules are
-// not part of the graph.
+// path. Packages and SvelteKit's $app modules are not part of the graph.
 
 const SRC_DIR = fileURLToPath(new URL('./', import.meta.url));
 

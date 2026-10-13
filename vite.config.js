@@ -35,8 +35,10 @@ export default defineConfig({
 			},
 			adapter: adapter({ runtime: 'nodejs24.x', regions: ['hnd1'] }),
 			// The PWA updates itself through the service worker (page-lifecycle.js).
-			// Kit 3 would otherwise poll /_app/version.json every hour, which the
-			// worker answers from its cache anyway. 0 keeps Kit 2's behaviour.
+			// Kit 3 polls /_app/version.json hourly by default; 0 turns that timer
+			// off, as in Kit 2. Kit 3 still runs updated.check() when the tab regains
+			// focus or visibility (not configurable); the worker answers version.json
+			// cache-first after the first hit, and nothing here reads `updated`.
 			version: { pollInterval: 0 }
 		})
 	],
