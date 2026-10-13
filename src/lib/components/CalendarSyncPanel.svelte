@@ -1,22 +1,22 @@
 <script>
     import { onMount } from 'svelte';
-    import { authClient } from '$lib/client/auth-client.js';
+    import { authClient } from '#lib/client/auth-client.js';
     import {
         deleteCalendarConnection,
         listCalendarProviders,
         syncCalendarProviders
-    } from '$lib/client/calendar-provider-api.js';
+    } from '#lib/client/calendar-provider-api.js';
 
     const session = authClient.useSession();
 
     let isOpen = $state(false);
     let isWorking = $state(false);
     let message = $state('');
-    let providers = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarProviderRecord[]} */ ([]));
+    let providers = $state(/** @type {import('#lib/client/calendar-provider-api.js').CalendarProviderRecord[]} */ ([]));
     let connections = $state(
-        /** @type {import('$lib/client/calendar-provider-api.js').CalendarConnectionRecord[]} */ ([])
+        /** @type {import('#lib/client/calendar-provider-api.js').CalendarConnectionRecord[]} */ ([])
     );
-    let syncRuns = $state(/** @type {import('$lib/client/calendar-provider-api.js').CalendarSyncRunRecord[]} */ ([]));
+    let syncRuns = $state(/** @type {import('#lib/client/calendar-provider-api.js').CalendarSyncRunRecord[]} */ ([]));
 
     onMount(() => {
         const oauthStatus = readCalendarSyncStatus();
@@ -115,7 +115,7 @@
     }
 
     /**
-     * @param {import('$lib/client/calendar-provider-api.js').CalendarProviderRecord} provider
+     * @param {import('#lib/client/calendar-provider-api.js').CalendarProviderRecord} provider
      */
     function getProviderSetupHint(provider) {
         if (provider.configured) return '';

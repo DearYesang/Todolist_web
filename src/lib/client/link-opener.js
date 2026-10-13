@@ -7,7 +7,7 @@ import { get, writable } from 'svelte/store';
  * pop-ups, so every open here must run synchronously inside a click handler:
  * no await, setTimeout or native confirm() before window.open.
  *
- * @typedef {import('$lib/shared/task-links.js').TaskLink} TaskLink
+ * @typedef {import('#lib/shared/task-links.js').TaskLink} TaskLink
  * @typedef {(url: string) => unknown} OpenFn
  *
  * @typedef {{

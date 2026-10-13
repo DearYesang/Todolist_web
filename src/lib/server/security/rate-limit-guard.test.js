@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { resetRateLimitBuckets } from '$lib/server/security/rate-limit.js';
+import { resetRateLimitBuckets } from '#lib/server/security/rate-limit.js';
 import { enforceImportRateLimit, enforceTaskWriteRateLimit } from './rate-limit-guard.js';
 
 describe('task write rate-limit guard', () => {

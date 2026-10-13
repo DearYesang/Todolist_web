@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { jsonResponse } from '$lib/test-support/http.js';
+import { jsonResponse } from '#lib/test-support/http.js';
 import {
 	applyServerCategoryCatalog,
 	assignTaskCategory,

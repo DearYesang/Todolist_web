@@ -7,7 +7,7 @@
         openNextBlocked,
         openPendingLinks,
         summarizeLinkOpenState
-    } from '$lib/client/link-opener.js';
+    } from '#lib/client/link-opener.js';
 
     /** @type {HTMLDivElement | null} */
     let panelElement = $state(null);
@@ -18,7 +18,7 @@
     /** @type {HTMLElement | null} */
     let returnFocusTarget = null;
     let panelHasFocus = false;
-    /** @type {import('$lib/shared/task-links.js').TaskLink[] | null} */
+    /** @type {import('#lib/shared/task-links.js').TaskLink[] | null} */
     let shownLinks = null;
     /** @type {string | null} */
     let shownTone = null;

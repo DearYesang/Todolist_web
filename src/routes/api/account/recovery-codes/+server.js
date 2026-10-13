@@ -1,12 +1,11 @@
-import { json } from '@sveltejs/kit';
-import { requireAuthUser } from '$lib/server/auth/session.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
 import {
 	createRecoveryCodesForUser,
 	getRecoveryCodeSummaryForUser,
 	revokeRecoveryCodesForUser
-} from '$lib/server/auth/account-security.js';
-import { apiErrorResponse } from '$lib/server/http/api-error.js';
-import { assertRateLimit, createRateLimitKey, RateLimitError } from '$lib/server/security/rate-limit.js';
+} from '#lib/server/auth/account-security.js';
+import { apiErrorResponse } from '#lib/server/http/api-error.js';
+import { assertRateLimit, createRateLimitKey, RateLimitError } from '#lib/server/security/rate-limit.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
@@ -15,7 +14,7 @@ export async function GET({ request }) {
 		return authResult.response;
 	}
 
-	return json(await getRecoveryCodeSummaryForUser(authResult.user.id), {
+	return Response.json(await getRecoveryCodeSummaryForUser(authResult.user.id), {
 		headers: {
 			'cache-control': 'private, no-store'
 		}
@@ -36,7 +35,7 @@ export async function POST(event) {
 			windowMs: 60 * 60 * 1000,
 			message: 'Too many recovery code regeneration requests.'
 		});
-		return json(await createRecoveryCodesForUser(authResult.user.id), {
+		return Response.json(await createRecoveryCodesForUser(authResult.user.id), {
 			status: 201,
 			headers: {
 				'cache-control': 'private, no-store'
@@ -61,7 +60,7 @@ export async function DELETE(event) {
 			windowMs: 60 * 60 * 1000,
 			message: 'Too many recovery code revoke requests.'
 		});
-		return json(await revokeRecoveryCodesForUser(authResult.user.id), {
+		return Response.json(await revokeRecoveryCodesForUser(authResult.user.id), {
 			headers: {
 				'cache-control': 'private, no-store'
 			}

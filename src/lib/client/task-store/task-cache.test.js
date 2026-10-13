@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
+import { installMemoryStorage } from '#lib/test-support/browser-globals.js';
 import { normalizeTask } from '../../shared/task-domain.js';
 import { insertTask, mergeTasks, replaceTasks, setTaskStorageOwner, taskIndex, tasks } from './task-cache.js';
 import { resetFilters } from './filters.js';

@@ -1,12 +1,33 @@
-/// <reference lib="webworker" />
+import { version } from '$app/env';
+import { assets, immutable } from '$app/manifest';
+import { asset, resolve } from '$app/paths';
+import { self as sw } from '$app/service-worker';
 
-import { base, build, files, version } from '$service-worker';
-
-const sw = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));
 const CACHE_PREFIX = 'todolist-cache';
 const CACHE_NAME = `${CACHE_PREFIX}-${version}`;
-const APP_SHELL = `${base}/`;
-const STATIC_ASSETS = [...new Set([...build, ...files, APP_SHELL])];
+const APP_SHELL = resolve('/');
+// resolve('/') is the base path followed by '/', so this is the base path:
+// '' unless paths.base is configured.
+const BASE = APP_SHELL.slice(0, -1);
+const STATIC_ASSETS = [
+	...new Set([...immutable.map((file) => `${BASE}/${file.path}`), ...assets.map((file) => asset(file.path)), APP_SHELL])
+];
+/**
+ * The static files a deploy may replace under the same name, so the network
+ * is asked before the cache.
+ * @type {import('$app/types').AssetPath[]}
+ */
+const REFRESHED_STATIC_FILES = [
+	'manifest.webmanifest',
+	'favicon.svg',
+	'apple-touch-icon.png',
+	'apple-touch-icon-20260504.png',
+	'pwa-icon-192.png',
+	'pwa-icon-192-20260504.png',
+	'pwa-icon-512.png',
+	'pwa-icon-512-20260504.png'
+];
+const REFRESHED_STATIC_ASSETS = REFRESHED_STATIC_FILES.map((file) => asset(file));
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -55,28 +76,14 @@ sw.addEventListener('fetch', (event) => {
  */
 function shouldBypass(request) {
 	const url = new URL(request.url);
-	return url.origin !== sw.location.origin || url.pathname.startsWith(`${base}/api/`);
+	return url.origin !== sw.location.origin || url.pathname.startsWith(`${BASE}/api/`);
 }
 
 /**
  * @param {Request} request
  */
 function shouldRefreshStaticAsset(request) {
-	const url = new URL(request.url);
-	if (!url.pathname.startsWith(`${base}/`) || url.pathname.includes('/_app/immutable/')) {
-		return false;
-	}
-
-	return [
-		'/manifest.webmanifest',
-		'/favicon.svg',
-		'/apple-touch-icon.png',
-		'/apple-touch-icon-20260504.png',
-		'/pwa-icon-192.png',
-		'/pwa-icon-192-20260504.png',
-		'/pwa-icon-512.png',
-		'/pwa-icon-512-20260504.png'
-	].some((path) => url.pathname === `${base}${path}`);
+	return REFRESHED_STATIC_ASSETS.includes(new URL(request.url).pathname);
 }
 
 /**

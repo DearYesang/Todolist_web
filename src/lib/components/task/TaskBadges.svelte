@@ -1,8 +1,8 @@
 <script>
-    import { getCategoryColor, PRIORITY_LABELS, URGENCY_LABELS } from '$lib/shared/task-domain.js';
+    import { getCategoryColor, PRIORITY_LABELS, URGENCY_LABELS } from '#lib/shared/task-domain.js';
 
     /** @type {{
-     *   task: import('$lib/shared/task-domain.js').Task;
+     *   task: import('#lib/shared/task-domain.js').Task;
      *   variant: 'card' | 'summary';
      *   onaddcategory?: (event: MouseEvent) => void;
      * }} */

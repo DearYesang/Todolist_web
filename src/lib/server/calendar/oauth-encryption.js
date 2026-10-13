@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import { ApiError } from '$lib/server/http/api-error.js';
+import { ApiError } from '#lib/server/http/api-error.js';
 
 const VERSION = 'v1';
 

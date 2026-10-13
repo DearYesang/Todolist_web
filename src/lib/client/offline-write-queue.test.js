@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
+import { installMemoryStorage } from '#lib/test-support/browser-globals.js';
 import {
 	enqueueOfflineMutation,
 	flushOfflineWriteQueue,

@@ -5,7 +5,7 @@ The project has moved from a Svelte 5 + Vite SPA shell to a SvelteKit shell. The
 ## Completed
 
 - `vite.config.js` uses the SvelteKit plugin.
-- `svelte.config.js` uses `@sveltejs/adapter-vercel`.
+- `vite.config.js` passes `@sveltejs/adapter-vercel` and the CSP to the SvelteKit plugin. SvelteKit 3 has no `svelte.config.js`.
 - `src/app.html` is the document shell.
 - `src/routes/+layout.svelte` imports the global stylesheet and owns document metadata.
 - `src/routes/+page.svelte` renders the existing app component.

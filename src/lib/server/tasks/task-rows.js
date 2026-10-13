@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
-import { getCategoryRowForBoard } from '$lib/server/categories/category-service.js';
-import { getDb, schema } from '$lib/server/db/index.js';
+import { getCategoryRowForBoard } from '#lib/server/categories/category-service.js';
+import { getDb, schema } from '#lib/server/db/index.js';
 import { attachCategoryMetaToTaskRow, mapTaskRowToClientTask } from './task-mapper.js';
 
 /**

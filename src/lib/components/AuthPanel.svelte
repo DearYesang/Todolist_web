@@ -1,5 +1,5 @@
 <script>
-    import { authClient } from '$lib/client/auth-client.js';
+    import { authClient } from '#lib/client/auth-client.js';
     import AuthAccountControls from './AuthAccountControls.svelte';
     import AuthSignInControls from './AuthSignInControls.svelte';
 

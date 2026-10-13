@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { requireAuthUser } from '$lib/server/auth/session.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
 import {
 	AccountSecurityConfigurationError,
 	AccountSecurityPolicyError,
@@ -8,9 +8,9 @@ import {
 	createRecoveryCodesForUser,
 	getRecoveryCodeSummaryForUser,
 	revokeRecoveryCodesForUser
-} from '$lib/server/auth/account-security.js';
-import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
-import { createCalendarSyncRedirect } from '$lib/server/calendar/oauth-status.js';
+} from '#lib/server/auth/account-security.js';
+import { CalendarTokenEncryptionError } from '#lib/server/calendar/oauth-encryption.js';
+import { createCalendarSyncRedirect } from '#lib/server/calendar/oauth-status.js';
 import {
 	CalendarSyncError,
 	completeCalendarProviderAuthorization,
@@ -19,8 +19,8 @@ import {
 	listCalendarProviderConnections,
 	syncCalendarProvidersForConnectedUsers,
 	syncCalendarProvidersForUser
-} from '$lib/server/calendar/provider-sync.js';
-import { CalendarProviderError } from '$lib/server/calendar/providers.js';
+} from '#lib/server/calendar/provider-sync.js';
+import { CalendarProviderError } from '#lib/server/calendar/providers.js';
 import {
 	CalendarTokenConfigurationError,
 	CalendarTokenLimitError,
@@ -28,12 +28,12 @@ import {
 	getCalendarTasksForToken,
 	listCalendarTokensForUser,
 	revokeCalendarTokenForUser
-} from '$lib/server/calendar/tokens.js';
-import * as boardProvisioning from '$lib/server/boards/board-provisioning.js';
-import * as categoryRepository from '$lib/server/categories/repository.js';
-import { assertRateLimit, assertVolatileRateLimit, RateLimitError } from '$lib/server/security/rate-limit.js';
-import * as taskRepository from '$lib/server/tasks/repository.js';
-import { TaskWriteError } from '$lib/server/tasks/validation.js';
+} from '#lib/server/calendar/tokens.js';
+import * as boardProvisioning from '#lib/server/boards/board-provisioning.js';
+import * as categoryRepository from '#lib/server/categories/repository.js';
+import { assertRateLimit, assertVolatileRateLimit, RateLimitError } from '#lib/server/security/rate-limit.js';
+import * as taskRepository from '#lib/server/tasks/repository.js';
+import { TaskWriteError } from '#lib/server/tasks/validation.js';
 import * as emailVerificationsRoute from './account/email-verifications/+server.js';
 import * as recoveryCodesRoute from './account/recovery-codes/+server.js';
 import * as boardPreferencesRoute from './board/preferences/+server.js';
@@ -69,7 +69,7 @@ const authState = vi.hoisted(() => ({
 	configurationError: /** @type {string | null} */ (null)
 }));
 
-vi.mock('$lib/server/auth/index.js', () => ({
+vi.mock('#lib/server/auth/index.js', () => ({
 	get authDatabaseConfigured() {
 		return authState.databaseConfigured;
 	},
@@ -78,16 +78,16 @@ vi.mock('$lib/server/auth/index.js', () => ({
 	}
 }));
 
-vi.mock('$lib/server/auth/session.js', () => ({
+vi.mock('#lib/server/auth/session.js', () => ({
 	requireAuthUser: vi.fn()
 }));
 
-vi.mock('$lib/server/security/rate-limit-guard.js', () => ({
+vi.mock('#lib/server/security/rate-limit-guard.js', () => ({
 	enforceTaskWriteRateLimit: vi.fn(),
 	enforceImportRateLimit: vi.fn()
 }));
 
-vi.mock('$lib/server/tasks/repository.js', () => ({
+vi.mock('#lib/server/tasks/repository.js', () => ({
 	createTaskForUser: vi.fn(),
 	deleteTaskCascadeForUser: vi.fn(),
 	listTasksForBoard: vi.fn(),
@@ -100,13 +100,13 @@ vi.mock('$lib/server/tasks/repository.js', () => ({
 	replaceTasksForUser: vi.fn()
 }));
 
-vi.mock('$lib/server/boards/board-provisioning.js', () => ({
+vi.mock('#lib/server/boards/board-provisioning.js', () => ({
 	ensurePersonalBoardForUser: vi.fn(),
 	getBoardPreferencesForUser: vi.fn(),
 	updateBoardPreferencesForUser: vi.fn()
 }));
 
-vi.mock('$lib/server/categories/repository.js', () => ({
+vi.mock('#lib/server/categories/repository.js', () => ({
 	listCategoriesForUser: vi.fn(),
 	createCategoryForUser: vi.fn(),
 	updateCategoryForUser: vi.fn(),
@@ -115,7 +115,7 @@ vi.mock('$lib/server/categories/repository.js', () => ({
 	reorderCategoriesForUser: vi.fn()
 }));
 
-vi.mock('$lib/server/auth/account-security.js', async (importOriginal) => ({
+vi.mock('#lib/server/auth/account-security.js', async (importOriginal) => ({
 	...(await importOriginal()),
 	assertAllowedAccountEmail: vi.fn(),
 	createPasskeyEmailVerification: vi.fn(),
@@ -124,7 +124,7 @@ vi.mock('$lib/server/auth/account-security.js', async (importOriginal) => ({
 	revokeRecoveryCodesForUser: vi.fn()
 }));
 
-vi.mock('$lib/server/calendar/tokens.js', async (importOriginal) => ({
+vi.mock('#lib/server/calendar/tokens.js', async (importOriginal) => ({
 	...(await importOriginal()),
 	createCalendarTokenForUser: vi.fn(),
 	getCalendarTasksForToken: vi.fn(),
@@ -132,7 +132,7 @@ vi.mock('$lib/server/calendar/tokens.js', async (importOriginal) => ({
 	revokeCalendarTokenForUser: vi.fn()
 }));
 
-vi.mock('$lib/server/calendar/provider-sync.js', async (importOriginal) => ({
+vi.mock('#lib/server/calendar/provider-sync.js', async (importOriginal) => ({
 	...(await importOriginal()),
 	completeCalendarProviderAuthorization: vi.fn(),
 	createCalendarProviderAuthorizationUrl: vi.fn(),
@@ -142,7 +142,7 @@ vi.mock('$lib/server/calendar/provider-sync.js', async (importOriginal) => ({
 	syncCalendarProvidersForUser: vi.fn()
 }));
 
-vi.mock('$lib/server/security/rate-limit.js', async (importOriginal) => ({
+vi.mock('#lib/server/security/rate-limit.js', async (importOriginal) => ({
 	...(await importOriginal()),
 	assertRateLimit: vi.fn(),
 	assertVolatileRateLimit: vi.fn()
@@ -184,7 +184,7 @@ function createEvent(method, { path = '/api', body, headers = {}, params = {} } 
  * @param {Response} response
  * @param {number} status
  * @param {unknown} body
- * @param {Record<string, string>} [headers] the headers besides content-type and content-length
+ * @param {Record<string, string>} [headers] the headers besides content-type
  */
 async function expectJson(response, status, body, headers = {}) {
 	const text = await response.text();
@@ -197,7 +197,6 @@ async function expectJson(response, status, body, headers = {}) {
 		body,
 		headers: {
 			'content-type': 'application/json',
-			'content-length': String(new TextEncoder().encode(text).byteLength),
 			...headers
 		}
 	});
@@ -383,8 +382,8 @@ describe('signed-out requests', () => {
 	});
 
 	it('requireAuthUser answers 503, 500 and 401 with a message', async () => {
-		/** @type {typeof import('$lib/server/auth/session.js')} */
-		const session = await vi.importActual('$lib/server/auth/session.js');
+		/** @type {typeof import('#lib/server/auth/session.js')} */
+		const session = await vi.importActual('#lib/server/auth/session.js');
 		const request = new Request('https://todo.example.com/api/tasks');
 
 		authState.databaseConfigured = false;
@@ -1067,11 +1066,18 @@ describe('calendar routes', () => {
 		const back = (query) => createCalendarSyncRedirect({ status: 'error', provider: 'google', ...query });
 
 		it('connect redirects to the provider, or back with the error message', async () => {
-			vi.mocked(createCalendarProviderAuthorizationUrl).mockResolvedValue('https://accounts.example/auth');
+			const providerUrl = 'https://accounts.google.com/o/oauth2/v2/auth?state=test';
+			vi.mocked(createCalendarProviderAuthorizationUrl).mockResolvedValue(providerUrl);
 			await expect(call['GET /api/calendar/providers/[provider]/connect']()).rejects.toMatchObject({
 				status: 302,
-				location: 'https://accounts.example/auth'
+				location: providerUrl
 			});
+
+			// Only the providers' own authorization origins may be redirected to.
+			vi.mocked(createCalendarProviderAuthorizationUrl).mockResolvedValue('https://accounts.example/auth');
+			await expect(call['GET /api/calendar/providers/[provider]/connect']()).rejects.toThrow(
+				/redirect_external_not_in_allowlist/
+			);
 
 			for (const error of syncErrors()) {
 				vi.mocked(createCalendarProviderAuthorizationUrl).mockRejectedValue(error);

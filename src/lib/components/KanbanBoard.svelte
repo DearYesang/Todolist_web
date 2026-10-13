@@ -1,7 +1,7 @@
 <script>
-    import { assignParent, filters, moveTask, taskIndex, tasks } from '$lib/client/task-store.js';
-    import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
-    import { buildColumnHierarchy, canAssignParent } from '$lib/shared/task-domain.js';
+    import { assignParent, filters, moveTask, taskIndex, tasks } from '#lib/client/task-store.js';
+    import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '#lib/client/pointer-dnd.js';
+    import { buildColumnHierarchy, canAssignParent } from '#lib/shared/task-domain.js';
     import { setBoardContext } from './board-context.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 

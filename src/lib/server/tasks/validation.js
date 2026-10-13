@@ -1,5 +1,5 @@
-import { ApiError } from '$lib/server/http/api-error.js';
-import { normalizeDateRange } from '$lib/shared/task-domain.js';
+import { ApiError } from '#lib/server/http/api-error.js';
+import { normalizeDateRange } from '#lib/shared/task-domain.js';
 import {
 	isOneOf,
 	LIMITS,
@@ -7,7 +7,7 @@ import {
 	TASK_STATUSES,
 	TASK_URGENCIES,
 	UUID_PATTERN
-} from '$lib/shared/task-rules.js';
+} from '#lib/shared/task-rules.js';
 
 export class TaskWriteError extends ApiError {
 	/**

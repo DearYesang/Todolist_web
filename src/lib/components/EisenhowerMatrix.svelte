@@ -1,12 +1,12 @@
 <script>
-    import { filters, taskIndex, tasks, updateTask } from '$lib/client/task-store.js';
-    import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
+    import { filters, taskIndex, tasks, updateTask } from '#lib/client/task-store.js';
+    import { createPointerDndController, DND_ZONE_ATTRIBUTE } from '#lib/client/pointer-dnd.js';
     import {
         buildHierarchy,
         isTaskInEisenhowerQuadrant,
         matchesFilters,
         resolveEisenhowerMove
-    } from '$lib/shared/task-domain.js';
+    } from '#lib/shared/task-domain.js';
     import { setBoardContext } from './board-context.js';
     import TaskTreeCard from './TaskTreeCard.svelte';
 
@@ -20,7 +20,7 @@
      *   subtitle: string;
      *   icon: string;
      *   importance: 'important' | 'less-important';
-     *   urgency: import('$lib/shared/task-domain.js').TaskUrgency;
+     *   urgency: import('#lib/shared/task-domain.js').TaskUrgency;
      * }} EisenhowerQuadrant
      */
 
@@ -113,7 +113,7 @@
     );
 
     /**
-     * @param {import('$lib/shared/task-domain.js').Task} task
+     * @param {import('#lib/shared/task-domain.js').Task} task
      * @param {EisenhowerQuadrant} quadrant
      */
     function isTaskInQuadrant(task, quadrant) {

@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installMemoryStorage } from '$lib/test-support/browser-globals.js';
-import { jsonResponse } from '$lib/test-support/http.js';
+import { installMemoryStorage } from '#lib/test-support/browser-globals.js';
+import { jsonResponse } from '#lib/test-support/http.js';
 import { DEFAULT_FILTERS } from '../shared/task-domain.js';
 import { linkOpenState, requestOpenLinks } from './link-opener.js';
 import { categories, filters, setCategoryFilter, setPriorityFilter, syncServerTasks, tasks } from './task-store.js';

@@ -1,6 +1,6 @@
 <script>
-    import { getCategoryColor } from '$lib/shared/task-domain.js';
-    import { suggestCategories } from '$lib/shared/category-suggestions.js';
+    import { getCategoryColor } from '#lib/shared/task-domain.js';
+    import { suggestCategories } from '#lib/shared/category-suggestions.js';
 
     /** @type {{
      *   value?: string;

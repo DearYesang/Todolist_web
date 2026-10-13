@@ -1,9 +1,8 @@
-import { json } from '@sveltejs/kit';
-import { CalendarSyncError, syncCalendarProvidersForConnectedUsers } from '$lib/server/calendar/provider-sync.js';
-import { CalendarProviderError } from '$lib/server/calendar/providers.js';
-import { CalendarTokenEncryptionError } from '$lib/server/calendar/oauth-encryption.js';
-import { apiErrorResponse } from '$lib/server/http/api-error.js';
-import { readBearerToken, secretsMatch } from '$lib/server/security/bearer-secret.js';
+import { CalendarSyncError, syncCalendarProvidersForConnectedUsers } from '#lib/server/calendar/provider-sync.js';
+import { CalendarProviderError } from '#lib/server/calendar/providers.js';
+import { CalendarTokenEncryptionError } from '#lib/server/calendar/oauth-encryption.js';
+import { apiErrorResponse } from '#lib/server/http/api-error.js';
+import { readBearerToken, secretsMatch } from '#lib/server/security/bearer-secret.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request, url }) {
@@ -22,11 +21,11 @@ export async function POST({ request, url }) {
 async function runCalendarCronSync(request, url) {
 	const secretCheck = checkCronSecret(request);
 	if (!secretCheck.ok) {
-		return json({ message: secretCheck.message }, { status: secretCheck.status });
+		return Response.json({ message: secretCheck.message }, { status: secretCheck.status });
 	}
 
 	try {
-		return json(
+		return Response.json(
 			await syncCalendarProvidersForConnectedUsers({
 				maxUsers: readMaxUsers(url)
 			}),

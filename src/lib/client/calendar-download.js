@@ -1,8 +1,8 @@
-import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
+import { createTaskCalendar } from '#lib/shared/calendar-ics.js';
 import { downloadBlob } from './download.js';
 
 /**
- * @param {import('$lib/shared/task-domain.js').Task} task
+ * @param {import('#lib/shared/task-domain.js').Task} task
  * @param {{ now?: Date }} [options]
  */
 export function downloadTaskCalendar(task, options = {}) {
@@ -16,7 +16,7 @@ export function downloadTaskCalendar(task, options = {}) {
 }
 
 /**
- * @param {Pick<import('$lib/shared/task-domain.js').Task, 'text'>} task
+ * @param {Pick<import('#lib/shared/task-domain.js').Task, 'text'>} task
  * @param {Date} [now]
  */
 export function createTaskCalendarFilename(task, now = new Date()) {

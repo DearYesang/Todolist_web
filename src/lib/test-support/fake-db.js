@@ -3,7 +3,7 @@ import { getTableName } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { vi } from 'vitest';
-import * as schema from '$lib/server/db/schema.js';
+import * as schema from '#lib/server/db/schema.js';
 
 export const USER_ID = 'user-id';
 export const TASK_ID = '11111111-1111-4111-8111-111111111111';
@@ -19,12 +19,12 @@ export function createFakeDb() {
 }
 
 /**
- * Stands in for $lib/server/db/index.js, with getDb() always answering the
+ * Stands in for #lib/server/db/index.js, with getDb() always answering the
  * same fake client. vi.mock hoists its factory above the test file's
  * imports, so the factory loads this module itself:
  *
- *     vi.mock('$lib/server/db/index.js', async () => {
- *         const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+ *     vi.mock('#lib/server/db/index.js', async () => {
+ *         const { createFakeDbModule } = await import('#lib/test-support/fake-db.js');
  *         return createFakeDbModule();
  *     });
  */

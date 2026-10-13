@@ -4,7 +4,7 @@
     import TaskBadges from './task/TaskBadges.svelte';
     import TaskLinkActions from './task/TaskLinkActions.svelte';
     import { getBoardContext } from './board-context.js';
-    import { DND_ZONE_ATTRIBUTE } from '$lib/client/pointer-dnd.js';
+    import { DND_ZONE_ATTRIBUTE } from '#lib/client/pointer-dnd.js';
     import {
         addSubtask,
         deleteSubtask,
@@ -14,15 +14,15 @@
         taskIndex,
         toggleCollapse,
         toggleSubtask
-    } from '$lib/client/task-store.js';
-    import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
-    import { getDeleteTaskConfirmMessage, getTaskDueStatus, STATUS_LABELS } from '$lib/shared/task-domain.js';
-    import { splitTextIntoLinkParts } from '$lib/shared/task-links.js';
-    import { createImeCompositionGuard } from '$lib/client/ime-keyboard.js';
+    } from '#lib/client/task-store.js';
+    import { downloadTaskCalendar } from '#lib/client/calendar-download.js';
+    import { getDeleteTaskConfirmMessage, getTaskDueStatus, STATUS_LABELS } from '#lib/shared/task-domain.js';
+    import { splitTextIntoLinkParts } from '#lib/shared/task-links.js';
+    import { createImeCompositionGuard } from '#lib/client/ime-keyboard.js';
 
     /** @type {{
-     *   task: import('$lib/shared/task-domain.js').Task;
-     *   childrenByParent: Record<string, import('$lib/shared/task-domain.js').Task[]>;
+     *   task: import('#lib/shared/task-domain.js').Task;
+     *   childrenByParent: Record<string, import('#lib/shared/task-domain.js').Task[]>;
      *   depth?: number;
      * }} */
     let { task, childrenByParent, depth = 0 } = $props();
@@ -56,7 +56,7 @@
     const subtaskProgress = $derived(
         task.subtasks.length === 0 ? 0 : Math.round((completedSubtasks / task.subtasks.length) * 100)
     );
-    /** @type {Record<string, import('$lib/shared/task-links.js').LinkPart[]>} */
+    /** @type {Record<string, import('#lib/shared/task-links.js').LinkPart[]>} */
     const subtaskParts = $derived(
         Object.fromEntries(task.subtasks.map((subtask) => [subtask.id, splitTextIntoLinkParts(subtask.text)]))
     );

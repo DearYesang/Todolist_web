@@ -3,16 +3,16 @@ import {
 	AccountSecurityPolicyError,
 	assertAllowedAccountEmail,
 	createPasskeyEmailVerification
-} from '$lib/server/auth/account-security.js';
-import { resetRateLimitBuckets } from '$lib/server/security/rate-limit.js';
+} from '#lib/server/auth/account-security.js';
+import { resetRateLimitBuckets } from '#lib/server/security/rate-limit.js';
 import { POST } from './+server.js';
 
-vi.mock('$lib/server/auth/index.js', () => ({
+vi.mock('#lib/server/auth/index.js', () => ({
 	authDatabaseConfigured: true,
 	authConfigurationError: null
 }));
 
-vi.mock('$lib/server/auth/account-security.js', async (importOriginal) => ({
+vi.mock('#lib/server/auth/account-security.js', async (importOriginal) => ({
 	...(await importOriginal()),
 	assertAllowedAccountEmail: vi.fn(),
 	createPasskeyEmailVerification: vi.fn()

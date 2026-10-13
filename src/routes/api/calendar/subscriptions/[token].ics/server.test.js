@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getCalendarTasksForToken } from '$lib/server/calendar/tokens.js';
-import { getMemoryRateLimitBucketCount, resetRateLimitBuckets } from '$lib/server/security/rate-limit.js';
+import { getCalendarTasksForToken } from '#lib/server/calendar/tokens.js';
+import { getMemoryRateLimitBucketCount, resetRateLimitBuckets } from '#lib/server/security/rate-limit.js';
 import { GET } from './+server.js';
 
 const VALID_TOKEN = `cal_${'a'.repeat(43)}`;
 
-vi.mock('$lib/server/calendar/tokens.js', async (importOriginal) => ({
+vi.mock('#lib/server/calendar/tokens.js', async (importOriginal) => ({
 	...(await importOriginal()),
 	getCalendarTasksForToken: vi.fn()
 }));

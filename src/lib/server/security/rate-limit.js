@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { ApiError } from '$lib/server/http/api-error.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { ApiError } from '#lib/server/http/api-error.js';
 
 const MAX_MEMORY_BUCKETS = 2000;
 

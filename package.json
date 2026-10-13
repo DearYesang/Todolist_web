@@ -9,7 +9,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --fail-on-warnings",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --fail-on-warnings && tsc -p src/service-worker/jsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "vite build",
@@ -24,8 +24,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
-    "@sveltejs/adapter-vercel": "^6.3.3",
-    "@sveltejs/kit": "^2.59.1",
+    "@sveltejs/adapter-vercel": "^7.0.0",
+    "@sveltejs/kit": "^3.0.0",
     "@types/node": "^26.6.4",
     "drizzle-kit": "^0.31.11",
     "prettier": "3.9.9",
@@ -37,10 +37,10 @@
     "vitest": "^5.0.3"
   },
   "overrides": {
-    "cookie": "^0.7.2",
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.0"
-    }
+    },
+    "@sveltejs/kit": "$@sveltejs/kit"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.7",
@@ -49,5 +49,9 @@
     "@opentelemetry/api": "^1.9.1",
     "better-auth": "^1.7.7",
     "drizzle-orm": "^0.45.3"
+  },
+  "imports": {
+    "#lib": "./src/lib/index.js",
+    "#lib/*": "./src/lib/*"
   }
 }

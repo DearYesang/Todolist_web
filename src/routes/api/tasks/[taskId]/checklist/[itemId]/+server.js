@@ -1,8 +1,7 @@
-import { json } from '@sveltejs/kit';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
-import { enforceTaskWriteRateLimit } from '$lib/server/security/rate-limit-guard.js';
-import { deleteChecklistItemForUser, updateChecklistItemForUser } from '$lib/server/tasks/repository.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { apiErrorResponse, readJsonBody } from '#lib/server/http/api-error.js';
+import { enforceTaskWriteRateLimit } from '#lib/server/security/rate-limit-guard.js';
+import { deleteChecklistItemForUser, updateChecklistItemForUser } from '#lib/server/tasks/repository.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function PATCH({ params, request }) {
@@ -19,7 +18,7 @@ export async function PATCH({ params, request }) {
 	try {
 		const payload = await readJsonBody(request);
 		const task = await updateChecklistItemForUser(authResult.user.id, params.taskId, params.itemId, payload);
-		return json({ task });
+		return Response.json({ task });
 	} catch (error) {
 		return apiErrorResponse(error);
 	}
@@ -39,7 +38,7 @@ export async function DELETE({ params, request }) {
 
 	try {
 		const task = await deleteChecklistItemForUser(authResult.user.id, params.taskId, params.itemId);
-		return json({ task });
+		return Response.json({ task });
 	} catch (error) {
 		return apiErrorResponse(error);
 	}

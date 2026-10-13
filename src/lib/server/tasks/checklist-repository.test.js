@@ -1,7 +1,7 @@
 import { getTableName } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getDb } from '$lib/server/db/index.js';
-import { BOARD_ID, NOW, TASK_ID, createFakeDb, createTaskRow } from '$lib/test-support/fake-db.js';
+import { getDb } from '#lib/server/db/index.js';
+import { BOARD_ID, NOW, TASK_ID, createFakeDb, createTaskRow } from '#lib/test-support/fake-db.js';
 import {
 	buildTaskVersionBump,
 	createChecklistItemForUser,
@@ -10,8 +10,8 @@ import {
 } from './checklist-repository.js';
 import { createTaskForUser, updateTaskForUser } from './task-repository.js';
 
-vi.mock('$lib/server/db/index.js', async () => {
-	const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+vi.mock('#lib/server/db/index.js', async () => {
+	const { createFakeDbModule } = await import('#lib/test-support/fake-db.js');
 	return createFakeDbModule();
 });
 

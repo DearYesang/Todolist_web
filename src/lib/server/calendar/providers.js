@@ -1,4 +1,4 @@
-import { ApiError } from '$lib/server/http/api-error.js';
+import { ApiError } from '#lib/server/http/api-error.js';
 
 const CALENDAR_PROVIDERS = {
 	google: {
@@ -18,6 +18,15 @@ const CALENDAR_PROVIDERS = {
 		scopes: ['offline_access', 'User.Read', 'Calendars.ReadWrite']
 	}
 };
+
+/**
+ * The origins the connect route may send a user to: each provider's
+ * authorization page. SvelteKit 3 refuses an external redirect it is not
+ * told about.
+ */
+export const CALENDAR_AUTHORIZATION_ORIGINS = Object.values(CALENDAR_PROVIDERS).map(
+	(provider) => new URL(provider.authUrl).origin
+);
 
 export class CalendarProviderError extends ApiError {
 	/** @param {string} message */
@@ -135,7 +144,7 @@ export async function fetchCalendarProviderAccount(provider, accessToken) {
  * @param {string} provider
  * @param {string} accessToken
  * @param {string | null} eventId
- * @param {import('$lib/shared/task-domain.js').Task} task
+ * @param {import('#lib/shared/task-domain.js').Task} task
  */
 export async function upsertProviderCalendarEvent(provider, accessToken, eventId, task) {
 	if (provider === 'google') {
@@ -270,7 +279,7 @@ function createJsonAuthHeaders(accessToken) {
 }
 
 /**
- * @param {import('$lib/shared/task-domain.js').Task} task
+ * @param {import('#lib/shared/task-domain.js').Task} task
  */
 function toGoogleEvent(task) {
 	return {
@@ -282,7 +291,7 @@ function toGoogleEvent(task) {
 }
 
 /**
- * @param {import('$lib/shared/task-domain.js').Task} task
+ * @param {import('#lib/shared/task-domain.js').Task} task
  */
 function toMicrosoftEvent(task) {
 	return {
@@ -304,7 +313,7 @@ function toMicrosoftEvent(task) {
 }
 
 /**
- * @param {import('$lib/shared/task-domain.js').Task} task
+ * @param {import('#lib/shared/task-domain.js').Task} task
  */
 function createTaskDescription(task) {
 	const lines = [`Status: ${task.status}`, `Priority: ${task.priority}`, `Urgency: ${task.urgency}`];

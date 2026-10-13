@@ -17,7 +17,7 @@ import {
 
 /**
  * @param {number} count
- * @returns {import('$lib/shared/task-links.js').TaskLink[]}
+ * @returns {import('#lib/shared/task-links.js').TaskLink[]}
  */
 function makeLinks(count) {
 	return Array.from({ length: count }, (_, index) => ({

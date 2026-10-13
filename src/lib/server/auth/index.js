@@ -3,8 +3,8 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { betterAuth } from 'better-auth';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { randomUUID } from 'node:crypto';
-import { getDb, schema } from '$lib/server/db';
-import { getProductionConfigError } from '$lib/server/config/env.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { getProductionConfigError } from '#lib/server/config/env.js';
 import {
 	assertValidPasskeyEmailCode,
 	assertValidRecoveryCodeForEmail,

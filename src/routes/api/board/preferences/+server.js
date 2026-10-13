@@ -1,7 +1,6 @@
-import { json } from '@sveltejs/kit';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { getBoardPreferencesForUser, updateBoardPreferencesForUser } from '$lib/server/boards/board-provisioning.js';
-import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { getBoardPreferencesForUser, updateBoardPreferencesForUser } from '#lib/server/boards/board-provisioning.js';
+import { apiErrorResponse, readJsonBody } from '#lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
@@ -10,7 +9,7 @@ export async function GET({ request }) {
 		return authResult.response;
 	}
 
-	return json(await getBoardPreferencesForUser(authResult.user.id));
+	return Response.json(await getBoardPreferencesForUser(authResult.user.id));
 }
 
 /** @type {import('./$types').RequestHandler} */
@@ -22,7 +21,7 @@ export async function PATCH({ request }) {
 
 	try {
 		const payload = await readJsonBody(request);
-		return json(await updateBoardPreferencesForUser(authResult.user.id, payload));
+		return Response.json(await updateBoardPreferencesForUser(authResult.user.id, payload));
 	} catch (error) {
 		return apiErrorResponse(error);
 	}

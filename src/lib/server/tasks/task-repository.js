@@ -1,11 +1,11 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { findOrCreateCategoryRow, getCategoryRowForBoard } from '$lib/server/categories/category-service.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { findOrCreateCategoryRow, getCategoryRowForBoard } from '#lib/server/categories/category-service.js';
 import {
 	getFirstBoardForUser,
 	getOrCreatePersonalBoardForUser,
 	getPersonalBoardForUser
-} from '$lib/server/boards/board-provisioning.js';
+} from '#lib/server/boards/board-provisioning.js';
 import { attachCategoryMetaToTaskRow, mapTaskRowToClientTask, mapTaskRowsToClientTasks } from './task-mapper.js';
 import { createPositionValue, getWritableTaskForUser, loadClientTask } from './task-rows.js';
 import {
@@ -118,7 +118,7 @@ export async function createTaskForUser(userId, payload) {
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  * @param {string} userId
  * @param {ReturnType<typeof parseCreateTaskInput>} input
@@ -140,7 +140,7 @@ async function resolveCategoryForTaskCreate(db, boardId, userId, input) {
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  * @param {string} userId
  * @param {ReturnType<typeof parseUpdateTaskInput>} input
@@ -180,7 +180,7 @@ async function resolveCategoryForTaskPatch(db, boardId, userId, input) {
 /**
  * The category a patch names, found, reactivated or created; null for an
  * empty or missing name.
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  * @param {string} userId
  * @param {ReturnType<typeof parseUpdateTaskInput>} input

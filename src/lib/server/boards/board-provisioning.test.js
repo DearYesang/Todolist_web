@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getDb } from '$lib/server/db/index.js';
-import { recordStatements } from '$lib/test-support/fake-db.js';
+import { getDb } from '#lib/server/db/index.js';
+import { recordStatements } from '#lib/test-support/fake-db.js';
 import {
 	ensurePersonalBoardForUser,
 	getBoardPreferencesForUser,
 	updateBoardPreferencesForUser
 } from './board-provisioning.js';
-import { listTasksForUser } from '$lib/server/tasks/task-repository.js';
+import { listTasksForUser } from '#lib/server/tasks/task-repository.js';
 
-vi.mock('$lib/server/db/index.js', async () => {
-	const { createFakeDbModule } = await import('$lib/test-support/fake-db.js');
+vi.mock('#lib/server/db/index.js', async () => {
+	const { createFakeDbModule } = await import('#lib/test-support/fake-db.js');
 	return createFakeDbModule();
 });
 

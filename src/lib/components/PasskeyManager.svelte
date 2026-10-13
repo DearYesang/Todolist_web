@@ -1,6 +1,6 @@
 <script>
-    import { deleteUserPasskey, listUserPasskeys, updateUserPasskeyName } from '$lib/client/passkey-management-api.js';
-    import { createFallbackPasskeyName, formatPasskeyMeta, getAuthErrorMessage } from '$lib/client/auth-labels.js';
+    import { deleteUserPasskey, listUserPasskeys, updateUserPasskeyName } from '#lib/client/passkey-management-api.js';
+    import { createFallbackPasskeyName, formatPasskeyMeta, getAuthErrorMessage } from '#lib/client/auth-labels.js';
 
     // The registered-passkey list under the account controls. It stays
     // mounted while signed in and only hides when closed; the account
@@ -18,7 +18,7 @@
     let passkeyListLoading = $state(false);
     let passkeyListError = $state('');
     let passkeyDrafts = $state(/** @type {Record<string, string>} */ ({}));
-    let managedPasskeys = $state(/** @type {import('$lib/client/passkey-management-api.js').ManagedPasskey[]} */ ([]));
+    let managedPasskeys = $state(/** @type {import('#lib/client/passkey-management-api.js').ManagedPasskey[]} */ ([]));
 
     export async function loadPasskeys() {
         if (passkeyListLoading) return;
@@ -43,7 +43,7 @@
     }
 
     /**
-     * @param {import('$lib/client/passkey-management-api.js').ManagedPasskey} passkey
+     * @param {import('#lib/client/passkey-management-api.js').ManagedPasskey} passkey
      */
     async function saveManagedPasskeyName(passkey) {
         if (isWorking) return;
@@ -74,7 +74,7 @@
     }
 
     /**
-     * @param {import('$lib/client/passkey-management-api.js').ManagedPasskey} passkey
+     * @param {import('#lib/client/passkey-management-api.js').ManagedPasskey} passkey
      */
     async function removeManagedPasskey(passkey) {
         if (isWorking) return;

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { extractBackupTasks } from '$lib/shared/task-backup.js';
-import { normalizeTaskList } from '$lib/shared/task-domain.js';
+import { extractBackupTasks } from '#lib/shared/task-backup.js';
+import { normalizeTaskList } from '#lib/shared/task-domain.js';
 import { TaskWriteError } from './validation.js';
 
 const MAX_IMPORT_TASKS = 500;
@@ -10,7 +10,7 @@ const MAX_IMPORT_CHECKLIST_ITEMS = 2500;
  * @typedef {{
  *   oldId: string;
  *   id: string;
- *   task: import('$lib/shared/task-domain.js').Task;
+ *   task: import('#lib/shared/task-domain.js').Task;
  *   parentTaskId: string | null;
  *   checklistItems: {
  *     oldId: string;
@@ -106,14 +106,14 @@ export function planTaskImport(payload, options = {}) {
 }
 
 /**
- * @param {import('$lib/shared/task-domain.js').Task[]} tasks
+ * @param {import('#lib/shared/task-domain.js').Task[]} tasks
  */
 function sortByParentDepth(tasks) {
 	const byId = new Map(tasks.map((task) => [task.id, task]));
 	const depthCache = new Map();
 
 	/**
-	 * @param {import('$lib/shared/task-domain.js').Task} task
+	 * @param {import('#lib/shared/task-domain.js').Task} task
 	 * @param {Set<string>} [seen]
 	 * @returns {number}
 	 */

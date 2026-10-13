@@ -1,10 +1,10 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { and, desc, eq, gt, isNull, lt, or } from 'drizzle-orm';
-import { getDb, schema } from '$lib/server/db/index.js';
-import { isPlaceholderValue } from '$lib/server/config/env.js';
-import { ApiError } from '$lib/server/http/api-error.js';
-import { ensurePersonalBoardForUser } from '$lib/server/boards/board-provisioning.js';
-import { listTasksForBoard } from '$lib/server/tasks/repository.js';
+import { getDb, schema } from '#lib/server/db/index.js';
+import { isPlaceholderValue } from '#lib/server/config/env.js';
+import { ApiError } from '#lib/server/http/api-error.js';
+import { ensurePersonalBoardForUser } from '#lib/server/boards/board-provisioning.js';
+import { listTasksForBoard } from '#lib/server/tasks/repository.js';
 
 const TOKEN_PREFIX = 'cal_';
 const TOKEN_BYTES = 32;

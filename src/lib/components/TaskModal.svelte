@@ -5,14 +5,14 @@
         deleteTaskCascade,
         taskIndex,
         updateTask
-    } from '$lib/client/task-store.js';
-    import { downloadTaskCalendar } from '$lib/client/calendar-download.js';
+    } from '#lib/client/task-store.js';
+    import { downloadTaskCalendar } from '#lib/client/calendar-download.js';
     import {
         getDeleteTaskConfirmMessage,
         PRIORITY_LABELS,
         STATUS_LABELS,
         URGENCY_LABELS
-    } from '$lib/shared/task-domain.js';
+    } from '#lib/shared/task-domain.js';
     import { fade, fly } from 'svelte/transition';
     import CategoryInput from './CategoryInput.svelte';
     import DateRangePicker from './DateRangePicker.svelte';

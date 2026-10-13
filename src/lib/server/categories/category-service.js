@@ -1,8 +1,8 @@
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { schema } from '$lib/server/db/index.js';
-import { normalizeCategoryKey, normalizeCategoryName } from '$lib/shared/category-suggestions.js';
-import { ApiError } from '$lib/server/http/api-error.js';
-import { LIMITS } from '$lib/shared/task-rules.js';
+import { schema } from '#lib/server/db/index.js';
+import { normalizeCategoryKey, normalizeCategoryName } from '#lib/shared/category-suggestions.js';
+import { ApiError } from '#lib/server/http/api-error.js';
+import { LIMITS } from '#lib/shared/task-rules.js';
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
@@ -21,7 +21,7 @@ export function mapCategoryRowToClientCategory(row) {
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  * @param {{ includeArchived?: boolean }} [options]
  */
@@ -39,7 +39,7 @@ export async function listCategoryRowsForBoard(db, boardId, options = {}) {
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  * @param {string} categoryId
  * @param {{ includeArchived?: boolean }} [options]
@@ -61,7 +61,7 @@ export async function getCategoryRowForBoard(db, boardId, categoryId, options = 
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  * @param {string} normalizedName
  * @param {{ includeArchived?: boolean }} [options]
@@ -83,7 +83,7 @@ async function getCategoryRowByNormalizedName(db, boardId, normalizedName, optio
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {{ boardId: string; userId: string; name: string }} input
  */
 export async function findOrCreateCategoryRow(db, input) {
@@ -174,7 +174,7 @@ export function parseCategoryColor(value) {
 }
 
 /**
- * @param {ReturnType<typeof import('$lib/server/db/index.js').getDb>} db
+ * @param {ReturnType<typeof import('#lib/server/db/index.js').getDb>} db
  * @param {string} boardId
  */
 async function getNextSortOrder(db, boardId) {

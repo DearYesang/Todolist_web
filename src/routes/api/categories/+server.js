@@ -1,7 +1,6 @@
-import { json } from '@sveltejs/kit';
-import { requireAuthUser } from '$lib/server/auth/session.js';
-import { createCategoryForUser, listCategoriesForUser } from '$lib/server/categories/repository.js';
-import { apiErrorResponse, readJsonBody } from '$lib/server/http/api-error.js';
+import { requireAuthUser } from '#lib/server/auth/session.js';
+import { createCategoryForUser, listCategoriesForUser } from '#lib/server/categories/repository.js';
+import { apiErrorResponse, readJsonBody } from '#lib/server/http/api-error.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ request }) {
@@ -11,7 +10,7 @@ export async function GET({ request }) {
 	}
 
 	const categories = await listCategoriesForUser(authResult.user.id);
-	return json(
+	return Response.json(
 		{ categories },
 		{
 			headers: {
@@ -31,7 +30,7 @@ export async function POST({ request }) {
 	try {
 		const payload = await readJsonBody(request);
 		const category = await createCategoryForUser(authResult.user.id, payload);
-		return json({ category }, { status: 201 });
+		return Response.json({ category }, { status: 201 });
 	} catch (error) {
 		return apiErrorResponse(error);
 	}

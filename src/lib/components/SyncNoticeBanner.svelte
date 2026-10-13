@@ -1,5 +1,5 @@
 <script>
-    import { canApplyLocalConflict } from '$lib/client/offline-conflicts.js';
+    import { canApplyLocalConflict } from '#lib/client/offline-conflicts.js';
     import {
         applyLocalConflict,
         dismissConflicts,
@@ -8,7 +8,7 @@
         keepServerConflict,
         syncStatus,
         toggleConflictDetails
-    } from '$lib/client/sync-status.js';
+    } from '#lib/client/sync-status.js';
 
     const conflicts = $derived($syncStatus.conflicts);
     const notice = $derived($syncStatus.notice);

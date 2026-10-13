@@ -1,22 +1,22 @@
 <script>
     import { onMount } from 'svelte';
     import { get } from 'svelte/store';
-    import { authClient } from '$lib/client/auth-client.js';
+    import { authClient } from '#lib/client/auth-client.js';
     import {
         applyUserScope,
         cacheAuthScope,
         clearCachedAuthScope,
         readCachedAuthScope
-    } from '$lib/client/user-scope.js';
-    import { setupPageLifecycle } from '$lib/client/page-lifecycle.js';
-    import { isOnline, runServerSync, setOnline } from '$lib/client/sync-status.js';
+    } from '#lib/client/user-scope.js';
+    import { setupPageLifecycle } from '#lib/client/page-lifecycle.js';
+    import { isOnline, runServerSync, setOnline } from '#lib/client/sync-status.js';
     import {
         clearDoneTasks,
         currentView,
         drainPendingTaskSyncsToOfflineQueue,
         setupCrossTabTaskSync,
         tasks
-    } from '$lib/client/task-store.js';
+    } from '#lib/client/task-store.js';
     import AppHeader from './AppHeader.svelte';
     import AuthPanel from './AuthPanel.svelte';
     import EisenhowerMatrix from './EisenhowerMatrix.svelte';

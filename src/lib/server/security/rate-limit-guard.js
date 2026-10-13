@@ -1,4 +1,4 @@
-import { assertRateLimit, createRateLimitHeaders, RateLimitError } from '$lib/server/security/rate-limit.js';
+import { assertRateLimit, createRateLimitHeaders, RateLimitError } from '#lib/server/security/rate-limit.js';
 
 // Keyed on the user id alone (no client IP) so the budget is a true per-user
 // hard stop: a leaked session replayed through rotating egress IPs shares one

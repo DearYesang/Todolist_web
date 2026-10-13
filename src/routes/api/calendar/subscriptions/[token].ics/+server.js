@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { createTaskCalendar } from '$lib/shared/calendar-ics.js';
-import { CalendarTokenConfigurationError, getCalendarTasksForToken } from '$lib/server/calendar/tokens.js';
+import { createTaskCalendar } from '#lib/shared/calendar-ics.js';
+import { CalendarTokenConfigurationError, getCalendarTasksForToken } from '#lib/server/calendar/tokens.js';
 import {
 	assertVolatileRateLimit,
 	createRateLimitHeaders,
 	createRateLimitKey,
 	RateLimitError
-} from '$lib/server/security/rate-limit.js';
+} from '#lib/server/security/rate-limit.js';
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const IP_RATE_LIMIT_MAX_REQUESTS = 120;
@@ -65,7 +65,7 @@ export async function GET(event) {
 }
 
 /**
- * @param {import('@sveltejs/kit').RequestEvent} event
+ * @param {import('./$types').RequestEvent} event
  */
 function createCalendarFeedRateLimitKey(event) {
 	return createRateLimitKey(event, 'calendar-feed', hashRateLimitToken(event.params.token));
