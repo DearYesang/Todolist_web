@@ -47,10 +47,10 @@
     "@sveltejs/kit": "$@sveltejs/kit"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "^1.7.7",
-    "@better-auth/passkey": "^1.7.7",
+    "@better-auth/drizzle-adapter": "^1.7.12",
+    "@better-auth/passkey": "^1.7.12",
     "@neondatabase/serverless": "^1.2.0",
-    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/api": "^1.10.0",
     "better-auth": "^1.7.7",
     "drizzle-orm": "^0.45.4"
   },
